@@ -37,19 +37,19 @@ export default function SidePanel({
           fixed lg:relative top-0 left-0 z-20 h-full
           bg-zinc-900/95 backdrop-blur-sm border-r border-zinc-700
           transition-transform duration-200 ease-in-out
-          w-40 pt-14 lg:pt-0
+          w-44 pt-16 lg:pt-0
           ${isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
         `}
       >
         <div className="p-2 space-y-1">
-          <h3 className="text-[9px] uppercase tracking-widest text-zinc-500 font-semibold mb-1.5">
+          <h3 className="text-[10px] uppercase tracking-widest text-zinc-500 font-semibold mb-2">
             Filter
           </h3>
 
           {/* Overall / Top 10 */}
           <button
             onClick={() => onFilterChange(null)}
-            className={`w-full text-left px-2 py-1.5 rounded text-[11px] font-medium transition-colors ${
+            className={`w-full text-left px-3 py-2 rounded text-xs font-medium transition-colors ${
               activeFilter === null
                 ? "bg-zinc-700 text-white"
                 : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
@@ -59,8 +59,8 @@ export default function SidePanel({
           </button>
 
           {/* クラスフィルター */}
-          <div className="border-t border-zinc-700 pt-1.5 mt-1">
-            <h4 className="text-[9px] uppercase tracking-widest text-zinc-500 font-semibold mb-1">
+          <div className="border-t border-zinc-700 pt-2 mt-2">
+            <h4 className="text-[10px] uppercase tracking-widest text-zinc-500 font-semibold mb-1.5">
               Class
             </h4>
             {classes.map((cls) => {
@@ -70,7 +70,7 @@ export default function SidePanel({
                 <button
                   key={cls.id}
                   onClick={() => onFilterChange(isActive ? null : cls.nameE)}
-                  className={`w-full text-left px-2 py-1.5 rounded text-[11px] font-medium transition-colors mb-0.5 flex items-center gap-2 ${
+                  className={`w-full text-left px-3 py-2 rounded text-xs font-medium transition-colors mb-1 flex items-center gap-2 ${
                     isActive
                       ? "bg-zinc-700 text-white"
                       : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"

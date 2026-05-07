@@ -10,19 +10,19 @@ interface TimingTableProps {
 }
 
 const COLUMNS = [
-  { key: "pos", label: "P", className: "w-[28px] text-center" },
-  { key: "pic", label: "PIC", className: "w-[32px] text-center" },
-  { key: "nr", label: "Nr", className: "w-[36px] text-center" },
-  { key: "class", label: "Class", className: "w-[52px] text-center" },
-  { key: "driver", label: "Driver", className: "text-left pl-2" },
-  { key: "car", label: "Car", className: "text-left pl-2" },
-  { key: "laps", label: "Laps", className: "w-[40px] text-center" },
-  { key: "gap", label: "Gap", className: "w-[80px] text-right pr-2" },
-  { key: "best", label: "Best", className: "w-[80px] text-right pr-2" },
-  { key: "s1", label: "S1", className: "w-[64px] text-right pr-1" },
-  { key: "s2", label: "S2", className: "w-[64px] text-right pr-1" },
-  { key: "s3", label: "S3", className: "w-[64px] text-right pr-1" },
-  { key: "pits", label: "Pits", className: "w-[32px] text-center" },
+  { key: "pos", label: "P", className: "w-[34px] text-center" },
+  { key: "pic", label: "PIC", className: "w-[38px] text-center" },
+  { key: "nr", label: "Nr", className: "w-[44px] text-center" },
+  { key: "class", label: "Class", className: "w-[60px] text-center" },
+  { key: "driver", label: "Driver", className: "text-left pl-3" },
+  { key: "car", label: "Car", className: "text-left pl-3" },
+  { key: "laps", label: "Laps", className: "w-[48px] text-center" },
+  { key: "gap", label: "Gap", className: "w-[90px] text-right pr-3" },
+  { key: "best", label: "Best", className: "w-[90px] text-right pr-3" },
+  { key: "s1", label: "S1", className: "w-[72px] text-right pr-2" },
+  { key: "s2", label: "S2", className: "w-[72px] text-right pr-2" },
+  { key: "s3", label: "S3", className: "w-[72px] text-right pr-2" },
+  { key: "pits", label: "Pits", className: "w-[38px] text-center" },
 ];
 
 export default function TimingTable({ standings, classFilter }: TimingTableProps) {
@@ -37,11 +37,11 @@ export default function TimingTable({ standings, classFilter }: TimingTableProps
     <div className="flex-1 overflow-auto">
       <table className="w-full border-collapse table-fixed">
         <thead className="sticky top-0 z-10">
-          <tr className="bg-zinc-800 border-b-2 border-red-700 h-[28px]">
+          <tr className="bg-zinc-800 border-b-2 border-red-700 h-[32px]">
             {COLUMNS.map((col) => (
               <th
                 key={col.key}
-                className={`py-1 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider ${col.className}`}
+                className={`py-1 text-xs font-semibold text-zinc-400 uppercase tracking-wider ${col.className}`}
               >
                 {col.label}
               </th>
