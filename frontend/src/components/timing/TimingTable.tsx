@@ -59,13 +59,13 @@ function getColumns(isRaceMode: boolean) {
     { key: "class", minW: 48, pct: "5.5%", align: "text-center" },
     { key: "driver", minW: 100, pct: isRaceMode ? "14.5%" : "16%", align: "text-left pl-2" },
     { key: "car", minW: 120, pct: isRaceMode ? "24.5%" : "26%", align: "text-left pl-2" },
-    { key: "laps", minW: 36, pct: "4%", align: "text-center" },
-    { key: "gap", minW: 64, pct: "8%", align: "text-right pr-2" },
-    { key: "best", minW: 72, pct: "8%", align: "text-right pr-2" },
-    { key: "s1", minW: 56, pct: "6.5%", align: "text-right pr-2" },
-    { key: "s2", minW: 56, pct: "6.5%", align: "text-right pr-2" },
-    { key: "s3", minW: 56, pct: "6%", align: "text-right pr-2" },
-    { key: "pit", minW: 48, pct: "5.5%", align: "text-right pr-2" },
+    { key: "laps", minW: 40, pct: "4%", align: "text-center" },
+    { key: "gap", minW: 80, pct: "8%", align: "text-right pr-3" },
+    { key: "best", minW: 88, pct: "8%", align: "text-right pr-3" },
+    { key: "s1", minW: 72, pct: "6.5%", align: "text-right pr-3" },
+    { key: "s2", minW: 72, pct: "6.5%", align: "text-right pr-3" },
+    { key: "s3", minW: 72, pct: "6%", align: "text-right pr-3" },
+    { key: "pit", minW: 60, pct: "5.5%", align: "text-right pr-3" },
   );
   return cols;
 }

@@ -106,23 +106,20 @@ export default function TimingRow({ standing, team, carClass, isEven, carCol, ga
         style={lapCol !== "laps" ? { fontSize: "0.85em" } : undefined}>
         {lapCellValue}
       </td>
-      <td className="py-1 pr-2 text-right font-mono text-zinc-300">{gapCellValue}</td>
-      <td className={`py-1 pr-2 text-right font-mono ${TIME_COLORS[standing.bestTimeType]}`}>
+      <td className="py-1 px-2 sm:pr-3 text-right font-mono text-zinc-300">{gapCellValue}</td>
+      <td className={`py-1 px-2 sm:pr-3 text-right font-mono ${TIME_COLORS[standing.bestTimeType]}`}>
         {formatTime(standing.bestTime)}
       </td>
-      {/* S1 */}
-      <td className={`py-1 pr-2 text-right font-mono ${TIME_COLORS[standing.sectors[0]?.type || "none"]} ${s1Flash}`}>
+      <td className={`py-1 px-2 sm:pr-3 text-right font-mono ${TIME_COLORS[standing.sectors[0]?.type || "none"]} ${s1Flash}`}>
         {formatTime(standing.sectors[0]?.time)}
       </td>
-      {/* S2 */}
-      <td className={`py-1 pr-2 text-right font-mono ${TIME_COLORS[standing.sectors[1]?.type || "none"]} ${s2Flash}`}>
+      <td className={`py-1 px-2 sm:pr-3 text-right font-mono ${TIME_COLORS[standing.sectors[1]?.type || "none"]} ${s2Flash}`}>
         {formatTime(standing.sectors[1]?.time)}
       </td>
-      {/* S3 */}
-      <td className={`py-1 pr-2 text-right font-mono ${TIME_COLORS[standing.sectors[2]?.type || "none"]} ${s3Flash}`}>
+      <td className={`py-1 px-2 sm:pr-3 text-right font-mono ${TIME_COLORS[standing.sectors[2]?.type || "none"]} ${s3Flash}`}>
         {formatTime(standing.sectors[2]?.time)}
       </td>
-      <td className="py-1 pr-2 text-right">{renderPitCell()}</td>
+      <td className="py-1 px-2 sm:pr-3 text-right">{renderPitCell()}</td>
     </tr>
   );
 }
