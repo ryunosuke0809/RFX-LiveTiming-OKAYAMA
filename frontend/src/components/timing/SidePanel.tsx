@@ -19,34 +19,18 @@ export default function SidePanel({
   onToggle,
 }: SidePanelProps) {
   return (
-    <>
-      {/* トグルボタン (モバイル) */}
-      <button
-        onClick={onToggle}
-        className="fixed top-20 left-0 z-30 bg-zinc-800 text-zinc-300 px-2 py-3 rounded-r-lg border border-l-0 border-zinc-600 hover:bg-zinc-700 transition-colors lg:hidden"
-        aria-label="Toggle filter panel"
-      >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={isOpen ? "M15 19l-7-7 7-7" : "M9 5l7 7-7 7"} />
-        </svg>
-      </button>
-
-      {/* パネル */}
+    <div className="relative flex-shrink-0">
+      {/* パネル本体 */}
       <aside
-        className={`
-          fixed lg:relative top-0 left-0 z-20 h-full
-          bg-zinc-900/95 backdrop-blur-sm border-r border-zinc-700
-          transition-transform duration-200 ease-in-out
-          w-44 pt-16 lg:pt-0
-          ${isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
-        `}
+        className={`h-full bg-zinc-900/95 border-r border-zinc-700 transition-all duration-200 ease-in-out overflow-hidden ${
+          isOpen ? "w-40" : "w-0 border-r-0"
+        }`}
       >
-        <div className="p-2 space-y-1">
+        <div className="w-40 p-2 space-y-1">
           <h3 className="text-[10px] uppercase tracking-widest text-zinc-500 font-semibold mb-2">
             Filter
           </h3>
 
-          {/* Overall / Top 10 */}
           <button
             onClick={() => onFilterChange(null)}
             className={`w-full text-left px-3 py-2 rounded text-xs font-medium transition-colors ${
@@ -58,7 +42,6 @@ export default function SidePanel({
             Overall
           </button>
 
-          {/* クラスフィルター */}
           <div className="border-t border-zinc-700 pt-2 mt-2">
             <h4 className="text-[10px] uppercase tracking-widest text-zinc-500 font-semibold mb-1.5">
               Class
@@ -85,13 +68,16 @@ export default function SidePanel({
         </div>
       </aside>
 
-      {/* オーバーレイ (モバイル) */}
-      {isOpen && (
-        <div
-          className="fixed inset-0 z-10 bg-black/50 lg:hidden"
-          onClick={onToggle}
-        />
-      )}
-    </>
+      {/* トグルボタン — パネル右端に固定 */}
+      <button
+        onClick={onToggle}
+        className="absolute top-2 -right-5 z-30 bg-zinc-800 text-zinc-400 w-5 h-10 flex items-center justify-center rounded-r border border-l-0 border-zinc-600 hover:bg-zinc-700 hover:text-zinc-200 transition-colors"
+        aria-label="Toggle filter panel"
+      >
+        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={isOpen ? "M15 19l-7-7 7-7" : "M9 5l7 7-7 7"} />
+        </svg>
+      </button>
+    </div>
   );
 }
