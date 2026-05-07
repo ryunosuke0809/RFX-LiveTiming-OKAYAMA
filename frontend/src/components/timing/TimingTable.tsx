@@ -10,19 +10,19 @@ interface TimingTableProps {
 }
 
 const COLUMNS = [
-  { key: "pos", label: "P", className: "w-[34px] text-center" },
-  { key: "pic", label: "PIC", className: "w-[38px] text-center" },
-  { key: "nr", label: "Nr", className: "w-[44px] text-center" },
-  { key: "class", label: "Class", className: "w-[60px] text-center" },
-  { key: "driver", label: "Driver", className: "text-left pl-3" },
-  { key: "car", label: "Car", className: "text-left pl-3" },
-  { key: "laps", label: "Laps", className: "w-[48px] text-center" },
-  { key: "gap", label: "Gap", className: "w-[90px] text-right pr-3" },
-  { key: "best", label: "Best", className: "w-[90px] text-right pr-3" },
-  { key: "s1", label: "S1", className: "w-[72px] text-right pr-2" },
-  { key: "s2", label: "S2", className: "w-[72px] text-right pr-2" },
-  { key: "s3", label: "S3", className: "w-[72px] text-right pr-2" },
-  { key: "pits", label: "Pits", className: "w-[38px] text-center" },
+  { key: "pos", label: "P", width: "30px" },
+  { key: "pic", label: "PIC", width: "32px" },
+  { key: "nr", label: "Nr", width: "34px" },
+  { key: "class", label: "Class", width: "52px" },
+  { key: "driver", label: "Driver", width: "140px" },
+  { key: "car", label: "Car", width: "220px" },
+  { key: "laps", label: "Laps", width: "40px" },
+  { key: "gap", label: "Gap", width: "76px" },
+  { key: "best", label: "Best", width: "76px" },
+  { key: "s1", label: "S1", width: "62px" },
+  { key: "s2", label: "S2", width: "62px" },
+  { key: "s3", label: "S3", width: "62px" },
+  { key: "pits", label: "Pits", width: "32px" },
 ];
 
 export default function TimingTable({ standings, classFilter }: TimingTableProps) {
@@ -35,13 +35,18 @@ export default function TimingTable({ standings, classFilter }: TimingTableProps
 
   return (
     <div className="flex-1 overflow-auto">
-      <table className="w-full border-collapse table-fixed">
+      <table className="border-collapse" style={{ tableLayout: "fixed" }}>
+        <colgroup>
+          {COLUMNS.map((col) => (
+            <col key={col.key} style={{ width: col.width }} />
+          ))}
+        </colgroup>
         <thead className="sticky top-0 z-10">
-          <tr className="bg-zinc-800 border-b-2 border-red-700 h-[32px]">
+          <tr className="bg-zinc-800 border-b-2 border-red-700">
             {COLUMNS.map((col) => (
               <th
                 key={col.key}
-                className={`py-1 text-xs font-semibold text-zinc-400 uppercase tracking-wider ${col.className}`}
+                className="py-1.5 text-[12px] font-semibold text-zinc-400 uppercase tracking-wider text-center"
               >
                 {col.label}
               </th>

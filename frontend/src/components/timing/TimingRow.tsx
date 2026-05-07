@@ -22,59 +22,59 @@ export default function TimingRow({ standing, team, carClass, isEven }: TimingRo
     "---";
 
   return (
-    <tr className={`${rowBg} hover:bg-zinc-700/40 transition-colors border-b border-zinc-800/40 h-[28px]`}>
+    <tr className={`${rowBg} hover:bg-zinc-700/40 transition-colors border-b border-zinc-800/40`}>
       {/* P */}
-      <td className="px-0.5 py-0 text-center w-[34px]">
-        <span className={`inline-flex items-center justify-center w-[26px] h-[22px] rounded-sm text-[13px] font-bold text-white ${statusBg}`}>
+      <td className="py-0.5 text-center">
+        <span className={`inline-flex items-center justify-center w-[22px] h-[20px] rounded-sm text-[12px] font-bold text-white ${statusBg}`}>
           {standing.position}
         </span>
       </td>
       {/* PIC */}
-      <td className="px-0 py-0 text-center text-[13px] text-zinc-400 font-mono w-[38px]">
+      <td className="py-0.5 text-center text-[12px] text-zinc-400 font-mono">
         {standing.classPosition}
       </td>
       {/* Nr */}
-      <td className="px-0 py-0 text-center text-[13px] font-bold text-white font-mono w-[44px]">
+      <td className="py-0.5 text-center text-[12px] font-bold text-white font-mono">
         {team?.no}
       </td>
       {/* Class */}
-      <td className="px-1 py-0 text-center w-[60px]">
+      <td className="py-0.5 text-center">
         <ClassBadge className={carClass?.nameE || "---"} />
       </td>
       {/* Driver */}
-      <td className="px-3 py-0 text-[13px] text-zinc-200 truncate">
+      <td className="py-0.5 px-2 text-[12px] text-zinc-200 truncate overflow-hidden whitespace-nowrap">
         {driverName}
       </td>
       {/* Car */}
-      <td className="px-3 py-0 text-[13px] text-zinc-400 truncate">
+      <td className="py-0.5 px-2 text-[12px] text-zinc-400 truncate overflow-hidden whitespace-nowrap">
         {team?.machine}
       </td>
       {/* Laps */}
-      <td className="px-0 py-0 text-center text-[13px] text-zinc-300 font-mono w-[48px]">
+      <td className="py-0.5 text-center text-[12px] text-zinc-300 font-mono">
         {standing.lap}
       </td>
       {/* Gap */}
-      <td className="px-3 py-0 text-right text-[13px] font-mono text-zinc-300 w-[90px]">
+      <td className="py-0.5 pr-2 text-right text-[12px] font-mono text-zinc-300">
         {standing.gap}
       </td>
       {/* Best */}
-      <td className={`px-3 py-0 text-right text-[13px] font-mono w-[90px] ${TIME_COLORS[standing.bestTimeType]}`}>
+      <td className={`py-0.5 pr-2 text-right text-[12px] font-mono ${TIME_COLORS[standing.bestTimeType]}`}>
         {formatTime(standing.bestTime)}
       </td>
       {/* S1 */}
-      <td className={`px-2 py-0 text-right text-[13px] font-mono w-[72px] ${TIME_COLORS[standing.sectors[0]?.type || "none"]}`}>
+      <td className={`py-0.5 pr-1 text-right text-[12px] font-mono ${TIME_COLORS[standing.sectors[0]?.type || "none"]}`}>
         {formatTime(standing.sectors[0]?.time)}
       </td>
       {/* S2 */}
-      <td className={`px-2 py-0 text-right text-[13px] font-mono w-[72px] ${TIME_COLORS[standing.sectors[1]?.type || "none"]}`}>
+      <td className={`py-0.5 pr-1 text-right text-[12px] font-mono ${TIME_COLORS[standing.sectors[1]?.type || "none"]}`}>
         {formatTime(standing.sectors[1]?.time)}
       </td>
       {/* S3 */}
-      <td className={`px-2 py-0 text-right text-[13px] font-mono w-[72px] ${TIME_COLORS[standing.sectors[2]?.type || "none"]}`}>
+      <td className={`py-0.5 pr-1 text-right text-[12px] font-mono ${TIME_COLORS[standing.sectors[2]?.type || "none"]}`}>
         {formatTime(standing.sectors[2]?.time)}
       </td>
       {/* Pits */}
-      <td className="px-0 py-0 text-center text-[13px] text-zinc-400 font-mono w-[38px]">
+      <td className="py-0.5 text-center text-[12px] text-zinc-400 font-mono">
         {standing.pits}
       </td>
     </tr>
