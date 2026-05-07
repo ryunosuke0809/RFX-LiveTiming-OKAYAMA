@@ -4,6 +4,19 @@ import type {
   ScheduleEntry, CarStatus, TimeType, SectorTime,
 } from "@/types/smis";
 
+// Mulberry32 PRNG — SSR/CSR で同じ結果を返す
+function mulberry32(seed: number) {
+  let s = seed | 0;
+  return () => {
+    s = (s + 0x6d2b79f5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+const seededRandom = mulberry32(42);
+
 export const mockCompetition: Competition = {
   id: "1",
   nameJ: "2026 AUTOBACS SUPER GT Round4",
@@ -219,8 +232,8 @@ const gt300Teams: Team[] = [
 export const mockTeams: Team[] = [...gt500Teams, ...gt300Teams];
 
 function randomSectorTime(base: number, variance: number): SectorTime {
-  const time = base + Math.floor(Math.random() * variance) - Math.floor(variance / 2);
-  const rand = Math.random();
+  const time = base + Math.floor(seededRandom() * variance) - Math.floor(variance / 2);
+  const rand = seededRandom();
   let type: TimeType = "current";
   if (rand < 0.05) type = "overall_best";
   else if (rand < 0.2) type = "personal_best";
@@ -229,10 +242,10 @@ function randomSectorTime(base: number, variance: number): SectorTime {
 
 function generateStandings(teams: Team[], classes: CarClass[]): Standing[] {
   const standings: Standing[] = [];
-  const sortedTeams = [...teams].sort(() => Math.random() - 0.5);
+  const sortedTeams = [...teams].sort(() => seededRandom() - 0.5);
 
   const classPositions: Record<string, number> = {};
-  const leaderTime = 8000000 + Math.floor(Math.random() * 500000);
+  const leaderTime = 8000000 + Math.floor(seededRandom() * 500000);
 
   sortedTeams.forEach((team, idx) => {
     const classId = team.classId;
@@ -241,18 +254,18 @@ function generateStandings(teams: Team[], classes: CarClass[]): Standing[] {
 
     const isGT500 = classId === "1:1:1";
     const baseLap = isGT500 ? 780000 : 850000;
-    const bestTime = baseLap + Math.floor(Math.random() * 30000);
-    const lastLapTime = baseLap + Math.floor(Math.random() * 50000);
+    const bestTime = baseLap + Math.floor(seededRandom() * 30000);
+    const lastLapTime = baseLap + Math.floor(seededRandom() * 50000);
 
-    const lapCount = Math.max(1, 15 - Math.floor(idx * 0.3) - Math.floor(Math.random() * 2));
+    const lapCount = Math.max(1, 15 - Math.floor(idx * 0.3) - Math.floor(seededRandom() * 2));
 
-    const statusRand = Math.random();
+    const statusRand = seededRandom();
     let status: CarStatus = "on_track";
     if (statusRand < 0.15) status = "in_pit";
     else if (statusRand < 0.2) status = "pit_out";
     else if (statusRand < 0.22) status = "stopped";
 
-    const gapTime = idx === 0 ? 0 : (Math.floor(Math.random() * 50000) + idx * 5000);
+    const gapTime = idx === 0 ? 0 : (Math.floor(seededRandom() * 50000) + idx * 5000);
 
     const sectorBase = isGT500 ? 260000 : 283000;
     const sectors: SectorTime[] = [
@@ -269,20 +282,20 @@ function generateStandings(teams: Team[], classes: CarClass[]): Standing[] {
       driverNo: 1,
       lap: lapCount,
       bestTime,
-      bestTimeLap: Math.floor(Math.random() * lapCount) + 1,
+      bestTimeLap: Math.floor(seededRandom() * lapCount) + 1,
       lastLapTime,
       lastPassingTime: leaderTime + gapTime,
-      sectorNo: Math.floor(Math.random() * 3) + 1,
+      sectorNo: Math.floor(seededRandom() * 3) + 1,
       sectorTime: sectors[0].time,
       order: idx + 1,
       gap: idx === 0 ? "LEADER" : `+${(gapTime / 10000).toFixed(3)}`,
-      interval: idx === 0 ? "" : `+${((Math.floor(Math.random() * 20000) + 1000) / 10000).toFixed(3)}`,
+      interval: idx === 0 ? "" : `+${((Math.floor(seededRandom() * 20000) + 1000) / 10000).toFixed(3)}`,
       status,
       sectors,
-      bestTimeType: Math.random() < 0.1 ? "overall_best" : Math.random() < 0.3 ? "personal_best" : "current",
-      lastLapTimeType: Math.random() < 0.08 ? "overall_best" : Math.random() < 0.25 ? "personal_best" : "current",
-      pits: Math.floor(Math.random() * 3),
-      positionChange: Math.floor(Math.random() * 5) - 2,
+      bestTimeType: seededRandom() < 0.1 ? "overall_best" : seededRandom() < 0.3 ? "personal_best" : "current",
+      lastLapTimeType: seededRandom() < 0.08 ? "overall_best" : seededRandom() < 0.25 ? "personal_best" : "current",
+      pits: Math.floor(seededRandom() * 3),
+      positionChange: Math.floor(seededRandom() * 5) - 2,
     });
   });
 

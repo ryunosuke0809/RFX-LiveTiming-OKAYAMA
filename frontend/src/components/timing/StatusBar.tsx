@@ -45,16 +45,6 @@ export default function StatusBar({ fastestLap, weather, trackCount }: StatusBar
           <span className="text-zinc-400">IN PIT</span>
           <span className="text-white font-mono font-bold text-[14px]">{trackCount.inPit}</span>
         </div>
-        <div className="hidden sm:flex items-center gap-2">
-          <span className="inline-block w-3 h-3 rounded-full bg-red-500" />
-          <span className="text-zinc-400">STOPPED</span>
-          <span className="text-white font-mono font-bold text-[14px]">{trackCount.stopped}</span>
-        </div>
-        <div className="hidden sm:flex items-center gap-2">
-          <span className="inline-block w-3 h-3 rounded-full bg-zinc-500" />
-          <span className="text-zinc-400">RETIRED</span>
-          <span className="text-white font-mono font-bold text-[14px]">{trackCount.retired}</span>
-        </div>
       </div>
 
       {/* WEATHER */}
