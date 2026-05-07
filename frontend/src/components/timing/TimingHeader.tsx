@@ -43,7 +43,7 @@ export default function TimingHeader({ sessionInfo }: TimingHeaderProps) {
           </span>
           <span className="font-bold text-zinc-300 tracking-wider mt-0.5"
             style={{ fontSize: "var(--timing-fs-sm)" }}>
-            MOLA
+            MOLA Timing System
           </span>
         </div>
         <div className="font-mono text-emerald-400 tabular-nums leading-none"

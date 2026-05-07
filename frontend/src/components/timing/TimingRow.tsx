@@ -1,6 +1,7 @@
 "use client";
 
 import type { Standing, Team, CarClass } from "@/types/smis";
+import type { CarColMode, GapColMode, LapColMode } from "./TimingTable";
 import { TIME_COLORS, STATUS_COLORS } from "@/lib/colors";
 import { formatTime } from "@/lib/format";
 import ClassBadge from "./ClassBadge";
@@ -10,9 +11,12 @@ interface TimingRowProps {
   team: Team | undefined;
   carClass: CarClass | undefined;
   isEven: boolean;
+  carCol: CarColMode;
+  gapCol: GapColMode;
+  lapCol: LapColMode;
 }
 
-export default function TimingRow({ standing, team, carClass, isEven }: TimingRowProps) {
+export default function TimingRow({ standing, team, carClass, isEven, carCol, gapCol, lapCol }: TimingRowProps) {
   const rowBg = isEven ? "bg-zinc-900/60" : "bg-zinc-900/30";
   const statusBg = STATUS_COLORS[standing.status];
 
@@ -20,6 +24,21 @@ export default function TimingRow({ standing, team, carClass, isEven }: TimingRo
     team?.drivers.find((d) => d.no === standing.driverNo)?.nameE ||
     team?.drivers[1]?.nameE ||
     "---";
+
+  const carCellValue = carCol === "team" ? (team?.nameE || "---") : (team?.machine || "---");
+
+  const gapCellValue = gapCol === "int" ? standing.interval : standing.gap;
+
+  let lapCellValue: string;
+  let lapCellColor = "text-zinc-300";
+  if (lapCol === "time") {
+    lapCellValue = formatTime(standing.lastPassingTime);
+  } else if (lapCol === "last") {
+    lapCellValue = formatTime(standing.lastLapTime);
+    lapCellColor = TIME_COLORS[standing.lastLapTimeType] || "text-zinc-300";
+  } else {
+    lapCellValue = String(standing.lap);
+  }
 
   return (
     <tr className={`${rowBg} hover:bg-zinc-700/40 transition-colors border-b border-zinc-800/40`}>
@@ -46,17 +65,18 @@ export default function TimingRow({ standing, team, carClass, isEven }: TimingRo
       <td className="py-1 pl-2 pr-1 text-zinc-200 truncate overflow-hidden whitespace-nowrap">
         {driverName}
       </td>
-      {/* Car */}
+      {/* Car / Team */}
       <td className="py-1 pl-2 pr-1 text-zinc-400 truncate overflow-hidden whitespace-nowrap">
-        {team?.machine}
+        {carCellValue}
       </td>
-      {/* Laps */}
-      <td className="py-1 text-center text-zinc-300 font-mono">
-        {standing.lap}
+      {/* Laps / Time / Last */}
+      <td className={`py-1 text-center font-mono ${lapCellColor}`}
+        style={lapCol !== "laps" ? { fontSize: "0.85em" } : undefined}>
+        {lapCellValue}
       </td>
-      {/* Gap */}
+      {/* Gap / Int */}
       <td className="py-1 pr-2 text-right font-mono text-zinc-300">
-        {standing.gap}
+        {gapCellValue}
       </td>
       {/* Best */}
       <td className={`py-1 pr-2 text-right font-mono ${TIME_COLORS[standing.bestTimeType]}`}>

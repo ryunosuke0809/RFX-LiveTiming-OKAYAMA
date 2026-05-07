@@ -1,7 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import type { Standing } from "@/types/smis";
 import TimingRow from "./TimingRow";
+import ColumnToggle from "./ColumnToggle";
 import { getTeamByStanding, getClassByStanding } from "@/data/mock";
 
 interface TimingTableProps {
@@ -9,29 +11,72 @@ interface TimingTableProps {
   classFilter: string | null;
 }
 
-const COLUMNS = [
-  { key: "pos", label: "P", width: "3%", align: "text-center" },
-  { key: "pic", label: "PIC", width: "3%", align: "text-center" },
-  { key: "nr", label: "Nr", width: "3.5%", align: "text-center" },
-  { key: "class", label: "Class", width: "5.5%", align: "text-center" },
-  { key: "driver", label: "Driver", width: "16%", align: "text-left pl-2" },
-  { key: "car", label: "Car", width: "26%", align: "text-left pl-2" },
-  { key: "laps", label: "Laps", width: "4%", align: "text-center" },
-  { key: "gap", label: "Gap", width: "8%", align: "text-right pr-2" },
-  { key: "best", label: "Best", width: "8%", align: "text-right pr-2" },
-  { key: "s1", label: "S1", width: "6.5%", align: "text-right pr-2" },
-  { key: "s2", label: "S2", width: "6.5%", align: "text-right pr-2" },
-  { key: "s3", label: "S3", width: "6.5%", align: "text-right pr-2" },
-  { key: "pits", label: "Pits", width: "3.5%", align: "text-center" },
+export type CarColMode = "car" | "team";
+export type GapColMode = "gap" | "int";
+export type LapColMode = "laps" | "time" | "last";
+
+const CAR_OPTIONS = [
+  { value: "car", label: "Car" },
+  { value: "team", label: "Team" },
 ];
 
+const GAP_OPTIONS = [
+  { value: "gap", label: "Gap" },
+  { value: "int", label: "Int" },
+];
+
+const LAP_OPTIONS = [
+  { value: "laps", label: "Laps" },
+  { value: "time", label: "Time" },
+  { value: "last", label: "Last" },
+];
+
+const COLUMNS = [
+  { key: "pos", width: "3%", align: "text-center" },
+  { key: "pic", width: "3%", align: "text-center" },
+  { key: "nr", width: "3.5%", align: "text-center" },
+  { key: "class", width: "5.5%", align: "text-center" },
+  { key: "driver", width: "16%", align: "text-left pl-2" },
+  { key: "car", width: "26%", align: "text-left pl-2" },
+  { key: "laps", width: "4%", align: "text-center" },
+  { key: "gap", width: "8%", align: "text-right pr-2" },
+  { key: "best", width: "8%", align: "text-right pr-2" },
+  { key: "s1", width: "6.5%", align: "text-right pr-2" },
+  { key: "s2", width: "6.5%", align: "text-right pr-2" },
+  { key: "s3", width: "6.5%", align: "text-right pr-2" },
+  { key: "pits", width: "3.5%", align: "text-center" },
+];
+
+const FIXED_LABELS: Record<string, string> = {
+  pos: "P", pic: "PIC", nr: "Nr", class: "Class",
+  driver: "Driver", best: "Best",
+  s1: "S1", s2: "S2", s3: "S3", pits: "Pits",
+};
+
 export default function TimingTable({ standings, classFilter }: TimingTableProps) {
+  const [carCol, setCarCol] = useState<CarColMode>("car");
+  const [gapCol, setGapCol] = useState<GapColMode>("gap");
+  const [lapCol, setLapCol] = useState<LapColMode>("laps");
+
   const filtered = classFilter
     ? standings.filter((s) => {
         const cls = getClassByStanding(s);
         return cls?.nameE === classFilter;
       })
     : standings;
+
+  const renderHeader = (col: typeof COLUMNS[number]) => {
+    if (col.key === "car") {
+      return <ColumnToggle options={CAR_OPTIONS} current={carCol} onChange={(v) => setCarCol(v as CarColMode)} />;
+    }
+    if (col.key === "gap") {
+      return <ColumnToggle options={GAP_OPTIONS} current={gapCol} onChange={(v) => setGapCol(v as GapColMode)} />;
+    }
+    if (col.key === "laps") {
+      return <ColumnToggle options={LAP_OPTIONS} current={lapCol} onChange={(v) => setLapCol(v as LapColMode)} />;
+    }
+    return FIXED_LABELS[col.key] || col.key;
+  };
 
   return (
     <div className="flex-1 overflow-auto">
@@ -52,7 +97,7 @@ export default function TimingTable({ standings, classFilter }: TimingTableProps
                 className={`py-1.5 font-semibold text-white uppercase tracking-wider ${col.align}`}
                 style={{ fontSize: "var(--timing-fs-sm)" }}
               >
-                {col.label}
+                {renderHeader(col)}
               </th>
             ))}
           </tr>
@@ -65,6 +110,9 @@ export default function TimingTable({ standings, classFilter }: TimingTableProps
               team={getTeamByStanding(standing)}
               carClass={getClassByStanding(standing)}
               isEven={idx % 2 === 0}
+              carCol={carCol}
+              gapCol={gapCol}
+              lapCol={lapCol}
             />
           ))}
         </tbody>
