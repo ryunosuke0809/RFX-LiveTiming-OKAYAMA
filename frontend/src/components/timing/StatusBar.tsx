@@ -11,19 +11,19 @@ interface StatusBarProps {
 
 export default function StatusBar({ fastestLap, weather, trackCount }: StatusBarProps) {
   return (
-    <footer className="flex items-center justify-between px-4 py-2 bg-zinc-900 border-t border-zinc-700 text-xs">
+    <footer className="flex items-center justify-between px-5 py-3 bg-zinc-900 border-t-2 border-zinc-700 text-sm">
       {/* FASTEST LAP */}
-      <div className="flex items-center gap-2.5">
-        <span className="font-bold text-fuchsia-400 uppercase tracking-wider">
+      <div className="flex items-center gap-3">
+        <span className="font-bold text-fuchsia-400 uppercase tracking-wider text-[14px]">
           Fastest Lap
         </span>
-        <span className="text-white font-mono font-bold">#{fastestLap.teamNo}</span>
-        <span className="text-zinc-300">{fastestLap.driverName}</span>
-        <span className="text-fuchsia-400 font-mono font-bold">
+        <span className="text-white font-mono font-bold text-[14px]">#{fastestLap.teamNo}</span>
+        <span className="text-zinc-300 text-[13px]">{fastestLap.driverName}</span>
+        <span className="text-fuchsia-400 font-mono font-bold text-[15px]">
           {formatTime(fastestLap.lapTime)}
         </span>
-        <span className="text-zinc-500">L{fastestLap.lap}</span>
-        <div className="hidden md:flex items-center gap-1.5 ml-2 text-zinc-500">
+        <span className="text-zinc-500 text-[13px]">L{fastestLap.lap}</span>
+        <div className="hidden md:flex items-center gap-2 ml-3 text-zinc-500 text-[13px]">
           <span>S1</span>
           <span className="text-fuchsia-300 font-mono">{formatTime(fastestLap.sectors[0])}</span>
           <span>S2</span>
@@ -34,35 +34,35 @@ export default function StatusBar({ fastestLap, weather, trackCount }: StatusBar
       </div>
 
       {/* TRACK COUNT */}
-      <div className="flex items-center gap-4">
-        <div className="flex items-center gap-1.5">
-          <span className="inline-block w-2.5 h-2.5 rounded-full bg-green-500" />
+      <div className="flex items-center gap-5 text-[13px]">
+        <div className="flex items-center gap-2">
+          <span className="inline-block w-3 h-3 rounded-full bg-green-500" />
           <span className="text-zinc-400">ON TRACK</span>
-          <span className="text-white font-mono font-bold">{trackCount.onTrack}</span>
+          <span className="text-white font-mono font-bold text-[14px]">{trackCount.onTrack}</span>
         </div>
-        <div className="flex items-center gap-1.5">
-          <span className="inline-block w-2.5 h-2.5 rounded-full bg-blue-500" />
+        <div className="flex items-center gap-2">
+          <span className="inline-block w-3 h-3 rounded-full bg-blue-500" />
           <span className="text-zinc-400">IN PIT</span>
-          <span className="text-white font-mono font-bold">{trackCount.inPit}</span>
+          <span className="text-white font-mono font-bold text-[14px]">{trackCount.inPit}</span>
         </div>
-        <div className="hidden sm:flex items-center gap-1.5">
-          <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-500" />
+        <div className="hidden sm:flex items-center gap-2">
+          <span className="inline-block w-3 h-3 rounded-full bg-red-500" />
           <span className="text-zinc-400">STOPPED</span>
-          <span className="text-white font-mono font-bold">{trackCount.stopped}</span>
+          <span className="text-white font-mono font-bold text-[14px]">{trackCount.stopped}</span>
         </div>
-        <div className="hidden sm:flex items-center gap-1.5">
-          <span className="inline-block w-2.5 h-2.5 rounded-full bg-zinc-500" />
+        <div className="hidden sm:flex items-center gap-2">
+          <span className="inline-block w-3 h-3 rounded-full bg-zinc-500" />
           <span className="text-zinc-400">RETIRED</span>
-          <span className="text-white font-mono font-bold">{trackCount.retired}</span>
+          <span className="text-white font-mono font-bold text-[14px]">{trackCount.retired}</span>
         </div>
       </div>
 
       {/* WEATHER */}
-      <div className="hidden lg:flex items-center gap-3 text-zinc-500">
-        <span>Air <span className="text-zinc-300 font-mono">{weather.airTemp}°C</span></span>
-        <span>Track <span className="text-zinc-300 font-mono">{weather.trackTemp}°C</span></span>
-        <span>Hum <span className="text-zinc-300 font-mono">{weather.humidity}%</span></span>
-        <span>Wind <span className="text-zinc-300 font-mono">{weather.windSpeed}m/s</span></span>
+      <div className="hidden lg:flex items-center gap-4 text-[13px] text-zinc-500">
+        <span>Air <span className="text-zinc-300 font-mono text-[13px]">{weather.airTemp}°C</span></span>
+        <span>Track <span className="text-zinc-300 font-mono text-[13px]">{weather.trackTemp}°C</span></span>
+        <span>Hum <span className="text-zinc-300 font-mono text-[13px]">{weather.humidity}%</span></span>
+        <span>Wind <span className="text-zinc-300 font-mono text-[13px]">{weather.windSpeed}m/s</span></span>
       </div>
     </footer>
   );
