@@ -46,7 +46,7 @@ export default function TimingTable({ standings, classFilter }: TimingTableProps
             {COLUMNS.map((col) => (
               <th
                 key={col.key}
-                className="py-1.5 text-[12px] font-semibold text-zinc-400 uppercase tracking-wider text-center"
+                className="py-1.5 text-[12px] font-semibold text-white uppercase tracking-wider text-center"
               >
                 {col.label}
               </th>
