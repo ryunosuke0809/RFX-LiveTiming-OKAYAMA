@@ -11,7 +11,7 @@ interface StatusBarProps {
 
 export default function StatusBar({ fastestLap, weather, trackCount }: StatusBarProps) {
   return (
-    <footer className="flex items-center justify-between px-2 py-1 bg-zinc-900 border-t border-zinc-700 text-[9px]">
+    <footer className="flex items-center justify-between px-3 py-1.5 bg-zinc-900 border-t border-zinc-700 text-[11px]">
       {/* FASTEST LAP */}
       <div className="flex items-center gap-2">
         <span className="font-bold text-fuchsia-400 uppercase tracking-wider">
@@ -36,29 +36,29 @@ export default function StatusBar({ fastestLap, weather, trackCount }: StatusBar
       {/* TRACK COUNT */}
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-1">
-          <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500" />
+          <span className="inline-block w-2 h-2 rounded-full bg-green-500" />
           <span className="text-zinc-400">ON TRACK</span>
           <span className="text-white font-mono font-bold">{trackCount.onTrack}</span>
         </div>
         <div className="flex items-center gap-1">
-          <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-500" />
+          <span className="inline-block w-2 h-2 rounded-full bg-blue-500" />
           <span className="text-zinc-400">IN PIT</span>
           <span className="text-white font-mono font-bold">{trackCount.inPit}</span>
         </div>
         <div className="hidden sm:flex items-center gap-1">
-          <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500" />
+          <span className="inline-block w-2 h-2 rounded-full bg-red-500" />
           <span className="text-zinc-400">STOPPED</span>
           <span className="text-white font-mono font-bold">{trackCount.stopped}</span>
         </div>
         <div className="hidden sm:flex items-center gap-1">
-          <span className="inline-block w-1.5 h-1.5 rounded-full bg-zinc-500" />
+          <span className="inline-block w-2 h-2 rounded-full bg-zinc-500" />
           <span className="text-zinc-400">RETIRED</span>
           <span className="text-white font-mono font-bold">{trackCount.retired}</span>
         </div>
       </div>
 
       {/* WEATHER */}
-      <div className="hidden lg:flex items-center gap-2 text-zinc-500">
+      <div className="hidden lg:flex items-center gap-3 text-zinc-500">
         <span>Air <span className="text-zinc-300 font-mono">{weather.airTemp}°C</span></span>
         <span>Track <span className="text-zinc-300 font-mono">{weather.trackTemp}°C</span></span>
         <span>Hum <span className="text-zinc-300 font-mono">{weather.humidity}%</span></span>

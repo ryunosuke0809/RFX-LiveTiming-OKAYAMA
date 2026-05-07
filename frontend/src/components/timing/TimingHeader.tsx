@@ -12,36 +12,36 @@ export default function TimingHeader({ sessionInfo }: TimingHeaderProps) {
   const { competition, session, flag, remainingTime, localTime } = sessionInfo;
 
   return (
-    <header className="flex items-center justify-between px-3 py-1.5 bg-gradient-to-r from-zinc-900 via-zinc-800 to-zinc-900 border-b border-zinc-700">
+    <header className="flex items-center justify-between px-4 py-2 bg-gradient-to-r from-zinc-900 via-zinc-800 to-zinc-900 border-b border-zinc-700">
       {/* 左: 残り時間 */}
-      <div className="flex items-center gap-3">
-        <div className="text-2xl font-bold font-mono text-white tracking-wider leading-none">
+      <div className="flex items-center gap-4">
+        <div className="text-[28px] font-bold font-mono text-white tracking-wider leading-none">
           {formatRemainingTime(remainingTime)}
         </div>
         <TrackStatus flag={flag} />
       </div>
 
       {/* 中央: イベント名・セッション名 */}
-      <div className="flex-1 text-center px-3">
-        <div className="text-[9px] text-zinc-400 uppercase tracking-widest leading-none">
+      <div className="flex-1 text-center px-4">
+        <div className="text-[11px] text-zinc-400 uppercase tracking-widest leading-none">
           {competition.nameE}
         </div>
-        <div className="text-[11px] font-semibold text-white mt-0.5 leading-none">
+        <div className="text-[13px] font-semibold text-white mt-1 leading-none">
           {session.nameE}
         </div>
       </div>
 
       {/* 右: ロゴ・時刻 */}
-      <div className="flex items-center gap-3 text-right">
+      <div className="flex items-center gap-4 text-right">
         <div className="flex flex-col items-end leading-none">
-          <span className="text-[8px] text-zinc-500 uppercase tracking-wider">
+          <span className="text-[9px] text-zinc-500 uppercase tracking-wider">
             Okayama International Circuit
           </span>
-          <span className="text-[10px] font-bold text-zinc-300 tracking-wider">
+          <span className="text-[11px] font-bold text-zinc-300 tracking-wider mt-0.5">
             MOLA
           </span>
         </div>
-        <div className="text-sm font-mono text-emerald-400 tabular-nums leading-none">
+        <div className="text-base font-mono text-emerald-400 tabular-nums leading-none">
           {localTime}
         </div>
       </div>

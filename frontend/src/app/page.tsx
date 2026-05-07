@@ -56,7 +56,7 @@ export default function TimingPage() {
       </div>
 
       {/* セッション切替タブ */}
-      <div className="flex items-center gap-0.5 px-3 pl-12 py-0.5 bg-zinc-900/80 border-b border-zinc-800">
+      <div className="flex items-center gap-1 px-4 pl-14 py-1 bg-zinc-900/80 border-b border-zinc-800">
         {SESSION_OPTIONS.map((opt) => (
           <button
             key={opt.id}
@@ -72,7 +72,7 @@ export default function TimingPage() {
                 remainingTime: opt.id === "race" ? 0 : 5400,
               }));
             }}
-            className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
+            className={`px-3 py-0.5 rounded text-[11px] font-medium transition-colors ${
               currentSession === opt.id
                 ? "bg-zinc-700 text-white"
                 : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800"
@@ -83,14 +83,14 @@ export default function TimingPage() {
         ))}
 
         {/* Flag selector (デモ用) */}
-        <div className="ml-auto flex items-center gap-0.5">
-          <span className="text-[8px] text-zinc-600 mr-0.5">Flag:</span>
+        <div className="ml-auto flex items-center gap-1">
+          <span className="text-[9px] text-zinc-600 mr-1">Flag:</span>
           {(["green", "yellow", "red", "fcy", "white", "chequered"] as TrackFlag[]).map((f) => (
             <button
               key={f}
               onClick={() => setSessionInfo((prev) => ({ ...prev, flag: f }))}
-              className={`w-4 h-4 rounded-sm text-[7px] font-bold flex items-center justify-center transition-all ${
-                sessionInfo.flag === f ? "ring-1 ring-white scale-110" : "opacity-50 hover:opacity-100"
+              className={`w-5 h-5 rounded-sm text-[8px] font-bold flex items-center justify-center transition-all ${
+                sessionInfo.flag === f ? "ring-2 ring-white scale-110" : "opacity-50 hover:opacity-100"
               } ${
                 f === "green" ? "bg-green-600" :
                 f === "yellow" ? "bg-yellow-500" :
