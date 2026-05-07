@@ -40,6 +40,20 @@ export function formatRemainingTime(seconds: number): string {
 }
 
 /**
+ * ピット滞在時間(秒)を表示用に変換
+ * 例: 32 → "32.0", 65 → "1:05.0"
+ */
+export function formatPitTime(seconds: number): string {
+  if (seconds < 0) return "";
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  if (m > 0) {
+    return `${m}:${s.toFixed(1).padStart(4, "0")}`;
+  }
+  return s.toFixed(1);
+}
+
+/**
  * 現在時刻をHH:MM:SS形式で取得
  */
 export function formatLocalTime(): string {

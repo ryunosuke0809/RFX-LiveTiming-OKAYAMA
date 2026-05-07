@@ -295,6 +295,7 @@ function generateStandings(teams: Team[], classes: CarClass[]): Standing[] {
       bestTimeType: seededRandom() < 0.1 ? "overall_best" : seededRandom() < 0.3 ? "personal_best" : "current",
       lastLapTimeType: seededRandom() < 0.08 ? "overall_best" : seededRandom() < 0.25 ? "personal_best" : "current",
       pits: Math.floor(seededRandom() * 3),
+      pitTime: status === "in_pit" ? null : (280000 + Math.floor(seededRandom() * 200000)),
       positionChange: Math.floor(seededRandom() * 5) - 2,
     });
   });

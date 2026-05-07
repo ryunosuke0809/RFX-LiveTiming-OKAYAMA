@@ -1,10 +1,11 @@
 "use client";
 
 import type { Standing, Team, CarClass } from "@/types/smis";
-import type { CarColMode, GapColMode, LapColMode } from "./TimingTable";
+import type { CarColMode, GapColMode, LapColMode, PitColMode } from "./TimingTable";
 import { TIME_COLORS, STATUS_COLORS } from "@/lib/colors";
-import { formatTime } from "@/lib/format";
+import { formatTime, formatPitTime } from "@/lib/format";
 import ClassBadge from "./ClassBadge";
+import PitTimer from "./PitTimer";
 
 interface TimingRowProps {
   standing: Standing;
@@ -14,9 +15,10 @@ interface TimingRowProps {
   carCol: CarColMode;
   gapCol: GapColMode;
   lapCol: LapColMode;
+  pitCol: PitColMode;
 }
 
-export default function TimingRow({ standing, team, carClass, isEven, carCol, gapCol, lapCol }: TimingRowProps) {
+export default function TimingRow({ standing, team, carClass, isEven, carCol, gapCol, lapCol, pitCol }: TimingRowProps) {
   const rowBg = isEven ? "bg-zinc-900/60" : "bg-zinc-900/30";
   const statusBg = STATUS_COLORS[standing.status];
 
@@ -39,6 +41,19 @@ export default function TimingRow({ standing, team, carClass, isEven, carCol, ga
   } else {
     lapCellValue = String(standing.lap);
   }
+
+  const renderPitCell = () => {
+    if (pitCol === "count") {
+      return <span className="text-zinc-400 font-mono">{standing.pits}</span>;
+    }
+    if (standing.status === "in_pit") {
+      return <PitTimer />;
+    }
+    if (standing.pitTime != null && standing.pits > 0) {
+      return <span className="text-zinc-300 font-mono">{formatPitTime(standing.pitTime / 10000)}</span>;
+    }
+    return <span className="text-zinc-600">---</span>;
+  };
 
   return (
     <tr className={`${rowBg} hover:bg-zinc-700/40 transition-colors border-b border-zinc-800/40`}>
@@ -94,9 +109,9 @@ export default function TimingRow({ standing, team, carClass, isEven, carCol, ga
       <td className={`py-1 pr-2 text-right font-mono ${TIME_COLORS[standing.sectors[2]?.type || "none"]}`}>
         {formatTime(standing.sectors[2]?.time)}
       </td>
-      {/* Pits */}
-      <td className="py-1 text-center text-zinc-400 font-mono">
-        {standing.pits}
+      {/* PIT */}
+      <td className="py-1 pr-2 text-right">
+        {renderPitCell()}
       </td>
     </tr>
   );

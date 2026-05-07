@@ -14,6 +14,7 @@ interface TimingTableProps {
 export type CarColMode = "car" | "team";
 export type GapColMode = "gap" | "int";
 export type LapColMode = "laps" | "time" | "last";
+export type PitColMode = "count" | "time";
 
 const CAR_OPTIONS = [
   { value: "car", label: "Car" },
@@ -31,6 +32,11 @@ const LAP_OPTIONS = [
   { value: "last", label: "Last" },
 ];
 
+const PIT_OPTIONS = [
+  { value: "count", label: "PIT" },
+  { value: "time", label: "PIT Time" },
+];
+
 const COLUMNS = [
   { key: "pos", width: "3%", align: "text-center" },
   { key: "pic", width: "3%", align: "text-center" },
@@ -43,20 +49,21 @@ const COLUMNS = [
   { key: "best", width: "8%", align: "text-right pr-2" },
   { key: "s1", width: "6.5%", align: "text-right pr-2" },
   { key: "s2", width: "6.5%", align: "text-right pr-2" },
-  { key: "s3", width: "6.5%", align: "text-right pr-2" },
-  { key: "pits", width: "3.5%", align: "text-center" },
+  { key: "s3", width: "6%", align: "text-right pr-2" },
+  { key: "pit", width: "5.5%", align: "text-right pr-2" },
 ];
 
 const FIXED_LABELS: Record<string, string> = {
   pos: "P", pic: "PIC", nr: "Nr", class: "Class",
   driver: "Driver", best: "Best",
-  s1: "S1", s2: "S2", s3: "S3", pits: "Pits",
+  s1: "S1", s2: "S2", s3: "S3",
 };
 
 export default function TimingTable({ standings, classFilter }: TimingTableProps) {
   const [carCol, setCarCol] = useState<CarColMode>("car");
   const [gapCol, setGapCol] = useState<GapColMode>("gap");
   const [lapCol, setLapCol] = useState<LapColMode>("laps");
+  const [pitCol, setPitCol] = useState<PitColMode>("count");
 
   const filtered = classFilter
     ? standings.filter((s) => {
@@ -74,6 +81,9 @@ export default function TimingTable({ standings, classFilter }: TimingTableProps
     }
     if (col.key === "laps") {
       return <ColumnToggle options={LAP_OPTIONS} current={lapCol} onChange={(v) => setLapCol(v as LapColMode)} />;
+    }
+    if (col.key === "pit") {
+      return <ColumnToggle options={PIT_OPTIONS} current={pitCol} onChange={(v) => setPitCol(v as PitColMode)} />;
     }
     return FIXED_LABELS[col.key] || col.key;
   };
@@ -113,6 +123,7 @@ export default function TimingTable({ standings, classFilter }: TimingTableProps
               carCol={carCol}
               gapCol={gapCol}
               lapCol={lapCol}
+              pitCol={pitCol}
             />
           ))}
         </tbody>

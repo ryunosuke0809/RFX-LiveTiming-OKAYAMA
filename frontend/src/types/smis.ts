@@ -89,6 +89,7 @@ export interface Standing {
   bestTimeType: TimeType;
   lastLapTimeType: TimeType;
   pits: number;
+  pitTime: number | null; // 最後のピット滞在時間 (1/10000秒)
   positionChange: number; // +/- 表示用
 }
 
