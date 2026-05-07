@@ -15,21 +15,13 @@ import {
   getMockTrackCount,
 } from "@/data/mock";
 import { formatLocalTime } from "@/lib/format";
-import type { SessionInfo, TrackFlag } from "@/types/smis";
-
-const SESSION_OPTIONS = [
-  { id: "fp1", label: "Free Practice 1", flag: "green" as TrackFlag },
-  { id: "fp2", label: "Free Practice 2", flag: "green" as TrackFlag },
-  { id: "qf", label: "Qualifying", flag: "green" as TrackFlag },
-  { id: "race", label: "Race", flag: "green" as TrackFlag },
-];
+import type { SessionInfo } from "@/types/smis";
 
 export default function TimingPage() {
   const [sessionInfo, setSessionInfo] = useState<SessionInfo>(mockSessionInfo);
   const [menuOpen, setMenuOpen] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [classFilter, setClassFilter] = useState<string | null>(null);
-  const [currentSession, setCurrentSession] = useState("fp1");
 
   // 時刻とカウントダウンの更新
   useEffect(() => {
@@ -53,55 +45,6 @@ export default function TimingPage() {
       {/* ヘッダー */}
       <div className="pl-12">
         <TimingHeader sessionInfo={sessionInfo} />
-      </div>
-
-      {/* セッション切替タブ */}
-      <div className="flex items-center gap-1.5 px-5 pl-14 py-1.5 bg-zinc-900/80 border-b border-zinc-800">
-        {SESSION_OPTIONS.map((opt) => (
-          <button
-            key={opt.id}
-            onClick={() => {
-              setCurrentSession(opt.id);
-              setSessionInfo((prev) => ({
-                ...prev,
-                session: {
-                  ...prev.session,
-                  nameE: opt.label,
-                },
-                flag: opt.flag,
-                remainingTime: opt.id === "race" ? 0 : 5400,
-              }));
-            }}
-            className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
-              currentSession === opt.id
-                ? "bg-zinc-700 text-white"
-                : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800"
-            }`}
-          >
-            {opt.label}
-          </button>
-        ))}
-
-        {/* Flag selector (デモ用) */}
-        <div className="ml-auto flex items-center gap-1.5">
-          <span className="text-[10px] text-zinc-600 mr-1">Flag:</span>
-          {(["green", "yellow", "red", "fcy", "white", "chequered"] as TrackFlag[]).map((f) => (
-            <button
-              key={f}
-              onClick={() => setSessionInfo((prev) => ({ ...prev, flag: f }))}
-              className={`w-6 h-6 rounded text-[9px] font-bold flex items-center justify-center transition-all ${
-                sessionInfo.flag === f ? "ring-2 ring-white scale-110" : "opacity-50 hover:opacity-100"
-              } ${
-                f === "green" ? "bg-green-600" :
-                f === "yellow" ? "bg-yellow-500" :
-                f === "red" ? "bg-red-600" :
-                f === "fcy" ? "bg-yellow-400" :
-                f === "white" ? "bg-white" :
-                "bg-zinc-300"
-              }`}
-            />
-          ))}
-        </div>
       </div>
 
       {/* メインコンテンツ */}
