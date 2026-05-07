@@ -17,9 +17,16 @@ interface TimingRowProps {
   lapCol: LapColMode;
   pitCol: PitColMode;
   isRaceMode: boolean;
+  sectorFlash?: 0 | 1 | 2 | 3; // 0=FL(行全体), 1=S1, 2=S2, 3=S3
 }
 
-export default function TimingRow({ standing, team, carClass, isEven, carCol, gapCol, lapCol, pitCol, isRaceMode }: TimingRowProps) {
+function getSectorFlashClass(type: string): string {
+  if (type === "overall_best") return "sector-flash sector-flash-ob";
+  if (type === "personal_best") return "sector-flash sector-flash-pb";
+  return "sector-flash sector-flash-cur";
+}
+
+export default function TimingRow({ standing, team, carClass, isEven, carCol, gapCol, lapCol, pitCol, isRaceMode, sectorFlash }: TimingRowProps) {
   const rowBg = isEven ? "bg-zinc-900/60" : "bg-zinc-900/30";
   const statusBg = STATUS_COLORS[standing.status];
 
@@ -56,30 +63,28 @@ export default function TimingRow({ standing, team, carClass, isEven, carCol, ga
   };
 
   const change = standing.positionChange;
-  const flashClass = isRaceMode && change !== 0
+  const posFlashClass = isRaceMode && change !== 0
     ? (change > 0 ? "pos-up" : "pos-down")
     : "";
+
+  const flFlashClass = sectorFlash === 0 ? "fl-flash" : "";
+
+  const s1Flash = sectorFlash === 1 ? getSectorFlashClass(standing.sectors[0]?.type || "current") : "";
+  const s2Flash = sectorFlash === 2 ? getSectorFlashClass(standing.sectors[1]?.type || "current") : "";
+  const s3Flash = sectorFlash === 3 ? getSectorFlashClass(standing.sectors[2]?.type || "current") : "";
 
   const renderPosChange = () => {
     if (change === 0) {
       return <span className="text-zinc-600">-</span>;
     }
     if (change > 0) {
-      return (
-        <span className="text-green-400 font-bold">
-          ▲{change}
-        </span>
-      );
+      return <span className="text-green-400 font-bold">▲{change}</span>;
     }
-    return (
-      <span className="text-red-400 font-bold">
-        ▼{Math.abs(change)}
-      </span>
-    );
+    return <span className="text-red-400 font-bold">▼{Math.abs(change)}</span>;
   };
 
   return (
-    <tr className={`${rowBg} ${flashClass} hover:bg-zinc-700/40 transition-colors border-b border-zinc-800/40`}>
+    <tr className={`${rowBg} ${posFlashClass} ${flFlashClass} hover:bg-zinc-700/40 transition-colors border-b border-zinc-800/40`}>
       {/* P */}
       <td className="py-1 text-center">
         <span className={`inline-flex items-center justify-center rounded-sm font-bold text-white ${statusBg}`}
@@ -87,61 +92,37 @@ export default function TimingRow({ standing, team, carClass, isEven, carCol, ga
           {standing.position}
         </span>
       </td>
-      {/* CHG (RACE/耐久のみ) */}
       {isRaceMode && (
         <td className="py-1 text-center" style={{ fontSize: "0.75em" }}>
           {renderPosChange()}
         </td>
       )}
-      {/* PIC */}
-      <td className="py-1 text-center text-zinc-400 font-mono">
-        {standing.classPosition}
-      </td>
-      {/* Nr */}
-      <td className="py-1 text-center font-bold text-white font-mono">
-        {team?.no}
-      </td>
-      {/* Class */}
-      <td className="py-1 text-center">
-        <ClassBadge className={carClass?.nameE || "---"} />
-      </td>
-      {/* Driver */}
-      <td className="py-1 pl-2 pr-1 text-zinc-200 truncate overflow-hidden whitespace-nowrap">
-        {driverName}
-      </td>
-      {/* Car / Team */}
-      <td className="py-1 pl-2 pr-1 text-zinc-400 truncate overflow-hidden whitespace-nowrap">
-        {carCellValue}
-      </td>
-      {/* Laps / Time / Last */}
+      <td className="py-1 text-center text-zinc-400 font-mono">{standing.classPosition}</td>
+      <td className="py-1 text-center font-bold text-white font-mono">{team?.no}</td>
+      <td className="py-1 text-center"><ClassBadge className={carClass?.nameE || "---"} /></td>
+      <td className="py-1 pl-2 pr-1 text-zinc-200 truncate overflow-hidden whitespace-nowrap">{driverName}</td>
+      <td className="py-1 pl-2 pr-1 text-zinc-400 truncate overflow-hidden whitespace-nowrap">{carCellValue}</td>
       <td className={`py-1 text-center font-mono ${lapCellColor}`}
         style={lapCol !== "laps" ? { fontSize: "0.85em" } : undefined}>
         {lapCellValue}
       </td>
-      {/* Gap / Int */}
-      <td className="py-1 pr-2 text-right font-mono text-zinc-300">
-        {gapCellValue}
-      </td>
-      {/* Best */}
+      <td className="py-1 pr-2 text-right font-mono text-zinc-300">{gapCellValue}</td>
       <td className={`py-1 pr-2 text-right font-mono ${TIME_COLORS[standing.bestTimeType]}`}>
         {formatTime(standing.bestTime)}
       </td>
       {/* S1 */}
-      <td className={`py-1 pr-2 text-right font-mono ${TIME_COLORS[standing.sectors[0]?.type || "none"]}`}>
+      <td className={`py-1 pr-2 text-right font-mono ${TIME_COLORS[standing.sectors[0]?.type || "none"]} ${s1Flash}`}>
         {formatTime(standing.sectors[0]?.time)}
       </td>
       {/* S2 */}
-      <td className={`py-1 pr-2 text-right font-mono ${TIME_COLORS[standing.sectors[1]?.type || "none"]}`}>
+      <td className={`py-1 pr-2 text-right font-mono ${TIME_COLORS[standing.sectors[1]?.type || "none"]} ${s2Flash}`}>
         {formatTime(standing.sectors[1]?.time)}
       </td>
       {/* S3 */}
-      <td className={`py-1 pr-2 text-right font-mono ${TIME_COLORS[standing.sectors[2]?.type || "none"]}`}>
+      <td className={`py-1 pr-2 text-right font-mono ${TIME_COLORS[standing.sectors[2]?.type || "none"]} ${s3Flash}`}>
         {formatTime(standing.sectors[2]?.time)}
       </td>
-      {/* PIT */}
-      <td className="py-1 pr-2 text-right">
-        {renderPitCell()}
-      </td>
+      <td className="py-1 pr-2 text-right">{renderPitCell()}</td>
     </tr>
   );
 }

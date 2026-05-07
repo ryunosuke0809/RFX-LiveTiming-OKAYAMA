@@ -66,3 +66,26 @@ body {
 .pos-down {
   animation: flash-down 2s ease-out;
 }
+
+/* FL通過 — 行全体ハイライト */
+@keyframes flash-fl {
+  0% { box-shadow: inset 0 0 0 200px rgba(255, 255, 255, 0.3); }
+  50% { box-shadow: inset 0 0 0 200px rgba(255, 255, 255, 0.1); }
+  100% { box-shadow: inset 0 0 0 200px transparent; }
+}
+.fl-flash {
+  animation: flash-fl 1.8s ease-out;
+}
+
+/* セクター通過 — セル単位ハイライト */
+@keyframes flash-sector {
+  0% { box-shadow: inset 0 0 8px 2px var(--sector-color); }
+  40% { box-shadow: inset 0 0 4px 1px var(--sector-color); }
+  100% { box-shadow: none; }
+}
+.sector-flash {
+  animation: flash-sector 1.5s ease-out;
+}
+.sector-flash-ob { --sector-color: rgba(216, 60, 246, 0.7); }
+.sector-flash-pb { --sector-color: rgba(34, 197, 94, 0.7); }
+.sector-flash-cur { --sector-color: rgba(255, 255, 255, 0.4); }

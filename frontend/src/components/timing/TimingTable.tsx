@@ -6,11 +6,18 @@ import TimingRow from "./TimingRow";
 import ColumnToggle from "./ColumnToggle";
 import { getTeamByStanding, getClassByStanding } from "@/data/mock";
 
+export interface SectorFlash {
+  teamId: string;
+  sector: 0 | 1 | 2 | 3; // 0=FL, 1=S1, 2=S2, 3=S3
+  key: number;
+}
+
 interface TimingTableProps {
   standings: Standing[];
   classFilter: string | null;
   flashKey?: number;
   isRaceMode?: boolean;
+  sectorFlashes?: SectorFlash[];
 }
 
 export type CarColMode = "car" | "team";
@@ -69,7 +76,7 @@ const FIXED_LABELS: Record<string, string> = {
   s1: "S1", s2: "S2", s3: "S3",
 };
 
-export default function TimingTable({ standings, classFilter, flashKey = 0, isRaceMode = false }: TimingTableProps) {
+export default function TimingTable({ standings, classFilter, flashKey = 0, isRaceMode = false, sectorFlashes = [] }: TimingTableProps) {
   const [carCol, setCarCol] = useState<CarColMode>("car");
   const [gapCol, setGapCol] = useState<GapColMode>("gap");
   const [lapCol, setLapCol] = useState<LapColMode>("laps");
@@ -127,9 +134,16 @@ export default function TimingTable({ standings, classFilter, flashKey = 0, isRa
         <tbody>
           {filtered.map((standing, idx) => {
             const hasChange = standing.positionChange !== 0;
+            const sf = sectorFlashes.find((f) => f.teamId === standing.teamId);
+            const rowKey = sf
+              ? `${standing.teamId}-sf-${sf.key}`
+              : hasChange
+                ? `${standing.teamId}-${flashKey}`
+                : standing.teamId;
+
             return (
               <TimingRow
-                key={hasChange ? `${standing.teamId}-${flashKey}` : standing.teamId}
+                key={rowKey}
                 standing={standing}
                 team={getTeamByStanding(standing)}
                 carClass={getClassByStanding(standing)}
@@ -139,6 +153,7 @@ export default function TimingTable({ standings, classFilter, flashKey = 0, isRa
                 lapCol={lapCol}
                 pitCol={pitCol}
                 isRaceMode={isRaceMode}
+                sectorFlash={sf?.sector}
               />
             );
           })}
