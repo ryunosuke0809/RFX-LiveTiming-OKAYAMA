@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import TimingHeader from "@/components/timing/TimingHeader";
 import TimingTable from "@/components/timing/TimingTable";
 import StatusBar from "@/components/timing/StatusBar";
@@ -15,15 +15,48 @@ import {
   getMockTrackCount,
 } from "@/data/mock";
 import { formatLocalTime } from "@/lib/format";
-import type { SessionInfo } from "@/types/smis";
+import type { SessionInfo, Standing } from "@/types/smis";
+
+function shufflePositions(standings: Standing[]): Standing[] {
+  const arr = [...standings];
+  const numSwaps = 2 + Math.floor(Math.random() * 3);
+
+  for (let i = 0; i < numSwaps; i++) {
+    const idxA = Math.floor(Math.random() * (arr.length - 1));
+    const idxB = idxA + 1 + Math.floor(Math.random() * Math.min(3, arr.length - idxA - 1));
+    if (idxB >= arr.length) continue;
+    [arr[idxA], arr[idxB]] = [arr[idxB], arr[idxA]];
+  }
+
+  const classPositions: Record<string, number> = {};
+  return arr.map((s, idx) => {
+    const classId = s.classId;
+    if (!classPositions[classId]) classPositions[classId] = 0;
+    classPositions[classId]++;
+
+    const oldPos = s.position;
+    const newPos = idx + 1;
+    const change = oldPos - newPos;
+
+    return {
+      ...s,
+      position: newPos,
+      classPosition: classPositions[classId],
+      positionChange: change,
+      gap: newPos === 1 ? "LEADER" : `+${((Math.random() * 20 + idx * 0.5)).toFixed(3)}`,
+      interval: newPos === 1 ? "" : `+${((Math.random() * 3 + 0.1)).toFixed(3)}`,
+    };
+  });
+}
 
 export default function TimingPage() {
   const [sessionInfo, setSessionInfo] = useState<SessionInfo>(mockSessionInfo);
+  const [standings, setStandings] = useState<Standing[]>(mockStandings);
   const [menuOpen, setMenuOpen] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [classFilter, setClassFilter] = useState<string | null>(null);
+  const [flashKey, setFlashKey] = useState(0);
 
-  // 時刻とカウントダウンの更新
   useEffect(() => {
     const timer = setInterval(() => {
       setSessionInfo((prev) => ({
@@ -35,21 +68,36 @@ export default function TimingPage() {
     return () => clearInterval(timer);
   }, []);
 
-  const trackCount = getMockTrackCount(mockStandings);
+  const handleShuffle = useCallback(() => {
+    setStandings((prev) => shufflePositions(prev));
+    setFlashKey((k) => k + 1);
+  }, []);
+
+  const trackCount = getMockTrackCount(standings);
 
   return (
     <div className="h-full flex flex-col">
-      {/* サイドメニュー */}
       <SideMenu isOpen={menuOpen} onClose={() => setMenuOpen(!menuOpen)} />
 
-      {/* ヘッダー */}
       <div className="pl-12">
         <TimingHeader sessionInfo={sessionInfo} />
       </div>
 
-      {/* メインコンテンツ */}
+      {/* DEMOコントロール */}
+      <div className="flex items-center gap-3 px-5 pl-14 py-1.5 bg-zinc-900/80 border-b border-zinc-800">
+        <span className="text-zinc-600 uppercase tracking-wider" style={{ fontSize: "var(--timing-fs-sm)" }}>
+          Demo
+        </span>
+        <button
+          onClick={handleShuffle}
+          className="px-3 py-1 rounded bg-amber-600 hover:bg-amber-500 text-white font-bold transition-colors"
+          style={{ fontSize: "var(--timing-fs-sm)" }}
+        >
+          ▶ Position Change
+        </button>
+      </div>
+
       <div className="flex flex-1 overflow-hidden">
-        {/* 左サイドパネル */}
         <SidePanel
           classes={mockClasses}
           activeFilter={classFilter}
@@ -58,13 +106,11 @@ export default function TimingPage() {
           onToggle={() => setFilterOpen(!filterOpen)}
         />
 
-        {/* タイミングテーブル */}
         <div className="flex-1 flex flex-col overflow-hidden lg:pl-0">
-          <TimingTable standings={mockStandings} classFilter={classFilter} />
+          <TimingTable standings={standings} classFilter={classFilter} flashKey={flashKey} />
         </div>
       </div>
 
-      {/* ステータスバー */}
       <StatusBar
         fastestLap={mockFastestLap}
         weather={mockWeather}

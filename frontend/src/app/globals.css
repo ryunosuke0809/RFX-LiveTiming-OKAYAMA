@@ -48,3 +48,19 @@ body {
 .tabular-nums {
   font-variant-numeric: tabular-nums;
 }
+
+/* 順位変動アニメーション */
+@keyframes flash-up {
+  0% { background-color: rgba(34, 197, 94, 0.4); }
+  100% { background-color: transparent; }
+}
+@keyframes flash-down {
+  0% { background-color: rgba(239, 68, 68, 0.35); }
+  100% { background-color: transparent; }
+}
+.pos-up {
+  animation: flash-up 1.5s ease-out;
+}
+.pos-down {
+  animation: flash-down 1.5s ease-out;
+}

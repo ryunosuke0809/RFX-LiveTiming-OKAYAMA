@@ -16,9 +16,10 @@ interface TimingRowProps {
   gapCol: GapColMode;
   lapCol: LapColMode;
   pitCol: PitColMode;
+  flashKey?: number;
 }
 
-export default function TimingRow({ standing, team, carClass, isEven, carCol, gapCol, lapCol, pitCol }: TimingRowProps) {
+export default function TimingRow({ standing, team, carClass, isEven, carCol, gapCol, lapCol, pitCol, flashKey }: TimingRowProps) {
   const rowBg = isEven ? "bg-zinc-900/60" : "bg-zinc-900/30";
   const statusBg = STATUS_COLORS[standing.status];
 
@@ -28,7 +29,6 @@ export default function TimingRow({ standing, team, carClass, isEven, carCol, ga
     "---";
 
   const carCellValue = carCol === "team" ? (team?.nameE || "---") : (team?.machine || "---");
-
   const gapCellValue = gapCol === "int" ? standing.interval : standing.gap;
 
   let lapCellValue: string;
@@ -55,14 +55,39 @@ export default function TimingRow({ standing, team, carClass, isEven, carCol, ga
     return <span className="text-zinc-600">---</span>;
   };
 
+  const change = standing.positionChange;
+  const flashClass = change > 0 ? "pos-up" : change < 0 ? "pos-down" : "";
+
+  const renderPosChange = () => {
+    if (change === 0) return null;
+    if (change > 0) {
+      return (
+        <span className="text-green-400" style={{ fontSize: "0.7em" }}>
+          ▲{change}
+        </span>
+      );
+    }
+    return (
+      <span className="text-red-400" style={{ fontSize: "0.7em" }}>
+        ▼{Math.abs(change)}
+      </span>
+    );
+  };
+
   return (
-    <tr className={`${rowBg} hover:bg-zinc-700/40 transition-colors border-b border-zinc-800/40`}>
+    <tr
+      key={flashKey}
+      className={`${rowBg} ${flashClass} hover:bg-zinc-700/40 transition-colors border-b border-zinc-800/40`}
+    >
       {/* P */}
       <td className="py-1 text-center">
-        <span className={`inline-flex items-center justify-center rounded-sm font-bold text-white ${statusBg}`}
-          style={{ width: "1.4em", height: "1.3em", fontSize: "0.9em" }}>
-          {standing.position}
-        </span>
+        <div className="flex items-center justify-center gap-0.5">
+          <span className={`inline-flex items-center justify-center rounded-sm font-bold text-white ${statusBg}`}
+            style={{ width: "1.4em", height: "1.3em", fontSize: "0.9em" }}>
+            {standing.position}
+          </span>
+          {renderPosChange()}
+        </div>
       </td>
       {/* PIC */}
       <td className="py-1 text-center text-zinc-400 font-mono">

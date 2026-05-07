@@ -9,6 +9,7 @@ import { getTeamByStanding, getClassByStanding } from "@/data/mock";
 interface TimingTableProps {
   standings: Standing[];
   classFilter: string | null;
+  flashKey?: number;
 }
 
 export type CarColMode = "car" | "team";
@@ -59,7 +60,7 @@ const FIXED_LABELS: Record<string, string> = {
   s1: "S1", s2: "S2", s3: "S3",
 };
 
-export default function TimingTable({ standings, classFilter }: TimingTableProps) {
+export default function TimingTable({ standings, classFilter, flashKey = 0 }: TimingTableProps) {
   const [carCol, setCarCol] = useState<CarColMode>("car");
   const [gapCol, setGapCol] = useState<GapColMode>("gap");
   const [lapCol, setLapCol] = useState<LapColMode>("laps");
@@ -124,6 +125,7 @@ export default function TimingTable({ standings, classFilter }: TimingTableProps
               gapCol={gapCol}
               lapCol={lapCol}
               pitCol={pitCol}
+              flashKey={standing.positionChange !== 0 ? flashKey : 0}
             />
           ))}
         </tbody>
