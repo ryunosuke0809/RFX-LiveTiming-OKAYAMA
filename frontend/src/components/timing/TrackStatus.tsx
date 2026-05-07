@@ -12,7 +12,7 @@ export default function TrackStatus({ flag }: TrackStatusProps) {
 
   if (flag === "chequered") {
     return (
-      <div className="inline-flex items-center px-4 py-1.5 rounded text-sm font-bold bg-gradient-to-r from-zinc-900 via-white to-zinc-900 text-black border border-zinc-400">
+      <div className="inline-flex items-center px-2 py-0.5 rounded-sm text-[10px] font-bold bg-gradient-to-r from-zinc-900 via-white to-zinc-900 text-black border border-zinc-400">
         FINISH
       </div>
     );
@@ -22,7 +22,7 @@ export default function TrackStatus({ flag }: TrackStatusProps) {
 
   return (
     <div
-      className={`inline-flex items-center px-4 py-1.5 rounded text-sm font-bold ${flagStyle.bg} ${flagStyle.text}`}
+      className={`inline-flex items-center px-2 py-0.5 rounded-sm text-[10px] font-bold ${flagStyle.bg} ${flagStyle.text}`}
     >
       {flagStyle.label}
     </div>
