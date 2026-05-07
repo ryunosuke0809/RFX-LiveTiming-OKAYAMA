@@ -10,19 +10,19 @@ interface TimingTableProps {
 }
 
 const COLUMNS = [
-  { key: "pos", label: "P", width: "30px" },
-  { key: "pic", label: "PIC", width: "32px" },
-  { key: "nr", label: "Nr", width: "34px" },
-  { key: "class", label: "Class", width: "52px" },
-  { key: "driver", label: "Driver", width: "140px" },
-  { key: "car", label: "Car", width: "220px" },
-  { key: "laps", label: "Laps", width: "40px" },
-  { key: "gap", label: "Gap", width: "76px" },
-  { key: "best", label: "Best", width: "76px" },
-  { key: "s1", label: "S1", width: "62px" },
-  { key: "s2", label: "S2", width: "62px" },
-  { key: "s3", label: "S3", width: "62px" },
-  { key: "pits", label: "Pits", width: "32px" },
+  { key: "pos", label: "P", width: "3%" },
+  { key: "pic", label: "PIC", width: "3%" },
+  { key: "nr", label: "Nr", width: "3.5%" },
+  { key: "class", label: "Class", width: "5.5%" },
+  { key: "driver", label: "Driver", width: "16%" },
+  { key: "car", label: "Car", width: "26%" },
+  { key: "laps", label: "Laps", width: "4%" },
+  { key: "gap", label: "Gap", width: "8%" },
+  { key: "best", label: "Best", width: "8%" },
+  { key: "s1", label: "S1", width: "6.5%" },
+  { key: "s2", label: "S2", width: "6.5%" },
+  { key: "s3", label: "S3", width: "6.5%" },
+  { key: "pits", label: "Pits", width: "3.5%" },
 ];
 
 export default function TimingTable({ standings, classFilter }: TimingTableProps) {
@@ -35,7 +35,7 @@ export default function TimingTable({ standings, classFilter }: TimingTableProps
 
   return (
     <div className="flex-1 overflow-auto">
-      <table className="border-collapse" style={{ tableLayout: "fixed" }}>
+      <table className="w-full border-collapse" style={{ tableLayout: "fixed" }}>
         <colgroup>
           {COLUMNS.map((col) => (
             <col key={col.key} style={{ width: col.width }} />
