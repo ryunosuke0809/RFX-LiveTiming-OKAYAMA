@@ -10,19 +10,19 @@ interface TimingTableProps {
 }
 
 const COLUMNS = [
-  { key: "pos", label: "P", width: "3%" },
-  { key: "pic", label: "PIC", width: "3%" },
-  { key: "nr", label: "Nr", width: "3.5%" },
-  { key: "class", label: "Class", width: "5.5%" },
-  { key: "driver", label: "Driver", width: "16%" },
-  { key: "car", label: "Car", width: "26%" },
-  { key: "laps", label: "Laps", width: "4%" },
-  { key: "gap", label: "Gap", width: "8%" },
-  { key: "best", label: "Best", width: "8%" },
-  { key: "s1", label: "S1", width: "6.5%" },
-  { key: "s2", label: "S2", width: "6.5%" },
-  { key: "s3", label: "S3", width: "6.5%" },
-  { key: "pits", label: "Pits", width: "3.5%" },
+  { key: "pos", label: "P", width: "3%", align: "text-center" },
+  { key: "pic", label: "PIC", width: "3%", align: "text-center" },
+  { key: "nr", label: "Nr", width: "3.5%", align: "text-center" },
+  { key: "class", label: "Class", width: "5.5%", align: "text-center" },
+  { key: "driver", label: "Driver", width: "16%", align: "text-left pl-2" },
+  { key: "car", label: "Car", width: "26%", align: "text-left pl-2" },
+  { key: "laps", label: "Laps", width: "4%", align: "text-center" },
+  { key: "gap", label: "Gap", width: "8%", align: "text-right pr-2" },
+  { key: "best", label: "Best", width: "8%", align: "text-right pr-2" },
+  { key: "s1", label: "S1", width: "6.5%", align: "text-right pr-2" },
+  { key: "s2", label: "S2", width: "6.5%", align: "text-right pr-2" },
+  { key: "s3", label: "S3", width: "6.5%", align: "text-right pr-2" },
+  { key: "pits", label: "Pits", width: "3.5%", align: "text-center" },
 ];
 
 export default function TimingTable({ standings, classFilter }: TimingTableProps) {
@@ -46,7 +46,7 @@ export default function TimingTable({ standings, classFilter }: TimingTableProps
             {COLUMNS.map((col) => (
               <th
                 key={col.key}
-                className="py-1.5 text-[12px] font-semibold text-white uppercase tracking-wider text-center"
+                className={`py-1.5 text-[13px] font-semibold text-white uppercase tracking-wider ${col.align}`}
               >
                 {col.label}
               </th>
