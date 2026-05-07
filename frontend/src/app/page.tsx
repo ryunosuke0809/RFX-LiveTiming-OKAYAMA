@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import TimingHeader from "@/components/timing/TimingHeader";
 import TimingTable from "@/components/timing/TimingTable";
 import StatusBar from "@/components/timing/StatusBar";
@@ -56,6 +56,9 @@ export default function TimingPage() {
   const [filterOpen, setFilterOpen] = useState(false);
   const [classFilter, setClassFilter] = useState<string | null>(null);
   const [flashKey, setFlashKey] = useState(0);
+  const [isRaceMode, setIsRaceMode] = useState(false);
+  const [autoRunning, setAutoRunning] = useState(false);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -68,9 +71,28 @@ export default function TimingPage() {
     return () => clearInterval(timer);
   }, []);
 
-  const handleShuffle = useCallback(() => {
+  const doShuffle = useCallback(() => {
     setStandings((prev) => shufflePositions(prev));
     setFlashKey((k) => k + 1);
+  }, []);
+
+  const toggleAutoRun = useCallback(() => {
+    if (autoRunning) {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      intervalRef.current = null;
+      setAutoRunning(false);
+    } else {
+      setIsRaceMode(true);
+      doShuffle();
+      intervalRef.current = setInterval(doShuffle, 3000);
+      setAutoRunning(true);
+    }
+  }, [autoRunning, doShuffle]);
+
+  useEffect(() => {
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
   }, []);
 
   const trackCount = getMockTrackCount(standings);
@@ -89,12 +111,37 @@ export default function TimingPage() {
           Demo
         </span>
         <button
-          onClick={handleShuffle}
-          className="px-3 py-1 rounded bg-amber-600 hover:bg-amber-500 text-white font-bold transition-colors"
+          onClick={() => { setIsRaceMode(false); setAutoRunning(false); if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null; } }}
+          className={`px-3 py-1 rounded font-medium transition-colors ${
+            !isRaceMode ? "bg-zinc-600 text-white" : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800"
+          }`}
           style={{ fontSize: "var(--timing-fs-sm)" }}
         >
-          ▶ Position Change
+          Practice
         </button>
+        <button
+          onClick={() => setIsRaceMode(true)}
+          className={`px-3 py-1 rounded font-medium transition-colors ${
+            isRaceMode ? "bg-zinc-600 text-white" : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800"
+          }`}
+          style={{ fontSize: "var(--timing-fs-sm)" }}
+        >
+          Race / Endurance
+        </button>
+
+        {isRaceMode && (
+          <button
+            onClick={toggleAutoRun}
+            className={`px-3 py-1 rounded font-bold transition-colors ${
+              autoRunning
+                ? "bg-red-600 hover:bg-red-500 text-white"
+                : "bg-amber-600 hover:bg-amber-500 text-white"
+            }`}
+            style={{ fontSize: "var(--timing-fs-sm)" }}
+          >
+            {autoRunning ? "■ Stop" : "▶ Auto Position Change"}
+          </button>
+        )}
       </div>
 
       <div className="flex flex-1 overflow-hidden">
@@ -107,7 +154,12 @@ export default function TimingPage() {
         />
 
         <div className="flex-1 flex flex-col overflow-hidden lg:pl-0">
-          <TimingTable standings={standings} classFilter={classFilter} flashKey={flashKey} />
+          <TimingTable
+            standings={standings}
+            classFilter={classFilter}
+            flashKey={flashKey}
+            isRaceMode={isRaceMode}
+          />
         </div>
       </div>
 
