@@ -36,7 +36,7 @@ export default function ColumnToggle({ options, current, onChange, align = "" }:
       </button>
 
       {open && (
-        <div className="absolute top-full left-0 mt-1 bg-zinc-700 border border-zinc-600 rounded shadow-lg z-50 min-w-max">
+        <div className="absolute top-full right-0 mt-1 bg-zinc-700 border border-zinc-600 rounded shadow-lg z-50 min-w-max">
           {options.map((opt) => (
             <button
               key={opt.value}
