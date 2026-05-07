@@ -157,13 +157,13 @@ export default function TimingPage() {
     <div className="h-full flex flex-col">
       <SideMenu isOpen={menuOpen} onClose={() => setMenuOpen(!menuOpen)} />
 
-      <div className="pl-12">
+      <div className="pl-10 sm:pl-12">
         <TimingHeader sessionInfo={sessionInfo} />
       </div>
 
       {/* DEMOコントロール */}
-      <div className="flex items-center gap-3 px-5 pl-14 py-1.5 bg-zinc-900/80 border-b border-zinc-800 flex-wrap">
-        <span className="text-zinc-600 uppercase tracking-wider" style={{ fontSize: "var(--timing-fs-sm)" }}>
+      <div className="flex items-center gap-1.5 sm:gap-3 px-2 sm:px-5 pl-11 sm:pl-14 py-1 sm:py-1.5 bg-zinc-900/80 border-b border-zinc-800 flex-wrap overflow-x-auto">
+        <span className="text-zinc-600 uppercase tracking-wider flex-shrink-0" style={{ fontSize: "var(--timing-fs-sm)" }}>
           Demo
         </span>
         <button
@@ -172,7 +172,7 @@ export default function TimingPage() {
             setAutoRunning(false);
             if (posIntervalRef.current) { clearInterval(posIntervalRef.current); posIntervalRef.current = null; }
           }}
-          className={`px-3 py-1 rounded font-medium transition-colors ${
+          className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded font-medium transition-colors flex-shrink-0 ${
             !isRaceMode ? "bg-zinc-600 text-white" : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800"
           }`}
           style={{ fontSize: "var(--timing-fs-sm)" }}
@@ -181,41 +181,39 @@ export default function TimingPage() {
         </button>
         <button
           onClick={() => setIsRaceMode(true)}
-          className={`px-3 py-1 rounded font-medium transition-colors ${
+          className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded font-medium transition-colors flex-shrink-0 ${
             isRaceMode ? "bg-zinc-600 text-white" : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800"
           }`}
           style={{ fontSize: "var(--timing-fs-sm)" }}
         >
-          Race / Endurance
+          Race
         </button>
 
-        <div className="w-px h-5 bg-zinc-700" />
+        <div className="w-px h-4 sm:h-5 bg-zinc-700 flex-shrink-0" />
 
-        {/* Sector Flash Demo */}
         <button
           onClick={toggleSectorDemo}
-          className={`px-3 py-1 rounded font-bold transition-colors ${
+          className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded font-bold transition-colors flex-shrink-0 ${
             sectorDemoRunning
               ? "bg-red-600 hover:bg-red-500 text-white"
               : "bg-purple-600 hover:bg-purple-500 text-white"
           }`}
           style={{ fontSize: "var(--timing-fs-sm)" }}
         >
-          {sectorDemoRunning ? "■ Stop Sector" : "▶ Sector Flash"}
+          {sectorDemoRunning ? "■ Sector" : "▶ Sector"}
         </button>
 
-        {/* Position Change Demo (RACEモード時のみ) */}
         {isRaceMode && (
           <button
             onClick={toggleAutoRun}
-            className={`px-3 py-1 rounded font-bold transition-colors ${
+            className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded font-bold transition-colors flex-shrink-0 ${
               autoRunning
                 ? "bg-red-600 hover:bg-red-500 text-white"
                 : "bg-amber-600 hover:bg-amber-500 text-white"
             }`}
             style={{ fontSize: "var(--timing-fs-sm)" }}
           >
-            {autoRunning ? "■ Stop Position" : "▶ Position Change"}
+            {autoRunning ? "■ Pos" : "▶ Pos"}
           </button>
         )}
       </div>

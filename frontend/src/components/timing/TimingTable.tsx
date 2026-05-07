@@ -48,24 +48,24 @@ const PIT_OPTIONS = [
 
 function getColumns(isRaceMode: boolean) {
   const cols = [
-    { key: "pos", width: isRaceMode ? "2.5%" : "3%", align: "text-center" },
+    { key: "pos", minW: 32, pct: isRaceMode ? "2.5%" : "3%", align: "text-center" },
   ];
   if (isRaceMode) {
-    cols.push({ key: "chg", width: "2.5%", align: "text-center" });
+    cols.push({ key: "chg", minW: 32, pct: "2.5%", align: "text-center" });
   }
   cols.push(
-    { key: "pic", width: "3%", align: "text-center" },
-    { key: "nr", width: "3.5%", align: "text-center" },
-    { key: "class", width: "5.5%", align: "text-center" },
-    { key: "driver", width: isRaceMode ? "14.5%" : "16%", align: "text-left pl-2" },
-    { key: "car", width: isRaceMode ? "24.5%" : "26%", align: "text-left pl-2" },
-    { key: "laps", width: "4%", align: "text-center" },
-    { key: "gap", width: "8%", align: "text-right pr-2" },
-    { key: "best", width: "8%", align: "text-right pr-2" },
-    { key: "s1", width: "6.5%", align: "text-right pr-2" },
-    { key: "s2", width: "6.5%", align: "text-right pr-2" },
-    { key: "s3", width: "6%", align: "text-right pr-2" },
-    { key: "pit", width: "5.5%", align: "text-right pr-2" },
+    { key: "pic", minW: 28, pct: "3%", align: "text-center" },
+    { key: "nr", minW: 30, pct: "3.5%", align: "text-center" },
+    { key: "class", minW: 48, pct: "5.5%", align: "text-center" },
+    { key: "driver", minW: 100, pct: isRaceMode ? "14.5%" : "16%", align: "text-left pl-2" },
+    { key: "car", minW: 120, pct: isRaceMode ? "24.5%" : "26%", align: "text-left pl-2" },
+    { key: "laps", minW: 36, pct: "4%", align: "text-center" },
+    { key: "gap", minW: 64, pct: "8%", align: "text-right pr-2" },
+    { key: "best", minW: 72, pct: "8%", align: "text-right pr-2" },
+    { key: "s1", minW: 56, pct: "6.5%", align: "text-right pr-2" },
+    { key: "s2", minW: 56, pct: "6.5%", align: "text-right pr-2" },
+    { key: "s3", minW: 56, pct: "6%", align: "text-right pr-2" },
+    { key: "pit", minW: 48, pct: "5.5%", align: "text-right pr-2" },
   );
   return cols;
 }
@@ -107,15 +107,17 @@ export default function TimingTable({ standings, classFilter, flashKey = 0, isRa
     return FIXED_LABELS[col.key] ?? col.key;
   };
 
+  const totalMinW = columns.reduce((sum, c) => sum + c.minW, 0);
+
   return (
     <div className="flex-1 overflow-auto">
       <table
-        className="w-full border-collapse"
-        style={{ tableLayout: "fixed", fontSize: "var(--timing-fs)" }}
+        className="border-collapse"
+        style={{ tableLayout: "fixed", fontSize: "var(--timing-fs)", minWidth: `${totalMinW}px`, width: "100%" }}
       >
         <colgroup>
           {columns.map((col) => (
-            <col key={col.key} style={{ width: col.width }} />
+            <col key={col.key} style={{ width: col.pct, minWidth: `${col.minW}px` }} />
           ))}
         </colgroup>
         <thead className="sticky top-0 z-10">

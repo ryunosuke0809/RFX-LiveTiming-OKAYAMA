@@ -18,11 +18,30 @@ body {
 }
 
 :root {
-  /* 1920px → 20px, 1280px → 13.4px, 最小11px */
   --timing-fs: clamp(11px, 1.05vw, 20px);
   --timing-fs-sm: clamp(9px, 0.85vw, 16px);
   --timing-fs-lg: clamp(14px, 1.3vw, 24px);
   --timing-fs-xl: clamp(20px, 2vw, 38px);
+}
+
+/* スマホ縦画面 */
+@media (max-width: 639px) {
+  :root {
+    --timing-fs: 11px;
+    --timing-fs-sm: 9px;
+    --timing-fs-lg: 13px;
+    --timing-fs-xl: 18px;
+  }
+}
+
+/* スマホ横画面 */
+@media (min-width: 640px) and (max-width: 899px) {
+  :root {
+    --timing-fs: 12px;
+    --timing-fs-sm: 10px;
+    --timing-fs-lg: 14px;
+    --timing-fs-xl: 22px;
+  }
 }
 
 /* スクロールバーのカスタマイズ */
