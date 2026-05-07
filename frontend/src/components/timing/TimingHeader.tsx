@@ -15,7 +15,8 @@ export default function TimingHeader({ sessionInfo }: TimingHeaderProps) {
     <header className="flex items-center justify-between px-5 py-2.5 bg-gradient-to-r from-zinc-900 via-zinc-800 to-zinc-900 border-b border-zinc-700">
       {/* 左: 残り時間 */}
       <div className="flex items-center gap-4">
-        <div className="text-4xl font-bold font-mono text-white tracking-wider leading-none">
+        <div className="font-bold font-mono text-white tracking-wider leading-none"
+          style={{ fontSize: "var(--timing-fs-xl)" }}>
           {formatRemainingTime(remainingTime)}
         </div>
         <TrackStatus flag={flag} />
@@ -23,10 +24,12 @@ export default function TimingHeader({ sessionInfo }: TimingHeaderProps) {
 
       {/* 中央: イベント名・セッション名 */}
       <div className="flex-1 text-center px-6">
-        <div className="text-xs text-zinc-400 uppercase tracking-widest leading-none">
+        <div className="text-zinc-400 uppercase tracking-widest leading-none"
+          style={{ fontSize: "var(--timing-fs-sm)" }}>
           {competition.nameE}
         </div>
-        <div className="text-sm font-semibold text-white mt-1 leading-none">
+        <div className="font-semibold text-white mt-1 leading-none"
+          style={{ fontSize: "var(--timing-fs)" }}>
           {session.nameE}
         </div>
       </div>
@@ -34,14 +37,17 @@ export default function TimingHeader({ sessionInfo }: TimingHeaderProps) {
       {/* 右: ロゴ・時刻 */}
       <div className="flex items-center gap-5 text-right">
         <div className="flex flex-col items-end leading-none">
-          <span className="text-[10px] text-zinc-500 uppercase tracking-wider">
+          <span className="text-zinc-500 uppercase tracking-wider"
+            style={{ fontSize: "var(--timing-fs-sm)" }}>
             Okayama International Circuit
           </span>
-          <span className="text-xs font-bold text-zinc-300 tracking-wider mt-0.5">
+          <span className="font-bold text-zinc-300 tracking-wider mt-0.5"
+            style={{ fontSize: "var(--timing-fs-sm)" }}>
             MOLA
           </span>
         </div>
-        <div className="text-xl font-mono text-emerald-400 tabular-nums leading-none">
+        <div className="font-mono text-emerald-400 tabular-nums leading-none"
+          style={{ fontSize: "var(--timing-fs-lg)" }}>
           {localTime}
         </div>
       </div>

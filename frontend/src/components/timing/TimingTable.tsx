@@ -35,7 +35,10 @@ export default function TimingTable({ standings, classFilter }: TimingTableProps
 
   return (
     <div className="flex-1 overflow-auto">
-      <table className="w-full border-collapse" style={{ tableLayout: "fixed" }}>
+      <table
+        className="w-full border-collapse"
+        style={{ tableLayout: "fixed", fontSize: "var(--timing-fs)" }}
+      >
         <colgroup>
           {COLUMNS.map((col) => (
             <col key={col.key} style={{ width: col.width }} />
@@ -46,7 +49,8 @@ export default function TimingTable({ standings, classFilter }: TimingTableProps
             {COLUMNS.map((col) => (
               <th
                 key={col.key}
-                className={`py-1.5 text-[13px] font-semibold text-white uppercase tracking-wider ${col.align}`}
+                className={`py-1.5 font-semibold text-white uppercase tracking-wider ${col.align}`}
+                style={{ fontSize: "var(--timing-fs-sm)" }}
               >
                 {col.label}
               </th>

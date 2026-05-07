@@ -17,6 +17,14 @@ body {
   color: var(--foreground);
 }
 
+:root {
+  /* 1920px → 20px, 1280px → 13.4px, 最小11px */
+  --timing-fs: clamp(11px, 1.05vw, 20px);
+  --timing-fs-sm: clamp(9px, 0.85vw, 16px);
+  --timing-fs-lg: clamp(14px, 1.3vw, 24px);
+  --timing-fs-xl: clamp(20px, 2vw, 38px);
+}
+
 /* スクロールバーのカスタマイズ */
 ::-webkit-scrollbar {
   width: 6px;
