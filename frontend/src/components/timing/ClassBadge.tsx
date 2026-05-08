@@ -10,7 +10,8 @@ export default function ClassBadge({ className }: ClassBadgeProps) {
   const colors = getClassColor(className);
   return (
     <span
-      className={`inline-block px-2 py-0.5 rounded-sm text-[11px] font-bold ${colors.bg} ${colors.text} leading-none`}
+      className={`inline-block px-1.5 py-px rounded-sm font-bold ${colors.bg} ${colors.text} leading-none`}
+      style={{ fontSize: "0.75em" }}
     >
       {className}
     </span>

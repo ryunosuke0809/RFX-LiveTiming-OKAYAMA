@@ -84,42 +84,42 @@ export default function TimingRow({ standing, team, carClass, isEven, carCol, ga
   };
 
   return (
-    <tr className={`${rowBg} ${posFlashClass} ${flFlashClass} hover:bg-zinc-700/40 transition-colors border-b border-zinc-800/40`}>
+    <tr className={`${rowBg} ${posFlashClass} ${flFlashClass} hover:bg-zinc-700/40 transition-colors border-b border-zinc-800/30`}>
       {/* P */}
-      <td className="py-1 text-center">
-        <span className={`inline-flex items-center justify-center rounded-sm font-bold text-white ${statusBg}`}
-          style={{ width: "1.4em", height: "1.3em", fontSize: "0.9em" }}>
+      <td className="py-px text-center">
+        <span className={`inline-flex items-center justify-center rounded-sm font-bold text-white leading-none ${statusBg}`}
+          style={{ width: "1.35em", height: "1.2em", fontSize: "0.9em" }}>
           {standing.position}
         </span>
       </td>
       {isRaceMode && (
-        <td className="py-1 text-center" style={{ fontSize: "0.75em" }}>
+        <td className="py-px text-center" style={{ fontSize: "0.75em" }}>
           {renderPosChange()}
         </td>
       )}
-      <td className="py-1 text-center text-zinc-400 font-mono">{standing.classPosition}</td>
-      <td className="py-1 text-center font-bold text-white font-mono">{team?.no}</td>
-      <td className="py-1 text-center"><ClassBadge className={carClass?.nameE || "---"} /></td>
-      <td className="py-1 pl-2 pr-1 text-zinc-200 truncate overflow-hidden whitespace-nowrap">{driverName}</td>
-      <td className="py-1 pl-2 pr-1 text-zinc-400 truncate overflow-hidden whitespace-nowrap">{carCellValue}</td>
-      <td className={`py-1 text-center font-mono ${lapCellColor}`}
+      <td className="py-px text-center text-zinc-400 font-mono">{standing.classPosition}</td>
+      <td className="py-px text-center font-bold text-white font-mono">{team?.no}</td>
+      <td className="py-px text-center"><ClassBadge className={carClass?.nameE || "---"} /></td>
+      <td className="py-px pl-2 pr-1 text-zinc-200 truncate overflow-hidden whitespace-nowrap">{driverName}</td>
+      <td className="py-px pl-2 pr-1 text-zinc-400 truncate overflow-hidden whitespace-nowrap">{carCellValue}</td>
+      <td className={`py-px text-center font-mono ${lapCellColor}`}
         style={lapCol !== "laps" ? { fontSize: "0.85em" } : undefined}>
         {lapCellValue}
       </td>
-      <td className="py-1 px-2 sm:pr-3 text-right font-mono text-zinc-300">{gapCellValue}</td>
-      <td className={`py-1 px-2 sm:pr-3 text-right font-mono ${TIME_COLORS[standing.bestTimeType]}`}>
+      <td className="py-px px-2 sm:pr-3 text-right font-mono text-zinc-300">{gapCellValue}</td>
+      <td className={`py-px px-2 sm:pr-3 text-right font-mono ${TIME_COLORS[standing.bestTimeType]}`}>
         {formatTime(standing.bestTime)}
       </td>
-      <td className={`py-1 px-2 sm:pr-3 text-right font-mono ${TIME_COLORS[standing.sectors[0]?.type || "none"]} ${s1Flash}`}>
+      <td className={`py-px px-2 sm:pr-3 text-right font-mono ${TIME_COLORS[standing.sectors[0]?.type || "none"]} ${s1Flash}`}>
         {formatTime(standing.sectors[0]?.time)}
       </td>
-      <td className={`py-1 px-2 sm:pr-3 text-right font-mono ${TIME_COLORS[standing.sectors[1]?.type || "none"]} ${s2Flash}`}>
+      <td className={`py-px px-2 sm:pr-3 text-right font-mono ${TIME_COLORS[standing.sectors[1]?.type || "none"]} ${s2Flash}`}>
         {formatTime(standing.sectors[1]?.time)}
       </td>
-      <td className={`py-1 px-2 sm:pr-3 text-right font-mono ${TIME_COLORS[standing.sectors[2]?.type || "none"]} ${s3Flash}`}>
+      <td className={`py-px px-2 sm:pr-3 text-right font-mono ${TIME_COLORS[standing.sectors[2]?.type || "none"]} ${s3Flash}`}>
         {formatTime(standing.sectors[2]?.time)}
       </td>
-      <td className="py-1 px-2 sm:pr-3 text-right">{renderPitCell()}</td>
+      <td className="py-px px-2 sm:pr-3 text-right">{renderPitCell()}</td>
     </tr>
   );
 }

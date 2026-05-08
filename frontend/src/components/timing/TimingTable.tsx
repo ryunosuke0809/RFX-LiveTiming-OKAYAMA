@@ -125,7 +125,7 @@ export default function TimingTable({ standings, classFilter, flashKey = 0, isRa
             {columns.map((col) => (
               <th
                 key={col.key}
-                className={`py-1.5 font-semibold text-white uppercase tracking-wider ${col.align}`}
+                className={`py-1 font-semibold text-white uppercase tracking-wider ${col.align}`}
                 style={{ fontSize: "var(--timing-fs-sm)" }}
               >
                 {renderHeader(col)}

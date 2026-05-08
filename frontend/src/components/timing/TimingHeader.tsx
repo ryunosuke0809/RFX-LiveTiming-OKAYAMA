@@ -12,7 +12,7 @@ export default function TimingHeader({ sessionInfo }: TimingHeaderProps) {
   const { competition, session, flag, remainingTime, localTime } = sessionInfo;
 
   return (
-    <header className="flex items-center justify-between px-3 sm:px-5 py-1.5 sm:py-2.5 bg-gradient-to-r from-zinc-900 via-zinc-800 to-zinc-900 border-b border-zinc-700">
+    <header className="flex items-center justify-between px-3 sm:px-5 py-1 sm:py-1.5 bg-gradient-to-r from-zinc-900 via-zinc-800 to-zinc-900 border-b border-zinc-700">
       {/* 左: 残り時間 */}
       <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
         <div className="font-bold font-mono text-white tracking-wider leading-none"

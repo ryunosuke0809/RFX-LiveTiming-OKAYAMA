@@ -12,7 +12,7 @@ interface StatusBarProps {
 export default function StatusBar({ fastestLap, weather, trackCount }: StatusBarProps) {
   return (
     <footer
-      className="flex flex-wrap items-center justify-between gap-y-1 px-3 sm:px-5 py-2 sm:py-3 bg-zinc-900 border-t-2 border-zinc-700"
+      className="flex flex-wrap items-center justify-between gap-y-1 px-3 sm:px-5 py-1 sm:py-1.5 bg-zinc-900 border-t-2 border-zinc-700"
       style={{ fontSize: "var(--timing-fs)" }}
     >
       {/* FASTEST LAP */}
