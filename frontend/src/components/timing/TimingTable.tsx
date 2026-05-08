@@ -48,15 +48,16 @@ const PIT_OPTIONS = [
 
 function getColumns(isRaceMode: boolean) {
   const cols = [
-    { key: "pos", minW: 32, pct: isRaceMode ? "2.5%" : "3%", align: "text-center" },
+    { key: "status", minW: 20, pct: "1.8%", align: "text-center" },
+    { key: "pos", minW: 28, pct: isRaceMode ? "2.2%" : "2.5%", align: "text-center" },
   ];
   if (isRaceMode) {
-    cols.push({ key: "chg", minW: 32, pct: "2.5%", align: "text-center" });
+    cols.push({ key: "chg", minW: 28, pct: "2.2%", align: "text-center" });
   }
   cols.push(
-    { key: "pic", minW: 28, pct: "3%", align: "text-center" },
-    { key: "nr", minW: 30, pct: "3.5%", align: "text-center" },
-    { key: "class", minW: 48, pct: "5.5%", align: "text-center" },
+    { key: "pic", minW: 28, pct: "2.5%", align: "text-center" },
+    { key: "nr", minW: 30, pct: "3%", align: "text-center" },
+    { key: "class", minW: 48, pct: "5%", align: "text-center" },
     { key: "driver", minW: 100, pct: isRaceMode ? "14.5%" : "16%", align: "text-left pl-2" },
     { key: "car", minW: 120, pct: isRaceMode ? "24.5%" : "26%", align: "text-left pl-2" },
     { key: "laps", minW: 40, pct: "4%", align: "text-center" },
@@ -71,7 +72,7 @@ function getColumns(isRaceMode: boolean) {
 }
 
 const FIXED_LABELS: Record<string, string> = {
-  pos: "P", chg: "", pic: "PIC", nr: "Nr", class: "Class",
+  status: "", pos: "P", chg: "", pic: "PIC", nr: "Nr", class: "Class",
   driver: "Driver", best: "Best",
   s1: "S1", s2: "S2", s3: "S3",
 };

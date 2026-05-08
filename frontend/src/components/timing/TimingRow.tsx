@@ -2,7 +2,7 @@
 
 import type { Standing, Team, CarClass } from "@/types/smis";
 import type { CarColMode, GapColMode, LapColMode, PitColMode } from "./TimingTable";
-import { TIME_COLORS, STATUS_COLORS } from "@/lib/colors";
+import { TIME_COLORS } from "@/lib/colors";
 import { formatTime, formatPitTime } from "@/lib/format";
 import ClassBadge from "./ClassBadge";
 import PitTimer from "./PitTimer";
@@ -26,9 +26,16 @@ function getSectorFlashClass(type: string): string {
   return "sector-flash sector-flash-cur";
 }
 
+const STATUS_INDICATOR: Record<string, { label: string; color: string }> = {
+  in_pit: { label: "P", color: "text-cyan-400" },
+  pit_out: { label: "O", color: "text-orange-400" },
+  stopped: { label: "S", color: "text-red-400" },
+  retired: { label: "R", color: "text-zinc-500" },
+};
+
 export default function TimingRow({ standing, team, carClass, isEven, carCol, gapCol, lapCol, pitCol, isRaceMode, sectorFlash }: TimingRowProps) {
   const rowBg = isEven ? "bg-zinc-900/60" : "bg-zinc-900/30";
-  const statusBg = STATUS_COLORS[standing.status];
+  const statusInfo = STATUS_INDICATOR[standing.status];
 
   const driverName =
     team?.drivers.find((d) => d.no === standing.driverNo)?.nameE ||
@@ -85,12 +92,15 @@ export default function TimingRow({ standing, team, carClass, isEven, carCol, ga
 
   return (
     <tr className={`${rowBg} ${posFlashClass} ${flFlashClass} hover:bg-zinc-700/40 transition-colors border-b border-zinc-800/30`}>
+      {/* STATUS */}
+      <td className="py-px text-center font-bold" style={{ fontSize: "0.85em" }}>
+        {statusInfo && (
+          <span className={statusInfo.color}>{statusInfo.label}</span>
+        )}
+      </td>
       {/* P */}
-      <td className="py-px text-center">
-        <span className={`inline-flex items-center justify-center rounded-sm font-bold text-white leading-none ${statusBg}`}
-          style={{ width: "1.35em", height: "1.2em", fontSize: "0.9em" }}>
-          {standing.position}
-        </span>
+      <td className="py-px text-center font-bold text-white font-mono">
+        {standing.position}
       </td>
       {isRaceMode && (
         <td className="py-px text-center" style={{ fontSize: "0.75em" }}>
