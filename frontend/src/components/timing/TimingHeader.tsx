@@ -48,12 +48,14 @@ export default function TimingHeader({ sessionInfo }: TimingHeaderProps) {
 
       {/* 下段: 残り時間 + フラグ (左) ... 現在時刻 (右) */}
       <div className="flex items-end justify-between px-3 sm:px-5 py-1 sm:py-1.5">
-        <div className="flex flex-col gap-0.5">
+        <div className="flex items-center gap-3">
           <div className="font-bold font-mono text-white tracking-wider leading-none"
             style={{ fontSize: "var(--timing-fs-xl)" }}>
             {formatRemainingTime(remainingTime)}
           </div>
+          {/* FLAG — 一時的にコメントアウト
           <TrackStatus flag={flag} />
+          */}
         </div>
 
         {/* セッション名 (モバイル) */}
