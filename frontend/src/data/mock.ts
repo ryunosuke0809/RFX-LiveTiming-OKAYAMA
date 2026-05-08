@@ -19,10 +19,10 @@ const seededRandom = mulberry32(42);
 
 export const mockCompetition: Competition = {
   id: "1",
-  nameJ: "2026 AUTOBACS SUPER GT Round4",
-  nameE: "2026 AUTOBACS SUPER GT Round4",
-  startDate: "2026/07/18",
-  endDate: "2026/07/19",
+  nameJ: "2026 AUTOBACS SUPER GT Round1",
+  nameE: "2026 AUTOBACS SUPER GT Round1",
+  startDate: "2026/04/19",
+  endDate: "2026/04/20",
 };
 
 export const mockCategory: Category = {
@@ -36,14 +36,14 @@ export const mockCategory: Category = {
 export const mockRound: Round = {
   id: "1:1:1",
   nameJ: "公式練習",
-  nameE: "Free Practice",
-  type: "T",
+  nameE: "Official Practice",
+  type: "L",
 };
 
 export const mockSession: Session = {
   id: "1:1:1:0:1",
-  nameJ: "公式練習 1回目",
-  nameE: "Free Practice 1",
+  nameJ: "公式練習",
+  nameE: "Official Practice",
   time: "1:30",
   lap: 0,
 };
