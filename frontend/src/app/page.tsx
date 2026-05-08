@@ -161,7 +161,7 @@ export default function TimingPage() {
         <TimingHeader sessionInfo={sessionInfo} />
       </div>
 
-      {/* DEMOコントロール */}
+      {/* DEMOコントロール — 一時的にコメントアウト
       <div className="flex items-center gap-1.5 sm:gap-3 px-2 sm:px-5 pl-11 sm:pl-14 py-1 sm:py-1.5 bg-zinc-900/80 border-b border-zinc-800 flex-wrap overflow-x-auto">
         <span className="text-zinc-600 uppercase tracking-wider flex-shrink-0" style={{ fontSize: "var(--timing-fs-sm)" }}>
           Demo
@@ -217,6 +217,7 @@ export default function TimingPage() {
           </button>
         )}
       </div>
+      */}
 
       <div className="flex flex-1 overflow-hidden">
         <SidePanel
