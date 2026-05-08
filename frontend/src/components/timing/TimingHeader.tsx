@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import type { SessionInfo } from "@/types/smis";
 import TrackStatus from "./TrackStatus";
 import { formatRemainingTime } from "@/lib/format";
@@ -25,15 +26,23 @@ export default function TimingHeader({ sessionInfo }: TimingHeaderProps) {
             {session.nameE}
           </span>
         </div>
-        <div className="flex items-center gap-3 sm:gap-5 flex-shrink-0 leading-none"
-          style={{ fontSize: "var(--timing-fs-sm)" }}>
-          {/* 将来的に <img> ロゴに差替え */}
-          <span className="text-zinc-500 uppercase tracking-wider hidden sm:inline whitespace-nowrap">
-            Okayama International Circuit
-          </span>
-          <span className="font-bold text-zinc-300 uppercase tracking-wider whitespace-nowrap">
-            MOLA
-          </span>
+        <div className="flex items-center gap-3 sm:gap-4 flex-shrink-0">
+          <Image
+            src="/images/okayama-logo.png"
+            alt="Okayama International Circuit"
+            width={140}
+            height={32}
+            className="hidden sm:block object-contain h-6 w-auto"
+            priority
+          />
+          <Image
+            src="/images/mola-logo.png"
+            alt="MOLA System Engineering"
+            width={80}
+            height={28}
+            className="object-contain h-5 sm:h-6 w-auto invert brightness-90"
+            priority
+          />
         </div>
       </div>
 
