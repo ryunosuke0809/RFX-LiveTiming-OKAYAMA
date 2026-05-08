@@ -7,6 +7,7 @@ import type { SectorFlash } from "@/components/timing/TimingTable";
 import StatusBar from "@/components/timing/StatusBar";
 import SidePanel from "@/components/timing/SidePanel";
 import SideMenu from "@/components/layout/SideMenu";
+import SplashScreen from "@/components/layout/SplashScreen";
 import {
   mockSessionInfo,
   mockStandings,
@@ -53,6 +54,7 @@ function randomTimeType(): TimeType {
 }
 
 export default function TimingPage() {
+  const [showSplash, setShowSplash] = useState(true);
   const [sessionInfo, setSessionInfo] = useState<SessionInfo>(mockSessionInfo);
   const [standings, setStandings] = useState<Standing[]>(mockStandings);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -153,8 +155,11 @@ export default function TimingPage() {
 
   const trackCount = getMockTrackCount(standings);
 
+  const handleSplashFinish = useCallback(() => setShowSplash(false), []);
+
   return (
     <div className="h-full flex flex-col">
+      {showSplash && <SplashScreen onFinish={handleSplashFinish} />}
       <SideMenu isOpen={menuOpen} onClose={() => setMenuOpen(!menuOpen)} />
 
       <div className="transition-all duration-300" style={{ paddingLeft: menuOpen ? "220px" : "40px" }}>
