@@ -9,7 +9,12 @@ export default function SchedulePage() {
 
   return (
     <div className="h-full flex flex-col">
-      <SideMenu isOpen={menuOpen} onClose={() => setMenuOpen(!menuOpen)} />
+      <SideMenu
+        isOpen={menuOpen}
+        onClose={() => setMenuOpen(!menuOpen)}
+        activeClassFilter={null}
+        onClassFilterChange={() => {}}
+      />
 
       {/* ヘッダー */}
       <header className="flex items-center justify-between px-4 pl-14 py-4 bg-gradient-to-r from-zinc-900 via-zinc-800 to-zinc-900 border-b border-zinc-700">

@@ -160,7 +160,13 @@ export default function TimingPage() {
   return (
     <div className="h-full flex flex-col">
       {showSplash && <SplashScreen onFinish={handleSplashFinish} />}
-      <SideMenu isOpen={menuOpen} onClose={() => setMenuOpen(!menuOpen)} />
+      <SideMenu
+        isOpen={menuOpen}
+        onClose={() => setMenuOpen(!menuOpen)}
+        classes={mockClasses}
+        activeClassFilter={classFilter}
+        onClassFilterChange={setClassFilter}
+      />
 
       <div className="transition-all duration-300" style={{ paddingLeft: menuOpen ? "220px" : "40px" }}>
         <TimingHeader sessionInfo={sessionInfo} />
