@@ -157,7 +157,7 @@ export default function TimingPage() {
     <div className="h-full flex flex-col">
       <SideMenu isOpen={menuOpen} onClose={() => setMenuOpen(!menuOpen)} />
 
-      <div className="pl-10 sm:pl-12">
+      <div className="transition-all duration-300" style={{ paddingLeft: menuOpen ? "220px" : "40px" }}>
         <TimingHeader sessionInfo={sessionInfo} />
       </div>
 
@@ -219,7 +219,8 @@ export default function TimingPage() {
       </div>
       */}
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden transition-all duration-300" style={{ paddingLeft: menuOpen ? "220px" : "40px" }}>
+        {/* FILTERパネル — 一時的にコメントアウト
         <SidePanel
           classes={mockClasses}
           activeFilter={classFilter}
@@ -227,8 +228,9 @@ export default function TimingPage() {
           isOpen={filterOpen}
           onToggle={() => setFilterOpen(!filterOpen)}
         />
+        */}
 
-        <div className="flex-1 flex flex-col overflow-hidden lg:pl-0">
+        <div className="flex-1 flex flex-col overflow-hidden">
           <TimingTable
             standings={standings}
             classFilter={classFilter}
@@ -239,11 +241,13 @@ export default function TimingPage() {
         </div>
       </div>
 
-      <StatusBar
-        fastestLap={mockFastestLap}
-        weather={mockWeather}
-        trackCount={trackCount}
-      />
+      <div className="transition-all duration-300" style={{ paddingLeft: menuOpen ? "220px" : "40px" }}>
+        <StatusBar
+          fastestLap={mockFastestLap}
+          weather={mockWeather}
+          trackCount={trackCount}
+        />
+      </div>
     </div>
   );
 }
