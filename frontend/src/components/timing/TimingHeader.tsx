@@ -66,8 +66,8 @@ export default function TimingHeader({ sessionInfo }: TimingHeaderProps) {
           </span>
         </div>
 
-        <div className="font-mono text-emerald-400 tabular-nums font-bold leading-none"
-          style={{ fontSize: "var(--timing-fs-lg)" }}>
+        <div className="font-bold font-mono text-emerald-400 tracking-wider leading-none"
+          style={{ fontSize: "var(--timing-fs-xl)" }}>
           {localTime}
         </div>
       </div>
