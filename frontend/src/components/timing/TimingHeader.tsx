@@ -47,7 +47,7 @@ export default function TimingHeader({ sessionInfo }: TimingHeaderProps) {
       </div>
 
       {/* 下段: 残り時間 + フラグ (左) ... 現在時刻 (右) */}
-      <div className="flex items-end justify-between px-3 sm:px-5 py-2 sm:py-3">
+      <div className="flex items-end justify-between px-3 sm:px-5 py-3 sm:py-5">
         <div className="flex items-center gap-3">
           <div className="font-bold font-mono text-white tracking-wider leading-none"
             style={{ fontSize: "var(--timing-fs-xl)" }}>
