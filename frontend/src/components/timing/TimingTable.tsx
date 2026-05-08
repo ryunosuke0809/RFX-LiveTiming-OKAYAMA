@@ -72,7 +72,7 @@ function getColumns(isRaceMode: boolean) {
 }
 
 const FIXED_LABELS: Record<string, string> = {
-  status: "", pos: "P", chg: "", pic: "PIC", nr: "Nr", class: "Class",
+  status: "", pos: "P", chg: "", pic: "PIC", nr: "No.", class: "Class",
   driver: "Driver", best: "Best",
   s1: "S1", s2: "S2", s3: "S3",
 };
