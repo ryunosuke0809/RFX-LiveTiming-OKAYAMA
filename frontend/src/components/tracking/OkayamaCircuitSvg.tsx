@@ -92,12 +92,16 @@ const TIMING_POINTS = [
 interface OkayamaCircuitSvgProps {
   standings?: Standing[];
   showCarMarkers?: boolean;
+  highlightedTeamIds?: Set<string>;
+  onMarkerClick?: (teamId: string) => void;
   className?: string;
 }
 
 export default function OkayamaCircuitSvg({
   standings = [],
   showCarMarkers = false,
+  highlightedTeamIds,
+  onMarkerClick,
   className = "",
 }: OkayamaCircuitSvgProps) {
   return (
@@ -235,48 +239,98 @@ export default function OkayamaCircuitSvg({
       </text>
 
       {/* 車両マーカー (Phase 4で実データ連携) */}
-      {showCarMarkers && standings.slice(0, 15).map((s, i) => {
-        const team = getTeamByStanding(s);
-        const cls = getClassByStanding(s);
-        if (!team) return null;
+      {showCarMarkers && (() => {
+        const total = standings.length;
+        const highlighted = highlightedTeamIds ?? new Set<string>();
+        const hasHighlights = highlighted.size > 0;
 
-        // 仮配置: コース上に均等分散 (将来はgetPointAtLengthで正確配置)
-        const t = i / 15;
-        let x: number, y: number;
-        if (t < 0.26) {
-          const p = t / 0.26;
-          x = 200 + p * 340;
-          y = 710 - p * 300;
-        } else if (t < 0.68) {
-          const p = (t - 0.26) / 0.42;
-          x = 540 - p * 440;
-          y = 410 - 200 * Math.sin(p * Math.PI);
-        } else {
-          const p = (t - 0.68) / 0.32;
-          x = 100 + p * 100;
-          y = 508 + p * 202;
-        }
+        // 非ハイライト車両を先に描画、ハイライト車両を上に描画
+        const sorted = [...standings].sort((a, b) => {
+          const aH = highlighted.has(a.teamId) ? 1 : 0;
+          const bH = highlighted.has(b.teamId) ? 1 : 0;
+          return aH - bH;
+        });
 
-        const fillColor = cls?.color || "#71717a";
+        return sorted.map((s) => {
+          const team = getTeamByStanding(s);
+          const cls = getClassByStanding(s);
+          if (!team) return null;
 
-        return (
-          <g key={s.teamId} filter="url(#glow)">
-            <circle cx={x} cy={y} r="9" fill={fillColor} opacity="0.95" stroke="#000" strokeWidth="1" />
-            <text
-              x={x}
-              y={y + 1}
-              textAnchor="middle"
-              dominantBaseline="central"
-              fill="white"
-              fontSize="7"
-              fontWeight="bold"
-              fontFamily="sans-serif"
+          const origIdx = standings.findIndex((st) => st.teamId === s.teamId);
+          const t = total > 1 ? origIdx / total : 0;
+          let x: number, y: number;
+          if (t < 0.26) {
+            const p = t / 0.26;
+            x = 200 + p * 340;
+            y = 710 - p * 300;
+          } else if (t < 0.68) {
+            const p = (t - 0.26) / 0.42;
+            x = 540 - p * 440;
+            y = 410 - 200 * Math.sin(p * Math.PI);
+          } else {
+            const p = (t - 0.68) / 0.32;
+            x = 100 + p * 100;
+            y = 508 + p * 202;
+          }
+
+          const isHighlighted = highlighted.has(s.teamId);
+          const fillColor = cls?.color || "#71717a";
+          const dimmed = hasHighlights && !isHighlighted;
+          const r = isHighlighted ? 13 : 9;
+
+          return (
+            <g
+              key={s.teamId}
+              filter={isHighlighted ? "url(#glow-strong)" : undefined}
+              style={{ cursor: onMarkerClick ? "pointer" : undefined }}
+              onClick={onMarkerClick ? () => onMarkerClick(s.teamId) : undefined}
             >
-              {team.no}
-            </text>
-          </g>
-        );
-      })}
+              {/* ハイライト時のパルスリング */}
+              {isHighlighted && (
+                <circle cx={x} cy={y} r={r + 4} fill="none" stroke={fillColor} strokeWidth="2" opacity="0.4">
+                  <animate attributeName="r" values={`${r + 2};${r + 8};${r + 2}`} dur="2s" repeatCount="indefinite" />
+                  <animate attributeName="opacity" values="0.5;0.1;0.5" dur="2s" repeatCount="indefinite" />
+                </circle>
+              )}
+              <circle
+                cx={x} cy={y} r={r}
+                fill={fillColor}
+                opacity={dimmed ? 0.3 : 0.95}
+                stroke={isHighlighted ? "#fff" : "#000"}
+                strokeWidth={isHighlighted ? 2 : 1}
+              />
+              <text
+                x={x} y={y + 1}
+                textAnchor="middle"
+                dominantBaseline="central"
+                fill="white"
+                fontSize={isHighlighted ? 9 : 7}
+                fontWeight="bold"
+                fontFamily="sans-serif"
+                opacity={dimmed ? 0.4 : 1}
+              >
+                {team.no}
+              </text>
+              {/* ハイライト時: チーム名ラベル */}
+              {isHighlighted && (
+                <g>
+                  <rect
+                    x={x + r + 4} y={y - 14}
+                    width={Math.max(team.nameE.length * 4.5, 60)} height="16"
+                    rx="3" fill="#18181b" stroke={fillColor} strokeWidth="1" opacity="0.9"
+                  />
+                  <text
+                    x={x + r + 8} y={y - 5}
+                    fill="#e4e4e7" fontSize="7" fontWeight="bold" fontFamily="sans-serif"
+                  >
+                    {team.nameE}
+                  </text>
+                </g>
+              )}
+            </g>
+          );
+        });
+      })()}
     </svg>
   );
 }
