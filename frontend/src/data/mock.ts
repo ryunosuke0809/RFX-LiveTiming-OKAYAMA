@@ -2,6 +2,7 @@ import type {
   Competition, Category, Round, Session, CarClass, Team,
   Standing, SessionInfo, FastestLap, WeatherData, TrackCount,
   ScheduleEntry, CarStatus, TimeType, SectorTime,
+  LapData, DriverPersonalData,
 } from "@/types/smis";
 
 // Mulberry32 PRNG — SSR/CSR で同じ結果を返す
@@ -354,4 +355,92 @@ export function getTeamByStanding(standing: Standing): Team | undefined {
 
 export function getClassByStanding(standing: Standing): CarClass | undefined {
   return mockClasses.find((c) => c.id === standing.classId);
+}
+
+function generateMockLapData(standing: Standing): DriverPersonalData {
+  const rng = mulberry32(Number(standing.teamId.replace(/:/g, "")) + 100);
+  const isGT500 = standing.classId === "1:1:1";
+  const baseLap = isGT500 ? 780000 : 850000;
+  const baseS1 = isGT500 ? 255000 : 278000;
+  const baseS2 = isGT500 ? 268000 : 292000;
+  const baseS3 = isGT500 ? 257000 : 280000;
+
+  const lapCount = standing.lap || Math.max(3, 8 + Math.floor(rng() * 8));
+  const laps: LapData[] = [];
+
+  let bestLapTime: number | null = null;
+  let bestLap = 0;
+  let bestS1: number | null = null;
+  let bestS2: number | null = null;
+  let bestS3: number | null = null;
+  let totalPits = 0;
+  let sumLap = 0;
+  let validLaps = 0;
+
+  for (let i = 1; i <= lapCount; i++) {
+    const isPit = rng() < 0.12;
+    if (isPit) totalPits++;
+
+    const variance = isPit ? 2.5 : 1.0;
+    const s1 = baseS1 + Math.floor((rng() - 0.4) * 15000 * variance);
+    const s2 = baseS2 + Math.floor((rng() - 0.4) * 18000 * variance);
+    const s3 = baseS3 + Math.floor((rng() - 0.4) * 12000 * variance);
+    const lapTime = s1 + s2 + s3 + (isPit ? 200000 + Math.floor(rng() * 100000) : 0);
+
+    const s1Type: TimeType = bestS1 === null || s1 < bestS1 ? (rng() < 0.3 ? "overall_best" : "personal_best") : "current";
+    const s2Type: TimeType = bestS2 === null || s2 < bestS2 ? (rng() < 0.3 ? "overall_best" : "personal_best") : "current";
+    const s3Type: TimeType = bestS3 === null || s3 < bestS3 ? (rng() < 0.3 ? "overall_best" : "personal_best") : "current";
+
+    if (!isPit) {
+      if (bestS1 === null || s1 < bestS1) bestS1 = s1;
+      if (bestS2 === null || s2 < bestS2) bestS2 = s2;
+      if (bestS3 === null || s3 < bestS3) bestS3 = s3;
+      if (bestLapTime === null || lapTime < bestLapTime) {
+        bestLapTime = lapTime;
+        bestLap = i;
+      }
+      sumLap += lapTime;
+      validLaps++;
+    }
+
+    const lapTimeType: TimeType =
+      !isPit && bestLapTime !== null && lapTime <= bestLapTime
+        ? (rng() < 0.25 ? "overall_best" : "personal_best")
+        : "current";
+
+    laps.push({
+      lap: i,
+      lapTime,
+      s1,
+      s2,
+      s3,
+      s1Type: isPit ? "current" : s1Type,
+      s2Type: isPit ? "current" : s2Type,
+      s3Type: isPit ? "current" : s3Type,
+      lapTimeType: isPit ? "current" : lapTimeType,
+      isPit,
+      position: standing.position + Math.floor((rng() - 0.5) * 4),
+    });
+  }
+
+  return {
+    teamId: standing.teamId,
+    laps,
+    bestLapTime,
+    bestLap,
+    bestS1,
+    bestS2,
+    bestS3,
+    totalPits,
+    avgLapTime: validLaps > 0 ? Math.floor(sumLap / validLaps) : null,
+  };
+}
+
+const _personalDataCache: Record<string, DriverPersonalData> = {};
+
+export function getMockPersonalData(standing: Standing): DriverPersonalData {
+  if (!_personalDataCache[standing.teamId]) {
+    _personalDataCache[standing.teamId] = generateMockLapData(standing);
+  }
+  return _personalDataCache[standing.teamId];
 }

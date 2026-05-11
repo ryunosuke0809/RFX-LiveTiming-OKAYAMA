@@ -18,6 +18,7 @@ interface TimingTableProps {
   flashKey?: number;
   isRaceMode?: boolean;
   sectorFlashes?: SectorFlash[];
+  onRowClick?: (standing: Standing) => void;
 }
 
 export type CarColMode = "car" | "team";
@@ -77,7 +78,7 @@ const FIXED_LABELS: Record<string, string> = {
   s1: "S1", s2: "S2", s3: "S3",
 };
 
-export default function TimingTable({ standings, classFilter, flashKey = 0, isRaceMode = false, sectorFlashes = [] }: TimingTableProps) {
+export default function TimingTable({ standings, classFilter, flashKey = 0, isRaceMode = false, sectorFlashes = [], onRowClick }: TimingTableProps) {
   const [carCol, setCarCol] = useState<CarColMode>("car");
   const [gapCol, setGapCol] = useState<GapColMode>("gap");
   const [lapCol, setLapCol] = useState<LapColMode>("laps");
@@ -157,6 +158,7 @@ export default function TimingTable({ standings, classFilter, flashKey = 0, isRa
                 pitCol={pitCol}
                 isRaceMode={isRaceMode}
                 sectorFlash={sf?.sector}
+                onClick={onRowClick ? () => onRowClick(standing) : undefined}
               />
             );
           })}

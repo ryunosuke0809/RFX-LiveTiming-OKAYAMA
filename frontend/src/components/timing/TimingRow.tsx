@@ -18,6 +18,7 @@ interface TimingRowProps {
   pitCol: PitColMode;
   isRaceMode: boolean;
   sectorFlash?: 0 | 1 | 2 | 3; // 0=FL(行全体), 1=S1, 2=S2, 3=S3
+  onClick?: () => void;
 }
 
 function getSectorFlashClass(type: string): string {
@@ -30,7 +31,7 @@ const STATUS_INDICATOR: Record<string, { label: string; color: string }> = {
   in_pit: { label: "P", color: "text-cyan-400" },
 };
 
-export default function TimingRow({ standing, team, carClass, isEven, carCol, gapCol, lapCol, pitCol, isRaceMode, sectorFlash }: TimingRowProps) {
+export default function TimingRow({ standing, team, carClass, isEven, carCol, gapCol, lapCol, pitCol, isRaceMode, sectorFlash, onClick }: TimingRowProps) {
   const rowBg = isEven ? "bg-zinc-900/60" : "bg-zinc-900/30";
   const statusInfo = STATUS_INDICATOR[standing.status];
 
@@ -88,7 +89,10 @@ export default function TimingRow({ standing, team, carClass, isEven, carCol, ga
   };
 
   return (
-    <tr className={`${rowBg} ${posFlashClass} ${flFlashClass} hover:bg-zinc-700/40 transition-colors border-b border-zinc-800/30`}>
+    <tr
+      className={`${rowBg} ${posFlashClass} ${flFlashClass} hover:bg-zinc-700/40 transition-colors border-b border-zinc-800/30 ${onClick ? "cursor-pointer" : ""}`}
+      onClick={onClick}
+    >
       {/* STATUS */}
       <td className="py-px text-center font-bold" style={{ fontSize: "0.85em" }}>
         {statusInfo && (

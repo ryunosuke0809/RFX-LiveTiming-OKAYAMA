@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import SideMenu from "@/components/layout/SideMenu";
+import DriverDetailPanel from "@/components/shared/DriverDetailPanel";
 import {
   mockStandings,
   mockClasses,
@@ -10,6 +11,7 @@ import {
   mockSchedule,
   getTeamByStanding,
   getClassByStanding,
+  getMockPersonalData,
 } from "@/data/mock";
 import { formatTime } from "@/lib/format";
 import type { Standing } from "@/types/smis";
@@ -87,6 +89,7 @@ export default function ResultPage() {
   const [activeTab, setActiveTab] = useState<ResultTab>("current");
   const [classFilter, setClassFilter] = useState<string | null>(null);
 
+  const [selectedStanding, setSelectedStanding] = useState<Standing | null>(null);
   const [calYear, setCalYear] = useState(2026);
   const [calMonth, setCalMonth] = useState(new Date().getMonth());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -181,6 +184,7 @@ export default function ResultPage() {
             standings={sortedStandings}
             classFilter={classFilter}
             onDownload={handleDownloadCsv}
+            onRowClick={(s) => setSelectedStanding(s)}
           />
         ) : (
           <CalendarView
@@ -197,6 +201,16 @@ export default function ResultPage() {
           />
         )}
       </div>
+
+      {selectedStanding && (
+        <DriverDetailPanel
+          standing={selectedStanding}
+          team={getTeamByStanding(selectedStanding)}
+          carClass={getClassByStanding(selectedStanding)}
+          personalData={getMockPersonalData(selectedStanding)}
+          onClose={() => setSelectedStanding(null)}
+        />
+      )}
     </div>
   );
 }
@@ -205,10 +219,12 @@ function CurrentResultView({
   standings,
   classFilter,
   onDownload,
+  onRowClick,
 }: {
   standings: Standing[];
   classFilter: string | null;
   onDownload: () => void;
+  onRowClick: (standing: Standing) => void;
 }) {
   return (
     <div className="p-4">
@@ -283,7 +299,8 @@ function CurrentResultView({
               return (
                 <tr
                   key={s.teamId}
-                  className={`border-b border-zinc-800/70 hover:bg-zinc-800/50 transition-colors ${
+                  onClick={() => onRowClick(s)}
+                  className={`border-b border-zinc-800/70 hover:bg-zinc-800/50 transition-colors cursor-pointer ${
                     idx % 2 === 0 ? "bg-zinc-900/40" : "bg-zinc-900/20"
                   }`}
                 >

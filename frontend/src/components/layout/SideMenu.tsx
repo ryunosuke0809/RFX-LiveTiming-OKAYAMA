@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import type { CarClass } from "@/types/smis";
 
 interface SideMenuProps {
@@ -15,6 +15,7 @@ interface SideMenuProps {
 
 export default function SideMenu({ isOpen, onClose, classes = [], activeClassFilter, onClassFilterChange }: SideMenuProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const [timingExpanded, setTimingExpanded] = useState(false);
 
   const isTimingPage = pathname === "/";
@@ -45,7 +46,11 @@ export default function SideMenu({ isOpen, onClose, classes = [], activeClassFil
         <div>
           <button
             onClick={() => {
-              if (isOpen) {
+              if (!isOpen) {
+                router.push("/");
+              } else if (!isTimingPage) {
+                router.push("/");
+              } else {
                 setTimingExpanded(!timingExpanded);
               }
             }}

@@ -8,6 +8,7 @@ import StatusBar from "@/components/timing/StatusBar";
 import SidePanel from "@/components/timing/SidePanel";
 import SideMenu from "@/components/layout/SideMenu";
 import SplashScreen from "@/components/layout/SplashScreen";
+import DriverDetailPanel from "@/components/shared/DriverDetailPanel";
 import {
   mockSessionInfo,
   mockStandings,
@@ -15,6 +16,9 @@ import {
   mockFastestLap,
   mockWeather,
   getMockTrackCount,
+  getTeamByStanding,
+  getClassByStanding,
+  getMockPersonalData,
 } from "@/data/mock";
 import { formatLocalTime } from "@/lib/format";
 import type { SessionInfo, Standing, TimeType, SectorTime } from "@/types/smis";
@@ -65,6 +69,7 @@ export default function TimingPage() {
   const [autoRunning, setAutoRunning] = useState(false);
   const [sectorFlashes, setSectorFlashes] = useState<SectorFlash[]>([]);
   const [sectorDemoRunning, setSectorDemoRunning] = useState(false);
+  const [selectedStanding, setSelectedStanding] = useState<Standing | null>(null);
 
   const posIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const secIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -248,6 +253,7 @@ export default function TimingPage() {
             flashKey={flashKey}
             isRaceMode={isRaceMode}
             sectorFlashes={sectorFlashes}
+            onRowClick={(standing) => setSelectedStanding(standing)}
           />
         </div>
       </div>
@@ -259,6 +265,16 @@ export default function TimingPage() {
           trackCount={trackCount}
         />
       </div>
+
+      {selectedStanding && (
+        <DriverDetailPanel
+          standing={selectedStanding}
+          team={getTeamByStanding(selectedStanding)}
+          carClass={getClassByStanding(selectedStanding)}
+          personalData={getMockPersonalData(selectedStanding)}
+          onClose={() => setSelectedStanding(null)}
+        />
+      )}
     </div>
   );
 }

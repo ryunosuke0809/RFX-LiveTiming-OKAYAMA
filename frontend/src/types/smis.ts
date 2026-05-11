@@ -149,3 +149,29 @@ export interface ScheduleEntry {
   localTime: string;
   hasResults: boolean;
 }
+
+export interface LapData {
+  lap: number;
+  lapTime: number | null;
+  s1: number | null;
+  s2: number | null;
+  s3: number | null;
+  s1Type: TimeType;
+  s2Type: TimeType;
+  s3Type: TimeType;
+  lapTimeType: TimeType;
+  isPit: boolean;
+  position: number;
+}
+
+export interface DriverPersonalData {
+  teamId: string;
+  laps: LapData[];
+  bestLapTime: number | null;
+  bestLap: number;
+  bestS1: number | null;
+  bestS2: number | null;
+  bestS3: number | null;
+  totalPits: number;
+  avgLapTime: number | null;
+}
