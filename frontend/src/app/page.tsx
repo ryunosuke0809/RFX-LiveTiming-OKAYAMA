@@ -58,7 +58,10 @@ function randomTimeType(): TimeType {
 }
 
 export default function TimingPage() {
-  const [showSplash, setShowSplash] = useState(true);
+  const [showSplash, setShowSplash] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return !sessionStorage.getItem("splash_shown");
+  });
   const [sessionInfo, setSessionInfo] = useState<SessionInfo>(mockSessionInfo);
   const [standings, setStandings] = useState<Standing[]>(mockStandings);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -160,7 +163,10 @@ export default function TimingPage() {
 
   const trackCount = getMockTrackCount(standings);
 
-  const handleSplashFinish = useCallback(() => setShowSplash(false), []);
+  const handleSplashFinish = useCallback(() => {
+    setShowSplash(false);
+    sessionStorage.setItem("splash_shown", "1");
+  }, []);
 
   return (
     <div className="h-full flex flex-col">
