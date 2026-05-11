@@ -51,13 +51,14 @@ export default function StatusBar({ fastestLap, weather, trackCount }: StatusBar
         </div>
       </div>
 
-      {/* WEATHER */}
+      {/* WEATHER — データ取得手段がないため一時コメントアウト
       <div className="hidden md:flex items-center gap-3 sm:gap-4 text-zinc-500" style={{ fontSize: "0.9em" }}>
         <span>Air <span className="text-zinc-300 font-mono">{weather.airTemp}°C</span></span>
         <span>Track <span className="text-zinc-300 font-mono">{weather.trackTemp}°C</span></span>
         <span className="hidden lg:inline">Hum <span className="text-zinc-300 font-mono">{weather.humidity}%</span></span>
         <span className="hidden lg:inline">Wind <span className="text-zinc-300 font-mono">{weather.windSpeed}m/s</span></span>
       </div>
+      */}
     </footer>
   );
 }

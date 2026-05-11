@@ -224,6 +224,7 @@ export default function ResultPage() {
             selectedDate={selectedDate}
             onSelectDate={setSelectedDate}
             selectedDateEvents={selectedDateEvents}
+            onViewSession={() => setActiveTab("classification")}
           />
         )}
       </div>
@@ -517,12 +518,14 @@ function IndividualView({
 function CalendarView({
   year, month, days, monthNames, dayNames,
   onPrevMonth, onNextMonth, selectedDate, onSelectDate, selectedDateEvents,
+  onViewSession,
 }: {
   year: number; month: number; days: (number | null)[];
   monthNames: string[]; dayNames: string[];
   onPrevMonth: () => void; onNextMonth: () => void;
   selectedDate: string | null; onSelectDate: (d: string | null) => void;
   selectedDateEvents: string[];
+  onViewSession: (session: string) => void;
 }) {
   return (
     <div className="p-4 max-w-4xl mx-auto">
@@ -586,7 +589,12 @@ function CalendarView({
                     <span className="text-xs text-zinc-500 ml-2">{mockSessionInfo.competition.nameE}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <button className="px-3 py-1.5 rounded-md text-xs font-bold bg-zinc-700 text-zinc-300 hover:bg-zinc-600 hover:text-white transition-colors">View</button>
+                    <button
+                      onClick={() => onViewSession(session)}
+                      className="px-3 py-1.5 rounded-md text-xs font-bold bg-zinc-700 text-zinc-300 hover:bg-zinc-600 hover:text-white transition-colors"
+                    >
+                      View
+                    </button>
                     <button className="px-3 py-1.5 rounded-md text-xs font-bold bg-amber-600 text-white hover:bg-amber-500 transition-colors">CSV</button>
                   </div>
                 </div>
@@ -618,7 +626,10 @@ function CalendarView({
                   <td className="py-2.5 px-4 text-sm text-zinc-300">{entry.session}</td>
                   <td className="py-2.5 px-4 text-center">
                     {entry.hasResults ? (
-                      <button className="px-3 py-1 rounded text-xs font-bold bg-amber-600 text-white hover:bg-amber-500 transition-colors">Results</button>
+                      <button
+                        onClick={() => onViewSession(entry.session)}
+                        className="px-3 py-1 rounded text-xs font-bold bg-amber-600 text-white hover:bg-amber-500 transition-colors"
+                      >Results</button>
                     ) : (
                       <span className="text-xs text-zinc-600">—</span>
                     )}
