@@ -58,11 +58,28 @@ export const SECTOR_LABEL_POSITIONS: { s1?: Vec2; s2?: Vec2; s3?: Vec2 } = {
  */
 export const TIMING_LABEL_OFFSET = 32;
 
-export type SectorAsset = { id: "s1" | "s2" | "s3"; d: string; offset: Vec2 };
+export type SectorAsset = {
+  id: "s1" | "s2" | "s3";
+  d: string;
+  offset: Vec2;
+  /**
+   * セクター個別のスムージング上書き。
+   *   samples を減らす + iterations を増やすほど角が大きく丸まる。
+   */
+  smoothing?: { samples?: number; iterations?: number };
+};
 
-/** Sec1 → Sec2 → Sec3 の順序固定（一周ラップを構成） */
+/**
+ * Sec1 → Sec2 → Sec3 の順序固定（一周ラップを構成）。
+ * Sec1 は元 SVG に細かい折れ点が多いため、スムージングを強めにかけて綺麗なカーブにする。
+ */
 export const TRACK_SECTORS: [SectorAsset, SectorAsset, SectorAsset] = [
-  { id: "s1", d: TRACK_PATH_S1, offset: TRACK_OFFSETS.s1 },
+  {
+    id: "s1",
+    d: TRACK_PATH_S1,
+    offset: TRACK_OFFSETS.s1,
+    smoothing: { samples: 38, iterations: 6 },
+  },
   { id: "s2", d: TRACK_PATH_S2, offset: TRACK_OFFSETS.s2 },
   { id: "s3", d: TRACK_PATH_S3, offset: TRACK_OFFSETS.s3 },
 ];

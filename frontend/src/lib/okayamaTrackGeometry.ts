@@ -50,9 +50,10 @@ function sampleSectorWorld(svg: SVGSVGElement, sector: SectorAsset): Vec2[] {
   try {
     const len = p.getTotalLength();
     if (!Number.isFinite(len) || len <= 0) return [];
+    const sampleCount = Math.max(8, sector.smoothing?.samples ?? SAMPLES_PER_SECTOR);
     const samples: Vec2[] = [];
-    for (let i = 0; i <= SAMPLES_PER_SECTOR; i++) {
-      const pt = p.getPointAtLength((i / SAMPLES_PER_SECTOR) * len);
+    for (let i = 0; i <= sampleCount; i++) {
+      const pt = p.getPointAtLength((i / sampleCount) * len);
       samples.push({ x: pt.x + sector.offset.x, y: pt.y + sector.offset.y });
     }
     return samples;
@@ -158,7 +159,12 @@ export function buildOkayamaLapGeometry(
     const rawSectorPolys = sectors.map((s) => sampleSectorWorld(svg, s));
     if (rawSectorPolys.some((p) => p.length < 2)) return null;
 
-    const smoothPolys = rawSectorPolys.map((p) => smoothPolyline(p));
+    const smoothPolys = rawSectorPolys.map((p, i) =>
+      smoothPolyline(
+        p,
+        sectors[i]?.smoothing?.iterations ?? SMOOTHING_ITERATIONS,
+      ),
+    );
     const sectorDs = {
       s1: polylineToD(smoothPolys[0]!),
       s2: polylineToD(smoothPolys[1]!),
