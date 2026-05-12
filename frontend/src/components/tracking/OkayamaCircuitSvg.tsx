@@ -297,7 +297,18 @@ export default function OkayamaCircuitSvg({
             const halfBand = 22;
             const segH = 4;
             const segs = Math.max(2, Math.round((halfBand * 2) / segH));
-            const labelPos = offsetOutside(fl, center, TIMING_LABEL_OFFSET + 12);
+
+            // FL ラインに直交する方向のうち、ラップ中心から離れる側（＝コース外側）を選ぶ
+            const perpA = { x: tan.y, y: -tan.x };
+            const dCOx = fl.x - center.x;
+            const dCOy = fl.y - center.y;
+            const sign = perpA.x * dCOx + perpA.y * dCOy >= 0 ? 1 : -1;
+            const perpOut = { x: perpA.x * sign, y: perpA.y * sign };
+            const labelDist = TIMING_LABEL_OFFSET + 14;
+            const labelPos = {
+              x: fl.x + perpOut.x * labelDist,
+              y: fl.y + perpOut.y * labelDist,
+            };
             return (
               <g key="fl-marker">
                 <g transform={`translate(${fl.x} ${fl.y}) rotate(${angleDeg})`}>
@@ -319,9 +330,10 @@ export default function OkayamaCircuitSvg({
                     />
                   ))}
                 </g>
+                {/* クレセント＋FL を視覚中心が labelPos に来るように左寄せ配置 */}
                 <g transform={`translate(${labelPos.x} ${labelPos.y})`}>
                   <path
-                    d="M 8 -10 A 12 12 0 0 0 8 10"
+                    d="M -10 -8 A 10 10 0 0 1 -10 8"
                     fill="none"
                     stroke="#22c55e"
                     strokeWidth={5}
@@ -329,13 +341,14 @@ export default function OkayamaCircuitSvg({
                     filter="url(#glow)"
                   />
                   <text
-                    x={18}
+                    x={6}
                     y={1}
                     fill="#fafafa"
                     fontSize={18}
                     fontWeight={900}
                     fontFamily="sans-serif"
                     dominantBaseline="middle"
+                    textAnchor="middle"
                     style={{ paintOrder: "stroke" }}
                     stroke="#0a0a0a"
                     strokeWidth={3}
