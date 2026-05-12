@@ -15,6 +15,7 @@ import {
   OKAYAMA_TRACK_CENTER,
   OKAYAMA_TRACK_VIEWBOX,
   SECTOR_LABEL_POSITIONS,
+  TIMING_LABEL_OFFSET,
 } from "@/lib/okayamaTrackAsset";
 import {
   buildOkayamaLapGeometry,
@@ -44,6 +45,17 @@ const PAN_DRAG_THRESHOLD = 4;
 const BOUNDARY_LINE_COLOR = "#f59e0b";
 /** 路面ストロークが 38px なので、はみ出すよう半分の長さを 26px に */
 const BOUNDARY_HALF_LEN = 26;
+
+/**
+ * 路面中心 `lapCenter` から外側へ `dist` ぶん押し出した座標を返す。
+ * タイミング点ラベルを路面に被らせないために使う。
+ */
+function offsetOutside(p: Vec2, lapCenter: Vec2, dist: number): Vec2 {
+  const dx = p.x - lapCenter.x;
+  const dy = p.y - lapCenter.y;
+  const d = Math.hypot(dx, dy) || 1;
+  return { x: p.x + (dx / d) * dist, y: p.y + (dy / d) * dist };
+}
 
 /**
  * 接線 `tangent` に直交する方向で `p` を通る横断ラインを路面の幅より広く引く。
@@ -326,39 +338,42 @@ export default function OkayamaCircuitSvg({
             </>
           )}
 
-          {/* タイミング点ラベル（FL / S1 / S2） */}
+          {/* タイミング点ラベル（FL / S1 / S2）— コース外側に押し出して路面と重ならないよう配置 */}
           {timing &&
             [
               { p: timing.fl, label: "FL" },
               { p: timing.s1End, label: "S1" },
               { p: timing.s2End, label: "S2" },
-            ].map(({ p, label }) => (
-              <g key={label}>
-                <rect
-                  x={p.x - 12}
-                  y={p.y - 22}
-                  width="24"
-                  height="14"
-                  rx="2"
-                  fill="#18181b"
-                  stroke="#f59e0b"
-                  strokeWidth="1"
-                  opacity={0.9}
-                />
-                <text
-                  x={p.x}
-                  y={p.y - 12}
-                  textAnchor="middle"
-                  dominantBaseline="central"
-                  fill="#f59e0b"
-                  fontSize="9"
-                  fontWeight="bold"
-                  fontFamily="sans-serif"
-                >
-                  {label}
-                </text>
-              </g>
-            ))}
+            ].map(({ p, label }) => {
+              const lp = offsetOutside(p, center, TIMING_LABEL_OFFSET);
+              return (
+                <g key={label}>
+                  <rect
+                    x={lp.x - 12}
+                    y={lp.y - 7}
+                    width="24"
+                    height="14"
+                    rx="2"
+                    fill="#18181b"
+                    stroke="#f59e0b"
+                    strokeWidth="1"
+                    opacity={0.92}
+                  />
+                  <text
+                    x={lp.x}
+                    y={lp.y + 1}
+                    textAnchor="middle"
+                    dominantBaseline="central"
+                    fill="#f59e0b"
+                    fontSize="9"
+                    fontWeight="bold"
+                    fontFamily="sans-serif"
+                  >
+                    {label}
+                  </text>
+                </g>
+              );
+            })}
 
           {/* マシンマーカー（ラップ上に等間隔配置） */}
           {showCarMarkers && (() => {

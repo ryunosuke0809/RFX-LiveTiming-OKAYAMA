@@ -44,12 +44,19 @@ export const TRACK_OFFSETS = {
  * セクターラベルのワールド座標。`undefined` の場合はセクター BBox の中心を自動採用。
  * 「12 号車の上」「56 号車の右横」など要望に応じてここで微調整する。
  *
- * S2 は Sec2 のロングバックストレート（(323,46)〜(1177,347) の対角線）の中ほどの上に配置する。
+ * S2 は Sec2 のロングバックストレート（(323,46)〜(1177,347) の対角線）の中ほどの上空。
+ * S3 は Sec3 右ループ（最右 x≈1664）のさらに右側、コース外側に配置。
  */
 export const SECTOR_LABEL_POSITIONS: { s1?: Vec2; s2?: Vec2; s3?: Vec2 } = {
   s2: { x: 720, y: 110 },
-  s3: { x: 1530, y: 555 },
+  s3: { x: 1720, y: 480 },
 };
+
+/**
+ * FL / S1 / S2 のタイミング点ラベル（小箱）をコース外側にどれだけ離すかの距離（px）。
+ * 路面のストローク（38px）の半分＋ラベル高に余裕を取った値。
+ */
+export const TIMING_LABEL_OFFSET = 32;
 
 export type SectorAsset = { id: "s1" | "s2" | "s3"; d: string; offset: Vec2 };
 
