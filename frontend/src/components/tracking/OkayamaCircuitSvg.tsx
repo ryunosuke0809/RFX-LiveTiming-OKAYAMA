@@ -3,16 +3,28 @@
 /**
  * 岡山国際サーキット SVG コースマップ
  *
- * 向き: 衛星図と同じ（上が北、下側がメイン／ピットストレート、時計回り）。
- * S1〜S3 はオーバーレイ（S1=青・S2=赤・S3=緑）に沿った概形。精密な座標は /dev/circuit-map-editor で再トレース可。
- *
- * 将来: getPointAtLength() で車両マーカーをパス上に配置・移動
+ * セクター境界は書き出し SVG（S1/S2/S3）に準拠。一周ラップはクライアントで結合したパスを
+ * サンプリングし、マーカーをそのライン上に配置する。
  */
 
+import { useLayoutEffect, useState } from "react";
 import type { Standing } from "@/types/smis";
 import { getTeamByStanding, getClassByStanding } from "@/data/mock";
+import {
+  OKAYAMA_TRACK_VIEWBOX,
+  TRACK_PATH_PIT_IN,
+  TRACK_PATH_S1,
+  TRACK_PATH_S2,
+  TRACK_PATH_S3,
+  TRACK_SECTOR_PATHS,
+} from "@/lib/okayamaTrackAsset";
+import {
+  buildOkayamaLapGeometry,
+  pointOnLapSamples,
+  type OkayamaLapGeometry,
+  type Vec2,
+} from "@/lib/okayamaTrackGeometry";
 
-// --- セクター色（衛星オーバーレイと対応）---
 const SECTOR_COLORS = {
   s1: "#3b82f6",
   s2: "#ef4444",
@@ -20,95 +32,13 @@ const SECTOR_COLORS = {
   pit: "#a1a1aa",
 };
 
-function stripLeadingMove(d: string): string {
-  return d.replace(/^M\s+[\d.]+\s+[\d.]+\s+/, "");
-}
+/** PIT OUT ラベル近似位置（ラップ上の正規化距離。レイアウト調整用） */
+const PIT_OUT_LAP_T = 0.82;
 
-// --- SVG パス（viewBox 0 0 1000 560）時計回り: FL → 西へメイン直線 → 左の大回り → 上のバックストレート → 右ヘアピン手前まで S1 ---
+const TRACK_STROKE_WIDE = 32;
+const TRACK_STROKE_LINE = 7;
 
-const PATH_S1 =
-  "M 545 508 L 480 510 L 380 508 L 280 502 L 200 490 L 145 460 L 105 415 L 78 360 L 62 300 L 65 235 L 88 175 L 135 125 L 205 88 L 295 68 L 410 65 L 530 75 L 650 95 L 750 130 L 820 175 L 865 225 L 882 275 L 878 312";
-
-const PATH_S2 =
-  "M 878 312 L 900 345 L 910 395 L 895 445 L 855 485 L 780 510 L 680 522 L 580 526 L 520 528";
-
-const PATH_S3 =
-  "M 520 528 L 680 524 L 840 515 L 928 498 L 968 455 L 982 395 L 962 328 L 900 268 L 805 235 L 695 228 L 582 248 L 478 298 L 402 365 L 372 430 L 398 488 L 475 508 L 545 508";
-
-const PATH_PIT =
-  "M 798 490 L 640 478 L 520 466 L 400 472 L 242 476 L 222 488";
-
-const FL_POINT = { x: 545, y: 508 };
-const PIT_IN_POINT = { x: 798, y: 490 };
-const PIT_OUT_POINT = { x: 222, y: 488 };
-
-/** S1 終端 = S2 始端（右ヘアピン手前） */
-const S1_END = { x: 878, y: 312 };
-/** S2 終端 = S3 始端（メインストレート上） */
-const S2_END = { x: 520, y: 528 };
-
-/** 全周ラップ用 1 path（M/L のみ想定） */
-export const PATH_FULL_CIRCUIT = `${PATH_S1} ${stripLeadingMove(PATH_S2)} ${stripLeadingMove(PATH_S3)}`;
-
-type XY = { x: number; y: number };
-
-function parseMlPath(d: string): [number, number][] {
-  const pts: [number, number][] = [];
-  for (const m of d.matchAll(/[ML]\s*([\d.]+)\s+([\d.]+)/g)) {
-    pts.push([Number(m[1]), Number(m[2])]);
-  }
-  return pts;
-}
-
-const MOCK_LAP_POINTS = parseMlPath(PATH_FULL_CIRCUIT);
-
-function mockPointOnLap(t: number): XY {
-  const pts = MOCK_LAP_POINTS;
-  if (pts.length < 2) return { x: 500, y: 280 };
-  const segs: number[] = [];
-  let total = 0;
-  for (let i = 0; i < pts.length - 1; i++) {
-    const [x1, y1] = pts[i];
-    const [x2, y2] = pts[i + 1];
-    const len = Math.hypot(x2 - x1, y2 - y1);
-    segs.push(len);
-    total += len;
-  }
-  if (total < 1e-6) return { x: pts[0][0], y: pts[0][1] };
-  let dist = (((t % 1) + 1) % 1) * total;
-  for (let i = 0; i < segs.length; i++) {
-    if (dist <= segs[i] + 1e-9) {
-      const len = segs[i];
-      const ratio = len < 1e-6 ? 0 : dist / len;
-      const [x1, y1] = pts[i];
-      const [x2, y2] = pts[i + 1];
-      return { x: x1 + (x2 - x1) * ratio, y: y1 + (y2 - y1) * ratio };
-    }
-    dist -= segs[i];
-  }
-  const [x, y] = pts[pts.length - 1];
-  return { x, y };
-}
-
-/** FL 付近の接線に垂直なコントロールライン */
-function flControlLine(): { x1: number; y1: number; x2: number; y2: number } {
-  const pts = parseMlPath(PATH_S1);
-  const p1 = pts[0] ?? [FL_POINT.x, FL_POINT.y];
-  const p2 = pts[1] ?? p1;
-  const dx = p2[0] - p1[0];
-  const dy = p2[1] - p1[1];
-  const len = Math.hypot(dx, dy) || 1;
-  const nx = (-dy / len) * 18;
-  const ny = (dx / len) * 18;
-  return {
-    x1: FL_POINT.x - nx,
-    y1: FL_POINT.y - ny,
-    x2: FL_POINT.x + nx,
-    y2: FL_POINT.y + ny,
-  };
-}
-
-function sectorDashThrough(p: XY, color: string, key: string) {
+function sectorDashThrough(p: Vec2, color: string, key: string) {
   const len = 14;
   return (
     <line
@@ -125,19 +55,17 @@ function sectorDashThrough(p: XY, color: string, key: string) {
   );
 }
 
-const SECTOR_LABELS = [
-  { x: 480, y: 118, label: "S1", color: SECTOR_COLORS.s1 },
-  { x: 918, y: 338, label: "S2", color: SECTOR_COLORS.s2 },
-  { x: 780, y: 468, label: "S3", color: SECTOR_COLORS.s3 },
-];
-
-const TIMING_POINTS: { x: number; y: number; label: string }[] = [
-  { x: FL_POINT.x, y: FL_POINT.y, label: "FL" },
-  { x: S1_END.x, y: S1_END.y, label: "S1" },
-  { x: S2_END.x, y: S2_END.y, label: "S2" },
-];
-
-const flLine = flControlLine();
+function flControlLine(timing: OkayamaLapGeometry["timing"]): { x1: number; y1: number; x2: number; y2: number } {
+  const { fl, flTangent } = timing;
+  const nx = (-flTangent.y) * 18;
+  const ny = flTangent.x * 18;
+  return {
+    x1: fl.x - nx,
+    y1: fl.y - ny,
+    x2: fl.x + nx,
+    y2: fl.y + ny,
+  };
+}
 
 interface OkayamaCircuitSvgProps {
   standings?: Standing[];
@@ -154,9 +82,23 @@ export default function OkayamaCircuitSvg({
   onMarkerClick,
   className = "",
 }: OkayamaCircuitSvgProps) {
+  const [geom, setGeom] = useState<OkayamaLapGeometry | null>(null);
+
+  useLayoutEffect(() => {
+    setGeom(buildOkayamaLapGeometry(TRACK_SECTOR_PATHS));
+  }, []);
+
+  const timing = geom?.timing;
+  const samples = geom?.samples ?? [];
+  const sectorCenters = geom?.sectorLabelCenters;
+  const pitInCenter = geom?.pitInCenter ?? { x: 280, y: 70 };
+  const pitOutLabelPos = geom ? pointOnLapSamples(geom.samples, PIT_OUT_LAP_T) : { x: 400, y: 500 };
+
+  const flLine = timing ? flControlLine(timing) : null;
+
   return (
     <svg
-      viewBox="0 0 1000 560"
+      viewBox={OKAYAMA_TRACK_VIEWBOX}
       className={`w-full h-full ${className}`}
       preserveAspectRatio="xMidYMid meet"
     >
@@ -177,83 +119,188 @@ export default function OkayamaCircuitSvg({
         </filter>
       </defs>
 
-      <path d={PATH_S1} fill="none" stroke="#27272a" strokeWidth="34" strokeLinecap="round" strokeLinejoin="round" />
-      <path d={PATH_S2} fill="none" stroke="#27272a" strokeWidth="34" strokeLinecap="round" strokeLinejoin="round" />
-      <path d={PATH_S3} fill="none" stroke="#27272a" strokeWidth="34" strokeLinecap="round" strokeLinejoin="round" />
-
-      <path d={PATH_S1} fill="none" stroke={SECTOR_COLORS.s1} strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" opacity="0.85" filter="url(#glow)" />
-      <path d={PATH_S2} fill="none" stroke={SECTOR_COLORS.s2} strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" opacity="0.85" filter="url(#glow)" />
-      <path d={PATH_S3} fill="none" stroke={SECTOR_COLORS.s3} strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" opacity="0.85" filter="url(#glow)" />
-
-      <path d={PATH_PIT} fill="none" stroke="#27272a" strokeWidth="18" strokeLinecap="round" strokeLinejoin="round" />
-      <path d={PATH_PIT} fill="none" stroke={SECTOR_COLORS.pit} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" opacity="0.65" strokeDasharray="6 4" />
-
-      <line
-        x1={flLine.x1}
-        y1={flLine.y1}
-        x2={flLine.x2}
-        y2={flLine.y2}
-        stroke="#ffffff"
-        strokeWidth="2.5"
-        opacity="0.95"
+      <path
+        d={TRACK_PATH_S1}
+        fill="none"
+        stroke="#27272a"
+        strokeWidth={TRACK_STROKE_WIDE}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d={TRACK_PATH_S2}
+        fill="none"
+        stroke="#27272a"
+        strokeWidth={TRACK_STROKE_WIDE}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d={TRACK_PATH_S3}
+        fill="none"
+        stroke="#27272a"
+        strokeWidth={TRACK_STROKE_WIDE}
+        strokeLinecap="round"
+        strokeLinejoin="round"
       />
 
-      {sectorDashThrough(S1_END, SECTOR_COLORS.s1, "dash-s1")}
-      {sectorDashThrough(S2_END, SECTOR_COLORS.s2, "dash-s2")}
+      <path
+        d={TRACK_PATH_S1}
+        fill="none"
+        stroke={SECTOR_COLORS.s1}
+        strokeWidth={TRACK_STROKE_LINE}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        opacity={0.88}
+        filter="url(#glow)"
+      />
+      <path
+        d={TRACK_PATH_S2}
+        fill="none"
+        stroke={SECTOR_COLORS.s2}
+        strokeWidth={TRACK_STROKE_LINE}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        opacity={0.88}
+        filter="url(#glow)"
+      />
+      <path
+        d={TRACK_PATH_S3}
+        fill="none"
+        stroke={SECTOR_COLORS.s3}
+        strokeWidth={TRACK_STROKE_LINE}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        opacity={0.88}
+        filter="url(#glow)"
+      />
 
-      {SECTOR_LABELS.map((s) => (
-        <text
-          key={s.label}
-          x={s.x}
-          y={s.y}
-          textAnchor="middle"
-          fill={s.color}
-          fontSize="18"
-          fontWeight="bold"
-          fontFamily="sans-serif"
-          opacity="0.7"
-          filter="url(#glow)"
-        >
-          {s.label}
-        </text>
-      ))}
+      <path
+        d={TRACK_PATH_PIT_IN}
+        fill="none"
+        stroke="#27272a"
+        strokeWidth={14}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d={TRACK_PATH_PIT_IN}
+        fill="none"
+        stroke={SECTOR_COLORS.pit}
+        strokeWidth={3}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        opacity={0.7}
+        strokeDasharray="6 4"
+      />
 
-      {TIMING_POINTS.map((p) => (
-        <g key={p.label}>
-          <rect
-            x={p.x - 10}
-            y={p.y - 18}
-            width="20"
-            height="12"
-            rx="2"
-            fill="#18181b"
-            stroke="#f59e0b"
-            strokeWidth="1"
-            opacity="0.9"
-          />
+      {flLine && (
+        <line
+          x1={flLine.x1}
+          y1={flLine.y1}
+          x2={flLine.x2}
+          y2={flLine.y2}
+          stroke="#ffffff"
+          strokeWidth="2.5"
+          opacity={0.95}
+        />
+      )}
+
+      {timing && (
+        <>
+          {sectorDashThrough(timing.s1End, SECTOR_COLORS.s1, "dash-s1")}
+          {sectorDashThrough(timing.s2End, SECTOR_COLORS.s2, "dash-s2")}
+        </>
+      )}
+
+      {sectorCenters && (
+        <>
           <text
-            x={p.x}
-            y={p.y - 10}
+            x={sectorCenters.s1.x}
+            y={sectorCenters.s1.y}
             textAnchor="middle"
-            dominantBaseline="central"
-            fill="#f59e0b"
-            fontSize="7"
+            dominantBaseline="middle"
+            fill={SECTOR_COLORS.s1}
+            fontSize="18"
             fontWeight="bold"
             fontFamily="sans-serif"
+            opacity={0.7}
+            filter="url(#glow)"
           >
-            {p.label}
+            S1
           </text>
-        </g>
-      ))}
+          <text
+            x={sectorCenters.s2.x}
+            y={sectorCenters.s2.y}
+            textAnchor="middle"
+            dominantBaseline="middle"
+            fill={SECTOR_COLORS.s2}
+            fontSize="18"
+            fontWeight="bold"
+            fontFamily="sans-serif"
+            opacity={0.7}
+            filter="url(#glow)"
+          >
+            S2
+          </text>
+          <text
+            x={sectorCenters.s3.x}
+            y={sectorCenters.s3.y}
+            textAnchor="middle"
+            dominantBaseline="middle"
+            fill={SECTOR_COLORS.s3}
+            fontSize="18"
+            fontWeight="bold"
+            fontFamily="sans-serif"
+            opacity={0.7}
+            filter="url(#glow)"
+          >
+            S3
+          </text>
+        </>
+      )}
+
+      {timing &&
+        [
+          { p: timing.fl, label: "FL" },
+          { p: timing.s1End, label: "S1" },
+          { p: timing.s2End, label: "S2" },
+        ].map(({ p, label }) => (
+          <g key={label}>
+            <rect
+              x={p.x - 10}
+              y={p.y - 18}
+              width="20"
+              height="12"
+              rx="2"
+              fill="#18181b"
+              stroke="#f59e0b"
+              strokeWidth="1"
+              opacity={0.9}
+            />
+            <text
+              x={p.x}
+              y={p.y - 10}
+              textAnchor="middle"
+              dominantBaseline="central"
+              fill="#f59e0b"
+              fontSize="7"
+              fontWeight="bold"
+              fontFamily="sans-serif"
+            >
+              {label}
+            </text>
+          </g>
+        ))}
 
       <text
-        x="515"
-        y="448"
+        x={(sectorCenters?.s2.x ?? 600) + 40}
+        y={(sectorCenters?.s2.y ?? 400) + 80}
         textAnchor="middle"
         fill={SECTOR_COLORS.pit}
         fontSize="9"
         fontFamily="sans-serif"
-        opacity="0.5"
+        opacity={0.5}
         fontWeight="600"
         letterSpacing="2"
       >
@@ -261,24 +308,24 @@ export default function OkayamaCircuitSvg({
       </text>
 
       <text
-        x={PIT_IN_POINT.x}
-        y={PIT_IN_POINT.y + 18}
+        x={pitInCenter.x}
+        y={pitInCenter.y + 16}
         textAnchor="middle"
         fill={SECTOR_COLORS.pit}
         fontSize="8"
         fontFamily="sans-serif"
-        opacity="0.55"
+        opacity={0.55}
       >
         PIT IN
       </text>
       <text
-        x={PIT_OUT_POINT.x}
-        y={PIT_OUT_POINT.y - 12}
+        x={pitOutLabelPos.x}
+        y={pitOutLabelPos.y - 10}
         textAnchor="middle"
         fill={SECTOR_COLORS.pit}
         fontSize="8"
         fontFamily="sans-serif"
-        opacity="0.55"
+        opacity={0.55}
       >
         PIT OUT
       </text>
@@ -301,7 +348,8 @@ export default function OkayamaCircuitSvg({
 
           const origIdx = standings.findIndex((st) => st.teamId === s.teamId);
           const t = total > 1 ? origIdx / total : 0;
-          const { x, y } = mockPointOnLap(t);
+          const { x, y } =
+            samples.length >= 2 ? pointOnLapSamples(samples, t) : { x: 600, y: 315 };
 
           const isHighlighted = highlighted.has(s.teamId);
           const fillColor = cls?.color || "#71717a";

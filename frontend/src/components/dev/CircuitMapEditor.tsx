@@ -315,7 +315,7 @@ export default function CircuitMapEditor() {
       <header className="flex-shrink-0 border-b border-zinc-800 px-4 py-3 flex flex-wrap items-center gap-3">
         <h1 className="text-sm font-bold text-white">コースライン作成（サンプル地図）</h1>
         <span className="text-[10px] text-zinc-500">
-          `/dev/circuit-map-editor` — 描画後、下のコードを `OkayamaCircuitSvg.tsx` に貼り付け
+          `/dev/circuit-map-editor` — 描画後、下のコードを `okayamaTrackAsset.ts` の `TRACK_PATH_*` に反映
         </span>
         <div className="flex items-center gap-2 ml-auto">
           <span className="text-[10px] text-zinc-500">底図</span>
