@@ -3,11 +3,8 @@
 /**
  * 岡山国際サーキット SVG コースマップ
  *
- * コースレイアウト: PDF公式コース図の向き準拠
- * セクター区間:
- *   S1 (962m)  — コントロールライン → S1計測ライン (Williams後)
- *   S2 (1558m) — S1計測ライン → S2計測ライン (Hairpin後)
- *   S3 (1183m) — S2計測ライン → コントロールライン
+ * レイアウト: /dev/circuit-map-editor で衛星トレースした path を反映
+ * 投影バウンド: N=34.921274 S=34.910024 E=134.224646 W=134.218575
  *
  * 将来: getPointAtLength() で車両マーカーをパス上に配置・移動
  */
@@ -17,77 +14,130 @@ import { getTeamByStanding, getClassByStanding } from "@/data/mock";
 
 // --- セクター色定義 ---
 const SECTOR_COLORS = {
-  s1: "#ef4444",   // 赤
-  s2: "#3b82f6",   // 青
-  s3: "#22c55e",   // 緑
-  pit: "#a1a1aa",  // グレー
+  s1: "#ef4444",
+  s2: "#3b82f6",
+  s3: "#22c55e",
+  pit: "#a1a1aa",
 };
 
-// --- SVG パスデータ (岡山国際サーキット — 衛星写真 & PDF準拠) ---
-// コースは時計回り。ピットストレートは下側。
+function stripLeadingMove(d: string): string {
+  return d.replace(/^M\s+[\d.]+\s+[\d.]+\s+/, "");
+}
 
-// S1: コントロールライン → S1計測ライン (First Corner, Williams Corner)
+// --- SVG パス（viewBox 0 0 1000 560）---
+
 const PATH_S1 =
-  "M 200,710 L 310,710 Q 370,708 420,700 Q 470,690 500,670 " +
-  "Q 530,650 545,620 Q 560,585 555,545 Q 548,505 535,470 " +
-  "Q 522,440 505,415";
+  "M 58.3 348.0 L 37.0 248.4 L 77.7 236.2 L 137.7 232.6 L 253.6 245.2 L 416.1 274.8 L 510.6 276.1 L 576.0 264.3 L 657.3 218.5 L 712.0 179.3 L 680.2 135.7 L 717.3 98.7";
 
-// S2: S1計測ライン → S2計測ライン (Moss S, Attwood, Hairpin)
 const PATH_S2 =
-  "M 505,415 Q 488,390 465,365 Q 440,335 410,305 " +
-  "Q 380,275 345,250 Q 310,225 280,210 " +
-  "Q 250,195 225,185 Q 195,175 172,175 " +
-  "Q 148,178 132,195 Q 115,215 108,250 " +
-  "Q 100,290 98,335 Q 96,380 100,420 " +
-  "Q 105,455 118,478 Q 132,500 152,510 Q 170,515 185,508";
+  "M 717.3 98.7 L 759.8 30.6 L 812.8 20.7 L 864.9 21.6 L 912.6 28.0 L 950.6 40.2 L 963.0 59.3 L 955.0 81.0 L 931.2 107.5 L 892.3 134.6 L 590.2 382.6 L 540.7 389.6 L 499.2 380.0 L 518.6 351.7 L 541.6 327.6 L 498.3 316.0 L 303.9 309.2 L 243.0 317.1 L 233.3 343.2 L 237.7 345.4";
 
-// S3: S2計測ライン → コントロールライン (Revolver, Piper, Redman, Hobbs, Mike Knight, Last Corner)
 const PATH_S3 =
-  "M 185,508 Q 195,520 190,545 Q 182,575 170,600 " +
-  "Q 158,625 145,648 Q 132,668 125,685 " +
-  "Q 120,700 128,715 Q 138,730 155,738 " +
-  "Q 175,742 200,710";
+  "M 237.7 345.4 L 262.4 450.3 L 310.1 460.6 L 372.9 448.1 L 425.9 419.4 L 468.3 415.3 L 513.3 425.8 L 478.0 504.4 L 438.2 521.1 L 196.2 539.3 L 120.2 527.9 L 99.0 492.8 L 58.3 348.0";
 
-// ピットロード: メインストレートの内側を平行に走る
 const PATH_PIT =
-  "M 475,680 Q 450,700 420,715 L 320,728 Q 270,730 230,725 Q 200,720 185,710";
+  "M 486.5 485.5 L 478.0 504.4 L 392.3 517.8 L 288.9 525.7 L 221.8 531.4 L 179.4 527.4 L 157.3 518.9 L 136.1 510.6 L 131.7 487.3 L 110.5 431.3 L 84.8 344.7 L 48.1 300.2";
 
-// 全周パス (アニメーション用 — 1本の連続パス)
-export const PATH_FULL_CIRCUIT =
-  PATH_S1.replace("M 200,710", "M 200,710") +
-  " " + PATH_S2.replace("M 505,415", "") +
-  " " + PATH_S3.replace("M 185,508", "").replace("Q 175,742 200,710", "Q 175,742 200,710");
+const FL_POINT = { x: 58.3, y: 348.0 };
+const PIT_IN_POINT = { x: 456.8, y: 507.7 };
+const PIT_OUT_POINT = { x: 84.8, y: 344.7 };
 
-// --- コーナー情報 ---
-const CORNERS = [
-  { x: 475, y: 680, label: "1", name: "First" },
-  { x: 550, y: 555, label: "2", name: "Williams" },
-  { x: 435, y: 325, label: "3", name: "Moss" },
-  { x: 365, y: 268, label: "4", name: "" },
-  { x: 300, y: 230, label: "5", name: "" },
-  { x: 180, y: 190, label: "6", name: "Attwood" },
-  { x: 100, y: 440, label: "7", name: "Hairpin" },
-  { x: 188, y: 530, label: "8", name: "Revolver" },
-  { x: 165, y: 610, label: "9", name: "Piper" },
-  { x: 135, y: 665, label: "10", name: "Redman" },
-  { x: 122, y: 698, label: "11", name: "Hobbs" },
-  { x: 140, y: 735, label: "12", name: "M.Knight" },
-  { x: 175, y: 730, label: "13", name: "Last" },
-];
+/** S1 終端 = S2 始端（計測イメージ） */
+const S1_END = { x: 717.3, y: 98.7 };
+/** S2 終端 = S3 始端 */
+const S2_END = { x: 237.7, y: 345.4 };
 
-// --- セクターラベル位置 ---
+/** 全周ラップ用 1 path（M/L のみ想定） */
+export const PATH_FULL_CIRCUIT = `${PATH_S1} ${stripLeadingMove(PATH_S2)} ${stripLeadingMove(PATH_S3)}`;
+
+type XY = { x: number; y: number };
+
+function parseMlPath(d: string): [number, number][] {
+  const pts: [number, number][] = [];
+  for (const m of d.matchAll(/[ML]\s*([\d.]+)\s+([\d.]+)/g)) {
+    pts.push([Number(m[1]), Number(m[2])]);
+  }
+  return pts;
+}
+
+const MOCK_LAP_POINTS = parseMlPath(PATH_FULL_CIRCUIT);
+
+function mockPointOnLap(t: number): XY {
+  const pts = MOCK_LAP_POINTS;
+  if (pts.length < 2) return { x: 500, y: 280 };
+  const segs: number[] = [];
+  let total = 0;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const [x1, y1] = pts[i];
+    const [x2, y2] = pts[i + 1];
+    const len = Math.hypot(x2 - x1, y2 - y1);
+    segs.push(len);
+    total += len;
+  }
+  if (total < 1e-6) return { x: pts[0][0], y: pts[0][1] };
+  let dist = (((t % 1) + 1) % 1) * total;
+  for (let i = 0; i < segs.length; i++) {
+    if (dist <= segs[i] + 1e-9) {
+      const len = segs[i];
+      const ratio = len < 1e-6 ? 0 : dist / len;
+      const [x1, y1] = pts[i];
+      const [x2, y2] = pts[i + 1];
+      return { x: x1 + (x2 - x1) * ratio, y: y1 + (y2 - y1) * ratio };
+    }
+    dist -= segs[i];
+  }
+  const [x, y] = pts[pts.length - 1];
+  return { x, y };
+}
+
+/** FL 付近の接線に垂直なコントロールライン */
+function flControlLine(): { x1: number; y1: number; x2: number; y2: number } {
+  const pts = parseMlPath(PATH_S1);
+  const p1 = pts[0] ?? [FL_POINT.x, FL_POINT.y];
+  const p2 = pts[1] ?? p1;
+  const dx = p2[0] - p1[0];
+  const dy = p2[1] - p1[1];
+  const len = Math.hypot(dx, dy) || 1;
+  const nx = (-dy / len) * 18;
+  const ny = (dx / len) * 18;
+  return {
+    x1: FL_POINT.x - nx,
+    y1: FL_POINT.y - ny,
+    x2: FL_POINT.x + nx,
+    y2: FL_POINT.y + ny,
+  };
+}
+
+function sectorDashThrough(p: XY, color: string, key: string) {
+  const len = 14;
+  return (
+    <line
+      key={key}
+      x1={p.x - len}
+      y1={p.y - len * 0.35}
+      x2={p.x + len}
+      y2={p.y + len * 0.35}
+      stroke={color}
+      strokeWidth="2"
+      opacity={0.75}
+      strokeDasharray="3 2"
+    />
+  );
+}
+
 const SECTOR_LABELS = [
-  { x: 540, y: 600, label: "S1", color: SECTOR_COLORS.s1 },
-  { x: 200, y: 320, label: "S2", color: SECTOR_COLORS.s2 },
-  { x: 145, y: 640, label: "S3", color: SECTOR_COLORS.s3 },
+  { x: 377, y: 223, label: "S1", color: SECTOR_COLORS.s1 },
+  { x: 598, y: 205, label: "S2", color: SECTOR_COLORS.s2 },
+  { x: 285, y: 424, label: "S3", color: SECTOR_COLORS.s3 },
 ];
 
-// --- 計測ポイント ---
-const TIMING_POINTS = [
-  { x: 200, y: 700, label: "FL" },
-  { x: 505, y: 405, label: "S1" },
-  { x: 185, y: 500, label: "S2" },
+const TIMING_POINTS: { x: number; y: number; label: string }[] = [
+  { x: FL_POINT.x, y: FL_POINT.y, label: "FL" },
+  { x: S1_END.x, y: S1_END.y, label: "S1" },
+  { x: S2_END.x, y: S2_END.y, label: "S2" },
 ];
+
+const flLine = flControlLine();
 
 interface OkayamaCircuitSvgProps {
   standings?: Standing[];
@@ -106,7 +156,7 @@ export default function OkayamaCircuitSvg({
 }: OkayamaCircuitSvgProps) {
   return (
     <svg
-      viewBox="60 130 540 640"
+      viewBox="0 0 1000 560"
       className={`w-full h-full ${className}`}
       preserveAspectRatio="xMidYMid meet"
     >
@@ -127,28 +177,30 @@ export default function OkayamaCircuitSvg({
         </filter>
       </defs>
 
-      {/* コース路面 (太い暗色でアスファルト表現) */}
-      <path d={PATH_S1} fill="none" stroke="#27272a" strokeWidth="22" strokeLinecap="round" strokeLinejoin="round" />
-      <path d={PATH_S2} fill="none" stroke="#27272a" strokeWidth="22" strokeLinecap="round" strokeLinejoin="round" />
-      <path d={PATH_S3} fill="none" stroke="#27272a" strokeWidth="22" strokeLinecap="round" strokeLinejoin="round" />
+      <path d={PATH_S1} fill="none" stroke="#27272a" strokeWidth="34" strokeLinecap="round" strokeLinejoin="round" />
+      <path d={PATH_S2} fill="none" stroke="#27272a" strokeWidth="34" strokeLinecap="round" strokeLinejoin="round" />
+      <path d={PATH_S3} fill="none" stroke="#27272a" strokeWidth="34" strokeLinecap="round" strokeLinejoin="round" />
 
-      {/* セクター色付きライン */}
-      <path d={PATH_S1} fill="none" stroke={SECTOR_COLORS.s1} strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" opacity="0.8" filter="url(#glow)" />
-      <path d={PATH_S2} fill="none" stroke={SECTOR_COLORS.s2} strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" opacity="0.8" filter="url(#glow)" />
-      <path d={PATH_S3} fill="none" stroke={SECTOR_COLORS.s3} strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" opacity="0.8" filter="url(#glow)" />
+      <path d={PATH_S1} fill="none" stroke={SECTOR_COLORS.s1} strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" opacity="0.85" filter="url(#glow)" />
+      <path d={PATH_S2} fill="none" stroke={SECTOR_COLORS.s2} strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" opacity="0.85" filter="url(#glow)" />
+      <path d={PATH_S3} fill="none" stroke={SECTOR_COLORS.s3} strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" opacity="0.85" filter="url(#glow)" />
 
-      {/* ピットロード */}
-      <path d={PATH_PIT} fill="none" stroke="#27272a" strokeWidth="12" strokeLinecap="round" strokeLinejoin="round" />
-      <path d={PATH_PIT} fill="none" stroke={SECTOR_COLORS.pit} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" opacity="0.6" strokeDasharray="6 4" />
+      <path d={PATH_PIT} fill="none" stroke="#27272a" strokeWidth="18" strokeLinecap="round" strokeLinejoin="round" />
+      <path d={PATH_PIT} fill="none" stroke={SECTOR_COLORS.pit} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" opacity="0.65" strokeDasharray="6 4" />
 
-      {/* コントロールライン */}
-      <line x1="200" y1="697" x2="200" y2="723" stroke="#ffffff" strokeWidth="2.5" opacity="0.9" />
+      <line
+        x1={flLine.x1}
+        y1={flLine.y1}
+        x2={flLine.x2}
+        y2={flLine.y2}
+        stroke="#ffffff"
+        strokeWidth="2.5"
+        opacity="0.95"
+      />
 
-      {/* セクター計測ライン */}
-      <line x1="498" y1="403" x2="512" y2="427" stroke={SECTOR_COLORS.s1} strokeWidth="2" opacity="0.7" strokeDasharray="3 2" />
-      <line x1="178" y1="498" x2="192" y2="518" stroke={SECTOR_COLORS.s2} strokeWidth="2" opacity="0.7" strokeDasharray="3 2" />
+      {sectorDashThrough(S1_END, SECTOR_COLORS.s1, "dash-s1")}
+      {sectorDashThrough(S2_END, SECTOR_COLORS.s2, "dash-s2")}
 
-      {/* セクターラベル */}
       {SECTOR_LABELS.map((s) => (
         <text
           key={s.label}
@@ -166,37 +218,6 @@ export default function OkayamaCircuitSvg({
         </text>
       ))}
 
-      {/* コーナー番号と名前 */}
-      {CORNERS.map((c) => (
-        <g key={c.label}>
-          <circle cx={c.x} cy={c.y} r="7" fill="#18181b" stroke="#52525b" strokeWidth="1" opacity="0.8" />
-          <text
-            x={c.x}
-            y={c.y + 1}
-            textAnchor="middle"
-            dominantBaseline="central"
-            fill="#a1a1aa"
-            fontSize="7"
-            fontWeight="bold"
-            fontFamily="sans-serif"
-          >
-            {c.label}
-          </text>
-          {c.name && (
-            <text
-              x={c.x + 12}
-              y={c.y - 10}
-              fill="#71717a"
-              fontSize="8"
-              fontFamily="sans-serif"
-            >
-              {c.name}
-            </text>
-          )}
-        </g>
-      ))}
-
-      {/* 計測ポイントマーカー */}
       {TIMING_POINTS.map((p) => (
         <g key={p.label}>
           <rect
@@ -225,26 +246,48 @@ export default function OkayamaCircuitSvg({
         </g>
       ))}
 
-      {/* PIT LANE ラベル */}
-      <text x="340" y="740" textAnchor="middle" fill={SECTOR_COLORS.pit} fontSize="9" fontFamily="sans-serif" opacity="0.5" fontWeight="600" letterSpacing="2">
+      <text
+        x="268"
+        y="498"
+        textAnchor="middle"
+        fill={SECTOR_COLORS.pit}
+        fontSize="9"
+        fontFamily="sans-serif"
+        opacity="0.5"
+        fontWeight="600"
+        letterSpacing="2"
+      >
         PIT LANE
       </text>
 
-      {/* PIT IN / PIT OUT ラベル */}
-      <text x="470" y="668" textAnchor="middle" fill={SECTOR_COLORS.pit} fontSize="7" fontFamily="sans-serif" opacity="0.4">
+      <text
+        x={PIT_IN_POINT.x}
+        y={PIT_IN_POINT.y + 18}
+        textAnchor="middle"
+        fill={SECTOR_COLORS.pit}
+        fontSize="8"
+        fontFamily="sans-serif"
+        opacity="0.55"
+      >
         PIT IN
       </text>
-      <text x="195" y="698" textAnchor="end" fill={SECTOR_COLORS.pit} fontSize="7" fontFamily="sans-serif" opacity="0.4">
+      <text
+        x={PIT_OUT_POINT.x}
+        y={PIT_OUT_POINT.y - 12}
+        textAnchor="middle"
+        fill={SECTOR_COLORS.pit}
+        fontSize="8"
+        fontFamily="sans-serif"
+        opacity="0.55"
+      >
         PIT OUT
       </text>
 
-      {/* 車両マーカー (Phase 4で実データ連携) */}
       {showCarMarkers && (() => {
         const total = standings.length;
         const highlighted = highlightedTeamIds ?? new Set<string>();
         const hasHighlights = highlighted.size > 0;
 
-        // 非ハイライト車両を先に描画、ハイライト車両を上に描画
         const sorted = [...standings].sort((a, b) => {
           const aH = highlighted.has(a.teamId) ? 1 : 0;
           const bH = highlighted.has(b.teamId) ? 1 : 0;
@@ -258,20 +301,7 @@ export default function OkayamaCircuitSvg({
 
           const origIdx = standings.findIndex((st) => st.teamId === s.teamId);
           const t = total > 1 ? origIdx / total : 0;
-          let x: number, y: number;
-          if (t < 0.26) {
-            const p = t / 0.26;
-            x = 200 + p * 340;
-            y = 710 - p * 300;
-          } else if (t < 0.68) {
-            const p = (t - 0.26) / 0.42;
-            x = 540 - p * 440;
-            y = 410 - 200 * Math.sin(p * Math.PI);
-          } else {
-            const p = (t - 0.68) / 0.32;
-            x = 100 + p * 100;
-            y = 508 + p * 202;
-          }
+          const { x, y } = mockPointOnLap(t);
 
           const isHighlighted = highlighted.has(s.teamId);
           const fillColor = cls?.color || "#71717a";
@@ -285,7 +315,6 @@ export default function OkayamaCircuitSvg({
               style={{ cursor: onMarkerClick ? "pointer" : undefined }}
               onClick={onMarkerClick ? () => onMarkerClick(s.teamId) : undefined}
             >
-              {/* ハイライト時のパルスリング */}
               {isHighlighted && (
                 <circle cx={x} cy={y} r={r + 4} fill="none" stroke={fillColor} strokeWidth="2" opacity="0.4">
                   <animate attributeName="r" values={`${r + 2};${r + 8};${r + 2}`} dur="2s" repeatCount="indefinite" />
@@ -293,14 +322,17 @@ export default function OkayamaCircuitSvg({
                 </circle>
               )}
               <circle
-                cx={x} cy={y} r={r}
+                cx={x}
+                cy={y}
+                r={r}
                 fill={fillColor}
                 opacity={dimmed ? 0.3 : 0.95}
                 stroke={isHighlighted ? "#fff" : "#000"}
                 strokeWidth={isHighlighted ? 2 : 1}
               />
               <text
-                x={x} y={y + 1}
+                x={x}
+                y={y + 1}
                 textAnchor="middle"
                 dominantBaseline="central"
                 fill="white"
@@ -311,18 +343,20 @@ export default function OkayamaCircuitSvg({
               >
                 {team.no}
               </text>
-              {/* ハイライト時: チーム名ラベル */}
               {isHighlighted && (
                 <g>
                   <rect
-                    x={x + r + 4} y={y - 14}
-                    width={Math.max(team.nameE.length * 4.5, 60)} height="16"
-                    rx="3" fill="#18181b" stroke={fillColor} strokeWidth="1" opacity="0.9"
+                    x={x + r + 4}
+                    y={y - 14}
+                    width={Math.max(team.nameE.length * 4.5, 60)}
+                    height="16"
+                    rx="3"
+                    fill="#18181b"
+                    stroke={fillColor}
+                    strokeWidth="1"
+                    opacity="0.9"
                   />
-                  <text
-                    x={x + r + 8} y={y - 5}
-                    fill="#e4e4e7" fontSize="7" fontWeight="bold" fontFamily="sans-serif"
-                  >
+                  <text x={x + r + 8} y={y - 5} fill="#e4e4e7" fontSize="7" fontWeight="bold" fontFamily="sans-serif">
                     {team.nameE}
                   </text>
                 </g>
