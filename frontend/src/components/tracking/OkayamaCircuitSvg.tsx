@@ -8,7 +8,7 @@
  * 同じくスムージング済みの `lapD` に沿って動く。ズームと回転は viewBox 中心を基準に <g> で適用。
  */
 
-import { useLayoutEffect, useState } from "react";
+import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import type { Standing } from "@/types/smis";
 import { getTeamByStanding, getClassByStanding } from "@/data/mock";
 import {
@@ -32,10 +32,12 @@ const SECTOR_COLORS = {
 const TRACK_STROKE_WIDE = 38;
 const TRACK_STROKE_LINE = 9;
 
-const ZOOM_MIN = 0.6;
-const ZOOM_MAX = 4;
+const ZOOM_MIN = 0.5;
+const ZOOM_MAX = 5;
 const ZOOM_STEP = 1.2;
+const ZOOM_DEFAULT = 1.5;
 const ROTATE_STEP = 15;
+const PAN_DRAG_THRESHOLD = 4;
 
 function sectorDashThrough(p: Vec2, color: string, key: string) {
   const len = 18;
@@ -82,8 +84,17 @@ export default function OkayamaCircuitSvg({
   className = "",
 }: OkayamaCircuitSvgProps) {
   const [geom, setGeom] = useState<OkayamaLapGeometry | null>(null);
-  const [zoom, setZoom] = useState(1);
+  const [zoom, setZoom] = useState(ZOOM_DEFAULT);
   const [rotation, setRotation] = useState(0);
+  const [pan, setPan] = useState<Vec2>({ x: 0, y: 0 });
+
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const dragRef = useRef<{
+    startSvg: Vec2;
+    panAtStart: Vec2;
+    moved: boolean;
+  } | null>(null);
+  const panBlockClickRef = useRef(false);
 
   useLayoutEffect(() => {
     setGeom(buildOkayamaLapGeometry());
@@ -99,22 +110,85 @@ export default function OkayamaCircuitSvg({
   const onRotateLeft = () => setRotation((r) => r - ROTATE_STEP);
   const onRotateRight = () => setRotation((r) => r + ROTATE_STEP);
   const onReset = () => {
-    setZoom(1);
+    setZoom(ZOOM_DEFAULT);
     setRotation(0);
+    setPan({ x: 0, y: 0 });
   };
+
+  const screenToSvg = useCallback((clientX: number, clientY: number): Vec2 => {
+    const svg = svgRef.current;
+    if (!svg) return { x: clientX, y: clientY };
+    const pt = svg.createSVGPoint();
+    pt.x = clientX;
+    pt.y = clientY;
+    const ctm = svg.getScreenCTM();
+    if (!ctm) return { x: clientX, y: clientY };
+    const t = pt.matrixTransform(ctm.inverse());
+    return { x: t.x, y: t.y };
+  }, []);
+
+  const handlePointerDown = useCallback(
+    (e: React.PointerEvent<SVGSVGElement>) => {
+      if (e.button !== 0 && e.pointerType === "mouse") return;
+      const start = screenToSvg(e.clientX, e.clientY);
+      dragRef.current = { startSvg: start, panAtStart: pan, moved: false };
+      panBlockClickRef.current = false;
+      (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
+    },
+    [pan, screenToSvg],
+  );
+
+  const handlePointerMove = useCallback(
+    (e: React.PointerEvent<SVGSVGElement>) => {
+      const drag = dragRef.current;
+      if (!drag) return;
+      const cur = screenToSvg(e.clientX, e.clientY);
+      const dx = cur.x - drag.startSvg.x;
+      const dy = cur.y - drag.startSvg.y;
+      if (!drag.moved && Math.hypot(dx, dy) < PAN_DRAG_THRESHOLD) return;
+      drag.moved = true;
+      panBlockClickRef.current = true;
+      setPan({ x: drag.panAtStart.x + dx, y: drag.panAtStart.y + dy });
+    },
+    [screenToSvg],
+  );
+
+  const handlePointerUp = useCallback(
+    (e: React.PointerEvent<SVGSVGElement>) => {
+      dragRef.current = null;
+      try {
+        (e.currentTarget as Element).releasePointerCapture?.(e.pointerId);
+      } catch {
+        /* noop */
+      }
+      if (panBlockClickRef.current) {
+        setTimeout(() => {
+          panBlockClickRef.current = false;
+        }, 0);
+      }
+    },
+    [],
+  );
 
   const center = OKAYAMA_TRACK_CENTER;
   const viewportTransform =
+    `translate(${pan.x} ${pan.y}) ` +
     `translate(${center.x} ${center.y}) ` +
     `scale(${zoom}) rotate(${rotation}) ` +
     `translate(${-center.x} ${-center.y})`;
 
   return (
-    <div className={`relative w-full h-full ${className}`}>
+    <div className={`relative w-full h-full overflow-hidden ${className}`}>
       <svg
+        ref={svgRef}
         viewBox={OKAYAMA_TRACK_VIEWBOX}
-        className="w-full h-full"
+        className="w-full h-full select-none touch-none"
         preserveAspectRatio="xMidYMid meet"
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+        style={{ cursor: dragRef.current ? "grabbing" : "grab" }}
       >
         <defs>
           <filter id="glow">
@@ -317,7 +391,14 @@ export default function OkayamaCircuitSvg({
                   key={s.teamId}
                   filter={isHighlighted ? "url(#glow-strong)" : undefined}
                   style={{ cursor: onMarkerClick ? "pointer" : undefined }}
-                  onClick={onMarkerClick ? () => onMarkerClick(s.teamId) : undefined}
+                  onClick={
+                    onMarkerClick
+                      ? () => {
+                          if (panBlockClickRef.current) return;
+                          onMarkerClick(s.teamId);
+                        }
+                      : undefined
+                  }
                 >
                   {isHighlighted && (
                     <circle cx={x} cy={y} r={r + 5} fill="none" stroke={fillColor} strokeWidth="2" opacity="0.4">
@@ -372,7 +453,7 @@ export default function OkayamaCircuitSvg({
         </g>
       </svg>
 
-      <div className="absolute top-2 right-2 flex flex-col gap-1.5 select-none">
+      <div className="absolute top-2 left-2 flex flex-col gap-1.5 select-none z-10">
         <div className="flex flex-col bg-zinc-900/80 backdrop-blur-sm border border-zinc-700 rounded-md overflow-hidden shadow-lg">
           <button
             type="button"
@@ -426,7 +507,7 @@ export default function OkayamaCircuitSvg({
         <button
           type="button"
           onClick={onReset}
-          disabled={zoom === 1 && rotation === 0}
+          disabled={zoom === ZOOM_DEFAULT && rotation === 0 && pan.x === 0 && pan.y === 0}
           className="w-9 h-7 flex items-center justify-center text-[10px] font-semibold rounded-md bg-zinc-900/80 backdrop-blur-sm border border-zinc-700 text-zinc-300 hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed shadow-lg transition-colors"
           aria-label="Reset view"
           title="リセット"

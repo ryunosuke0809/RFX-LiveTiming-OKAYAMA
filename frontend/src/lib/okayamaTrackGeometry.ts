@@ -6,11 +6,14 @@ import {
 
 const NS = "http://www.w3.org/2000/svg";
 
-/** 1 セクターあたりの初期サンプル数（多いほど元形状に忠実） */
-const SAMPLES_PER_SECTOR = 220;
+/**
+ * 1 セクターあたりの初期サンプル数（少なめにして Chaikin がコーナーを大きく丸めるようにする）。
+ * 元 SVG の細かな角を残さないため、敢えてサンプル数を絞る。
+ */
+const SAMPLES_PER_SECTOR = 60;
 
 /** Chaikin スムージングの繰返し回数（多いほど角が丸くなる） */
-const SMOOTHING_ITERATIONS = 2;
+const SMOOTHING_ITERATIONS = 4;
 
 /** 隣接セクター間ギャップ補完の最小距離 */
 const BRIDGE_THRESHOLD = 4;
