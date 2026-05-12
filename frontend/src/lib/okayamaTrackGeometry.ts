@@ -1,16 +1,25 @@
-import { TRACK_PATH_PIT_IN, TRACK_SECTOR_PATHS } from "@/lib/okayamaTrackAsset";
+import {
+  TRACK_PATH_PIT_IN,
+  TRACK_OFFSETS,
+  TRACK_SECTORS,
+  type SectorAsset,
+  type Vec2,
+} from "@/lib/okayamaTrackAsset";
 
 const NS = "http://www.w3.org/2000/svg";
 
-const SAMPLE_COUNT = 512;
+const SAMPLES_PER_SECTOR = 256;
 
-export type Vec2 = { x: number; y: number };
+export type { Vec2 } from "@/lib/okayamaTrackAsset";
 
 export type OkayamaLapGeometry = {
+  /** ワールド座標で結合された一周パスの d 文字列（M/L のみ） */
   lapD: string;
   totalLen: number;
+  /** ラップ全体に占める各セクターの長さ累積（ワールド座標基準） */
   cutS1: number;
   cutS2: number;
+  /** 一周をサンプリングしたワールド座標列（マーカー位置補間用） */
   samples: Vec2[];
   sectorLabelCenters: { s1: Vec2; s2: Vec2; s3: Vec2 };
   pitInCenter: Vec2;
@@ -18,40 +27,54 @@ export type OkayamaLapGeometry = {
     fl: Vec2;
     s1End: Vec2;
     s2End: Vec2;
-    /** 単位接線（FL 付近） */
+    /** FL 付近の単位接線（コントロールラインの傾き） */
     flTangent: Vec2;
   };
 };
 
-function stripLeadingMoveto(d: string): string {
-  return d.replace(/^M\s*[-\d.]+\s*[-\d.]+\s*/i, "");
-}
-
-function sampleMergedPath(merged: SVGPathElement): Vec2[] {
-  const total = merged.getTotalLength();
-  const out: Vec2[] = [];
-  if (!Number.isFinite(total) || total <= 0) return out;
-  for (let i = 0; i < SAMPLE_COUNT; i++) {
-    const pt = merged.getPointAtLength((i / (SAMPLE_COUNT - 1)) * total);
-    out.push({ x: pt.x, y: pt.y });
-  }
-  return out;
-}
-
-function bboxCenter(svg: SVGSVGElement, d: string): Vec2 {
+function sampleSectorWorld(
+  svg: SVGSVGElement,
+  sector: SectorAsset,
+): { samples: Vec2[]; len: number; bbox: { x: number; y: number; w: number; h: number } } {
   const p = document.createElementNS(NS, "path") as SVGPathElement;
-  p.setAttribute("d", d);
+  p.setAttribute("d", sector.d);
   svg.appendChild(p);
   try {
+    const len = p.getTotalLength();
+    if (!Number.isFinite(len) || len <= 0) {
+      return { samples: [], len: 0, bbox: { x: 0, y: 0, w: 0, h: 0 } };
+    }
+    const samples: Vec2[] = [];
+    for (let i = 0; i <= SAMPLES_PER_SECTOR; i++) {
+      const pt = p.getPointAtLength((i / SAMPLES_PER_SECTOR) * len);
+      samples.push({ x: pt.x + sector.offset.x, y: pt.y + sector.offset.y });
+    }
     const bb = p.getBBox();
-    return { x: bb.x + bb.width / 2, y: bb.y + bb.height / 2 };
+    return {
+      samples,
+      len,
+      bbox: { x: bb.x + sector.offset.x, y: bb.y + sector.offset.y, w: bb.width, h: bb.height },
+    };
   } finally {
     svg.removeChild(p);
   }
 }
 
+function bridgeBetween(prev: Vec2, next: Vec2, stepPx = 6): Vec2[] {
+  const dx = next.x - prev.x;
+  const dy = next.y - prev.y;
+  const dist = Math.hypot(dx, dy);
+  if (dist <= stepPx) return [];
+  const steps = Math.ceil(dist / stepPx);
+  const out: Vec2[] = [];
+  for (let i = 1; i < steps; i++) {
+    out.push({ x: prev.x + (dx * i) / steps, y: prev.y + (dy * i) / steps });
+  }
+  return out;
+}
+
 export function pointOnLapSamples(samples: Vec2[], t: number): Vec2 {
-  if (samples.length < 2) return { x: 600, y: 315 };
+  if (samples.length < 2) return { x: 800, y: 400 };
   const u = ((t % 1) + 1) % 1;
   const idx = u * (samples.length - 1);
   const i = Math.floor(idx);
@@ -61,11 +84,35 @@ export function pointOnLapSamples(samples: Vec2[], t: number): Vec2 {
   return { x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f };
 }
 
+function buildLapDFromPoints(points: Vec2[]): string {
+  if (points.length === 0) return "";
+  const head = points[0]!;
+  const parts: string[] = [`M ${head.x.toFixed(3)} ${head.y.toFixed(3)}`];
+  for (let i = 1; i < points.length; i++) {
+    const p = points[i]!;
+    parts.push(`L ${p.x.toFixed(3)} ${p.y.toFixed(3)}`);
+  }
+  return parts.join(" ");
+}
+
+function bboxCenter(svg: SVGSVGElement, d: string, offset: Vec2): Vec2 {
+  const p = document.createElementNS(NS, "path") as SVGPathElement;
+  p.setAttribute("d", d);
+  svg.appendChild(p);
+  try {
+    const bb = p.getBBox();
+    return { x: bb.x + bb.width / 2 + offset.x, y: bb.y + bb.height / 2 + offset.y };
+  } finally {
+    svg.removeChild(p);
+  }
+}
+
 /**
- * **Sec1 → Sec2 → Sec3** の順（配列 index 0→1→2）で直線ブリッジを挟み一周パスを生成する（クライアントのみ）。
+ * Sec1 → Sec2 → Sec3（順序固定）にオフセットを適用し、ワールド座標で一周パスを生成する。
+ * 端点の僅かなズレは直線ブリッジで吸収する（クライアントのみ）。
  */
 export function buildOkayamaLapGeometry(
-  sectors: [string, string, string] = TRACK_SECTOR_PATHS,
+  sectors: [SectorAsset, SectorAsset, SectorAsset] = TRACK_SECTORS,
 ): OkayamaLapGeometry | null {
   if (typeof document === "undefined") return null;
 
@@ -77,66 +124,98 @@ export function buildOkayamaLapGeometry(
   document.body.appendChild(svg);
 
   try {
-    const lengths: number[] = [];
-    const ends: Vec2[] = [];
-    const starts: Vec2[] = [];
+    const sectorWorlds = sectors.map((s) => sampleSectorWorld(svg, s));
+    if (sectorWorlds.some((sw) => sw.samples.length < 2)) return null;
 
-    for (const d of sectors) {
-      const p = document.createElementNS(NS, "path") as SVGPathElement;
-      p.setAttribute("d", d);
-      svg.appendChild(p);
-      const len = p.getTotalLength();
-      if (!Number.isFinite(len) || len <= 0) return null;
-      const pLen = p.getPointAtLength(len);
-      const p0 = p.getPointAtLength(0);
-      lengths.push(len);
-      ends.push({ x: pLen.x, y: pLen.y });
-      starts.push({ x: p0.x, y: p0.y });
+    const merged: Vec2[] = [];
+    const sectorLengthsWorld: number[] = [];
+
+    for (let i = 0; i < sectorWorlds.length; i++) {
+      const samples = sectorWorlds[i].samples;
+      if (i > 0) {
+        const prev = merged[merged.length - 1]!;
+        const next = samples[0]!;
+        merged.push(...bridgeBetween(prev, next));
+      }
+      const startIdx = merged.length;
+      merged.push(...samples);
+      let lenAccum = 0;
+      for (let j = startIdx + 1; j < merged.length; j++) {
+        const a = merged[j - 1]!;
+        const b = merged[j]!;
+        lenAccum += Math.hypot(b.x - a.x, b.y - a.y);
+      }
+      sectorLengthsWorld.push(lenAccum);
     }
 
-    let combined = sectors[0];
-    for (let i = 1; i < sectors.length; i++) {
-      const st = starts[i];
-      combined += ` L ${st.x} ${st.y} ` + stripLeadingMoveto(sectors[i]);
-    }
-    const st0 = starts[0];
-    combined += ` L ${st0.x} ${st0.y}`;
+    const last = merged[merged.length - 1]!;
+    const head = merged[0]!;
+    merged.push(...bridgeBetween(last, head));
+    merged.push({ x: head.x, y: head.y });
 
-    const merged = document.createElementNS(NS, "path") as SVGPathElement;
-    merged.setAttribute("d", combined);
-    svg.appendChild(merged);
-    const totalLen = merged.getTotalLength();
+    const lapD = buildLapDFromPoints(merged);
+
+    const lapPath = document.createElementNS(NS, "path") as SVGPathElement;
+    lapPath.setAttribute("d", lapD);
+    svg.appendChild(lapPath);
+    const totalLen = lapPath.getTotalLength();
     if (!Number.isFinite(totalLen) || totalLen <= 0) return null;
 
-    const b12 = Math.hypot(starts[1].x - ends[0].x, starts[1].y - ends[0].y);
-    const cutS1 = lengths[0];
-    const cutS2 = lengths[0] + b12 + lengths[1];
+    const segLengths: number[] = [];
+    for (let i = 1; i < merged.length; i++) {
+      segLengths.push(
+        Math.hypot(merged[i]!.x - merged[i - 1]!.x, merged[i]!.y - merged[i - 1]!.y),
+      );
+    }
+    const cumulative = [0];
+    for (const l of segLengths) cumulative.push(cumulative[cumulative.length - 1]! + l);
 
-    const samples = sampleMergedPath(merged);
+    let cumIndex = 0;
+    function lengthAtIndex(targetIdx: number): number {
+      const idx = Math.min(Math.max(targetIdx, 0), cumulative.length - 1);
+      return cumulative[idx]!;
+    }
 
-    const fl = merged.getPointAtLength(0);
-    const s1End = merged.getPointAtLength(Math.min(cutS1, totalLen));
-    const s2End = merged.getPointAtLength(Math.min(cutS2, totalLen));
-    const look = Math.min(6, totalLen * 0.004);
-    const flB = merged.getPointAtLength(look);
+    let counter = 0;
+    const sectorEndIdx: number[] = [];
+    for (let i = 0; i < sectorWorlds.length; i++) {
+      if (i > 0) {
+        const prev = sectorWorlds[i - 1].samples[sectorWorlds[i - 1].samples.length - 1]!;
+        const next = sectorWorlds[i].samples[0]!;
+        const dist = Math.hypot(next.x - prev.x, next.y - prev.y);
+        if (dist > 6) counter += Math.ceil(dist / 6) - 1;
+      }
+      counter += sectorWorlds[i].samples.length;
+      sectorEndIdx.push(counter - 1);
+    }
+    void cumIndex;
+
+    const cutS1 = lengthAtIndex(sectorEndIdx[0]!);
+    const cutS2 = lengthAtIndex(sectorEndIdx[1]!);
+
+    const fl = lapPath.getPointAtLength(0);
+    const s1End = lapPath.getPointAtLength(Math.min(cutS1, totalLen));
+    const s2End = lapPath.getPointAtLength(Math.min(cutS2, totalLen));
+    const look = Math.min(8, totalLen * 0.004);
+    const flB = lapPath.getPointAtLength(look);
     const dx = flB.x - fl.x;
     const dy = flB.y - fl.y;
     const tl = Math.hypot(dx, dy) || 1;
 
     const sectorLabelCenters = {
-      s1: bboxCenter(svg, sectors[0]),
-      s2: bboxCenter(svg, sectors[1]),
-      s3: bboxCenter(svg, sectors[2]),
+      s1: bboxCenter(svg, sectors[0].d, sectors[0].offset),
+      s2: bboxCenter(svg, sectors[1].d, sectors[1].offset),
+      s3: bboxCenter(svg, sectors[2].d, sectors[2].offset),
     };
 
     return {
-      lapD: combined,
+      lapD,
       totalLen,
       cutS1,
       cutS2,
-      samples,
+      samples: merged,
       sectorLabelCenters,
-      pitInCenter: bboxCenter(svg, TRACK_PATH_PIT_IN),
+      pitInCenter: bboxCenter(svg, TRACK_PATH_PIT_IN, TRACK_OFFSETS.pitIn),
       timing: {
         fl: { x: fl.x, y: fl.y },
         s1End: { x: s1End.x, y: s1End.y },

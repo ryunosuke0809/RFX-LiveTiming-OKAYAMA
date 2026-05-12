@@ -1,12 +1,22 @@
 /**
  * 岡山コースマップ用 SVG パス（Figma 等から書き出し）
  *
- * ラップ結合順は常に **Sec1 → Sec2 → Sec3**（`TRACK_PATH_S1` → `S2` → `S3`）。
- * 端点がわずかに離れている場合はジオメトリ側で直線ブリッジを挟んで一周にする。
+ * 各セクターは別ファイルで書き出されたため、それぞれ自分のバウンディングボックスを
+ * 原点 (0,0) とする独立した座標系を持つ。実際の岡山コースのレイアウトに揃えるため、
+ * セクターごとに「コース全体（ワールド）座標」へのオフセットを与える。
+ *
+ * 端点が一致するように算出したオフセット（許容誤差は約 5px）:
+ *   Sec1.end (0.16, 0.48)   + offset(253.88, 194.03)  ≈ Sec2.start (254.04, 194.50)
+ *   Sec2.end (1050.04, 623) + offset(0, 0)            ≈ Sec3.start (15.52, 211.53) + offset(1034.52, 411.47)
+ *   Sec3.end (0.02, 359.53) + offset(1034.52, 411.47) ≈ Sec1.start (785.40, 577.19) + offset(253.88, 194.03)
+ *
+ * Sec1 → Sec2 → Sec3 の順で時計回り（または図面上の進行方向）に一周する。
  */
 
-/** 全セクター・ピットを含む表示用 viewBox（余白あり） */
-export const OKAYAMA_TRACK_VIEWBOX = "0 0 1200 630";
+export type Vec2 = { x: number; y: number };
+
+/** 全セクター・ピットを含む表示用 viewBox（左右上下に余白あり） */
+export const OKAYAMA_TRACK_VIEWBOX = "-40 -40 1740 870";
 
 export const TRACK_PATH_S1 =
   "M785.405 577.189L472.833 586.975L440.877 570.338L420.405 540.489V494.003L433.887 450.452C486.34 378.41 515.749 338.018 568.203 265.975V190.975L529.155 137.975L461.155 98.9753L314.655 32.4753L231.155 23.9753L124.155 40.9753L0.155235 0.475281";
@@ -21,9 +31,20 @@ export const TRACK_PATH_S3 =
 export const TRACK_PATH_PIT_IN =
   "M547.013 0.0438232C536.513 119.544 492.413 105.444 490.013 107.044L457.013 118.044H391.513H318.513L29.0134 125.77L0.0133667 126.544";
 
-/** ラップ・表示ともにこの順で Sec1→Sec2→Sec3 を結合する */
-export const TRACK_SECTOR_PATHS: [string, string, string] = [
-  TRACK_PATH_S1,
-  TRACK_PATH_S2,
-  TRACK_PATH_S3,
+/** 各セクターのワールド座標へのオフセット（ピクセル） */
+export const TRACK_OFFSETS = {
+  s1: { x: 253.881, y: 194.025 },
+  s2: { x: 0, y: 0 },
+  s3: { x: 1034.523, y: 411.468 },
+  /** ピットインはメインストレート脇に手動配置（必要に応じて微調整） */
+  pitIn: { x: 486, y: 614 },
+} as const;
+
+export type SectorAsset = { id: "s1" | "s2" | "s3"; d: string; offset: Vec2 };
+
+/** Sec1 → Sec2 → Sec3 の順序固定（一周ラップを構成） */
+export const TRACK_SECTORS: [SectorAsset, SectorAsset, SectorAsset] = [
+  { id: "s1", d: TRACK_PATH_S1, offset: TRACK_OFFSETS.s1 },
+  { id: "s2", d: TRACK_PATH_S2, offset: TRACK_OFFSETS.s2 },
+  { id: "s3", d: TRACK_PATH_S3, offset: TRACK_OFFSETS.s3 },
 ];
