@@ -30,8 +30,8 @@ const TAG_LABEL: Record<CircuitTag, string> = {
 };
 
 const TAG_COLOR: Record<CircuitTag, string> = {
-  sec1: "#ef4444",
-  sec2: "#3b82f6",
+  sec1: "#3b82f6",
+  sec2: "#ef4444",
   sec3: "#22c55e",
   pit: "#a1a1aa",
   fl: "#f59e0b",
@@ -168,8 +168,8 @@ function buildExportSnippet(map: L.Map): string {
 
   lines.push("// --- SVG ルート例 ---");
   lines.push(`<svg viewBox="0 0 ${VIEW_W} ${VIEW_H}" preserveAspectRatio="xMidYMid meet">`);
-  lines.push('  <path d={PATH_S1} fill="none" stroke="#ef4444" strokeWidth="4" />');
-  lines.push('  <path d={PATH_S2} fill="none" stroke="#3b82f6" strokeWidth="4" />');
+  lines.push('  <path d={PATH_S1} fill="none" stroke="#3b82f6" strokeWidth="4" />');
+  lines.push('  <path d={PATH_S2} fill="none" stroke="#ef4444" strokeWidth="4" />');
   lines.push('  <path d={PATH_S3} fill="none" stroke="#22c55e" strokeWidth="4" />');
   lines.push('  <path d={PATH_PIT} fill="none" stroke="#a1a1aa" strokeWidth="3" strokeDasharray="6 4" />');
   lines.push(

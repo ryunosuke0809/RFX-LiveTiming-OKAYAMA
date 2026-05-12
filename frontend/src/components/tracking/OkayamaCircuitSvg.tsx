@@ -3,8 +3,8 @@
 /**
  * 岡山国際サーキット SVG コースマップ
  *
- * レイアウト: /dev/circuit-map-editor で衛星トレースした path を反映
- * 投影バウンド: N=34.921274 S=34.910024 E=134.224646 W=134.218575
+ * 向き: 衛星図と同じ（上が北、下側がメイン／ピットストレート、時計回り）。
+ * S1〜S3 はオーバーレイ（S1=青・S2=赤・S3=緑）に沿った概形。精密な座標は /dev/circuit-map-editor で再トレース可。
  *
  * 将来: getPointAtLength() で車両マーカーをパス上に配置・移動
  */
@@ -12,10 +12,10 @@
 import type { Standing } from "@/types/smis";
 import { getTeamByStanding, getClassByStanding } from "@/data/mock";
 
-// --- セクター色定義 ---
+// --- セクター色（衛星オーバーレイと対応）---
 const SECTOR_COLORS = {
-  s1: "#ef4444",
-  s2: "#3b82f6",
+  s1: "#3b82f6",
+  s2: "#ef4444",
   s3: "#22c55e",
   pit: "#a1a1aa",
 };
@@ -24,28 +24,28 @@ function stripLeadingMove(d: string): string {
   return d.replace(/^M\s+[\d.]+\s+[\d.]+\s+/, "");
 }
 
-// --- SVG パス（viewBox 0 0 1000 560）---
+// --- SVG パス（viewBox 0 0 1000 560）時計回り: FL → 西へメイン直線 → 左の大回り → 上のバックストレート → 右ヘアピン手前まで S1 ---
 
 const PATH_S1 =
-  "M 58.3 348.0 L 37.0 248.4 L 77.7 236.2 L 137.7 232.6 L 253.6 245.2 L 416.1 274.8 L 510.6 276.1 L 576.0 264.3 L 657.3 218.5 L 712.0 179.3 L 680.2 135.7 L 717.3 98.7";
+  "M 545 508 L 480 510 L 380 508 L 280 502 L 200 490 L 145 460 L 105 415 L 78 360 L 62 300 L 65 235 L 88 175 L 135 125 L 205 88 L 295 68 L 410 65 L 530 75 L 650 95 L 750 130 L 820 175 L 865 225 L 882 275 L 878 312";
 
 const PATH_S2 =
-  "M 717.3 98.7 L 759.8 30.6 L 812.8 20.7 L 864.9 21.6 L 912.6 28.0 L 950.6 40.2 L 963.0 59.3 L 955.0 81.0 L 931.2 107.5 L 892.3 134.6 L 590.2 382.6 L 540.7 389.6 L 499.2 380.0 L 518.6 351.7 L 541.6 327.6 L 498.3 316.0 L 303.9 309.2 L 243.0 317.1 L 233.3 343.2 L 237.7 345.4";
+  "M 878 312 L 900 345 L 910 395 L 895 445 L 855 485 L 780 510 L 680 522 L 580 526 L 520 528";
 
 const PATH_S3 =
-  "M 237.7 345.4 L 262.4 450.3 L 310.1 460.6 L 372.9 448.1 L 425.9 419.4 L 468.3 415.3 L 513.3 425.8 L 478.0 504.4 L 438.2 521.1 L 196.2 539.3 L 120.2 527.9 L 99.0 492.8 L 58.3 348.0";
+  "M 520 528 L 680 524 L 840 515 L 928 498 L 968 455 L 982 395 L 962 328 L 900 268 L 805 235 L 695 228 L 582 248 L 478 298 L 402 365 L 372 430 L 398 488 L 475 508 L 545 508";
 
 const PATH_PIT =
-  "M 486.5 485.5 L 478.0 504.4 L 392.3 517.8 L 288.9 525.7 L 221.8 531.4 L 179.4 527.4 L 157.3 518.9 L 136.1 510.6 L 131.7 487.3 L 110.5 431.3 L 84.8 344.7 L 48.1 300.2";
+  "M 798 490 L 640 478 L 520 466 L 400 472 L 242 476 L 222 488";
 
-const FL_POINT = { x: 58.3, y: 348.0 };
-const PIT_IN_POINT = { x: 456.8, y: 507.7 };
-const PIT_OUT_POINT = { x: 84.8, y: 344.7 };
+const FL_POINT = { x: 545, y: 508 };
+const PIT_IN_POINT = { x: 798, y: 490 };
+const PIT_OUT_POINT = { x: 222, y: 488 };
 
-/** S1 終端 = S2 始端（計測イメージ） */
-const S1_END = { x: 717.3, y: 98.7 };
-/** S2 終端 = S3 始端 */
-const S2_END = { x: 237.7, y: 345.4 };
+/** S1 終端 = S2 始端（右ヘアピン手前） */
+const S1_END = { x: 878, y: 312 };
+/** S2 終端 = S3 始端（メインストレート上） */
+const S2_END = { x: 520, y: 528 };
 
 /** 全周ラップ用 1 path（M/L のみ想定） */
 export const PATH_FULL_CIRCUIT = `${PATH_S1} ${stripLeadingMove(PATH_S2)} ${stripLeadingMove(PATH_S3)}`;
@@ -126,9 +126,9 @@ function sectorDashThrough(p: XY, color: string, key: string) {
 }
 
 const SECTOR_LABELS = [
-  { x: 377, y: 223, label: "S1", color: SECTOR_COLORS.s1 },
-  { x: 598, y: 205, label: "S2", color: SECTOR_COLORS.s2 },
-  { x: 285, y: 424, label: "S3", color: SECTOR_COLORS.s3 },
+  { x: 480, y: 118, label: "S1", color: SECTOR_COLORS.s1 },
+  { x: 918, y: 338, label: "S2", color: SECTOR_COLORS.s2 },
+  { x: 780, y: 468, label: "S3", color: SECTOR_COLORS.s3 },
 ];
 
 const TIMING_POINTS: { x: number; y: number; label: string }[] = [
@@ -247,8 +247,8 @@ export default function OkayamaCircuitSvg({
       ))}
 
       <text
-        x="268"
-        y="498"
+        x="515"
+        y="448"
         textAnchor="middle"
         fill={SECTOR_COLORS.pit}
         fontSize="9"

@@ -57,8 +57,8 @@ export default function TrackingPage() {
             </button>
           )}
           <div className="hidden sm:flex items-center gap-3 text-[10px] font-semibold">
-            <span className="flex items-center gap-1"><span className="w-3 h-1 rounded bg-red-500" />S1</span>
-            <span className="flex items-center gap-1"><span className="w-3 h-1 rounded bg-blue-500" />S2</span>
+            <span className="flex items-center gap-1"><span className="w-3 h-1 rounded bg-blue-500" />S1</span>
+            <span className="flex items-center gap-1"><span className="w-3 h-1 rounded bg-red-500" />S2</span>
             <span className="flex items-center gap-1"><span className="w-3 h-1 rounded bg-green-500" />S3</span>
             <span className="flex items-center gap-1"><span className="w-3 h-1 rounded bg-zinc-400" />Pit</span>
           </div>
