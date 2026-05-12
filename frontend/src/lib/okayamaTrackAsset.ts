@@ -15,11 +15,14 @@
 
 export type Vec2 = { x: number; y: number };
 
-/** 全セクターを含む表示用 viewBox（左右上下に余白あり） */
-export const OKAYAMA_TRACK_VIEWBOX = "-40 -40 1740 870";
+/**
+ * 全セクターを含む表示用 viewBox。
+ * preserveAspectRatio="xMidYMid meet" で必ず収まるよう、上下左右に十分な余白を取る。
+ */
+export const OKAYAMA_TRACK_VIEWBOX = "-80 -80 1820 940";
 
 /** viewBox 中心（`scale` / `rotate` の基準点に使用） */
-export const OKAYAMA_TRACK_CENTER: Vec2 = { x: 830, y: 395 };
+export const OKAYAMA_TRACK_CENTER: Vec2 = { x: 830, y: 390 };
 
 export const TRACK_PATH_S1 =
   "M785.405 577.189L472.833 586.975L440.877 570.338L420.405 540.489V494.003L433.887 450.452C486.34 378.41 515.749 338.018 568.203 265.975V190.975L529.155 137.975L461.155 98.9753L314.655 32.4753L231.155 23.9753L124.155 40.9753L0.155235 0.475281";
@@ -40,9 +43,11 @@ export const TRACK_OFFSETS = {
 /**
  * セクターラベルのワールド座標。`undefined` の場合はセクター BBox の中心を自動採用。
  * 「12 号車の上」「56 号車の右横」など要望に応じてここで微調整する。
+ *
+ * S2 は Sec2 のロングバックストレート（(323,46)〜(1177,347) の対角線）の中ほどの上に配置する。
  */
 export const SECTOR_LABEL_POSITIONS: { s1?: Vec2; s2?: Vec2; s3?: Vec2 } = {
-  s2: { x: 460, y: 245 },
+  s2: { x: 720, y: 110 },
   s3: { x: 1530, y: 555 },
 };
 

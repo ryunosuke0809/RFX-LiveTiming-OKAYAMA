@@ -36,7 +36,7 @@ const TRACK_STROKE_LINE = 9;
 const ZOOM_MIN = 0.5;
 const ZOOM_MAX = 5;
 const ZOOM_STEP = 1.2;
-const ZOOM_DEFAULT = 1;
+const ZOOM_DEFAULT = 0.83;
 const ROTATE_STEP = 15;
 const PAN_DRAG_THRESHOLD = 4;
 
