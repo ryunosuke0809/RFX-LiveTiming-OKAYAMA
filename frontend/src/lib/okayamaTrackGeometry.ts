@@ -62,7 +62,7 @@ export function pointOnLapSamples(samples: Vec2[], t: number): Vec2 {
 }
 
 /**
- * S1→S2→S3 を直線ブリッジでつなぎ一周パスを生成し、長さとサンプルを求める（クライアントのみ）。
+ * **Sec1 → Sec2 → Sec3** の順（配列 index 0→1→2）で直線ブリッジを挟み一周パスを生成する（クライアントのみ）。
  */
 export function buildOkayamaLapGeometry(
   sectors: [string, string, string] = TRACK_SECTOR_PATHS,

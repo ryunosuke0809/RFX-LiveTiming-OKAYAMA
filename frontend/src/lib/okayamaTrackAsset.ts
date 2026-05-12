@@ -1,6 +1,8 @@
 /**
  * 岡山コースマップ用 SVG パス（Figma 等から書き出し）
- * 同一座標空間で S1→S2→S3 が一周になるよう結合し、ラップ上のマーカー位置を計算する。
+ *
+ * ラップ結合順は常に **Sec1 → Sec2 → Sec3**（`TRACK_PATH_S1` → `S2` → `S3`）。
+ * 端点がわずかに離れている場合はジオメトリ側で直線ブリッジを挟んで一周にする。
  */
 
 /** 全セクター・ピットを含む表示用 viewBox（余白あり） */
@@ -19,6 +21,7 @@ export const TRACK_PATH_S3 =
 export const TRACK_PATH_PIT_IN =
   "M547.013 0.0438232C536.513 119.544 492.413 105.444 490.013 107.044L457.013 118.044H391.513H318.513L29.0134 125.77L0.0133667 126.544";
 
+/** ラップ・表示ともにこの順で Sec1→Sec2→Sec3 を結合する */
 export const TRACK_SECTOR_PATHS: [string, string, string] = [
   TRACK_PATH_S1,
   TRACK_PATH_S2,

@@ -3,8 +3,8 @@
 /**
  * 岡山国際サーキット SVG コースマップ
  *
- * セクター境界は書き出し SVG（S1/S2/S3）に準拠。一周ラップはクライアントで結合したパスを
- * サンプリングし、マーカーをそのライン上に配置する。
+ * Sec1→Sec2→Sec3 の順で結合した一周（`okayamaTrackGeometry`）に沿ってマーカーを配置する。
+ * ジオメトリ算出後は結合パスを下層に描き、完成図のように一周がつながって見える。
  */
 
 import { useLayoutEffect, useState } from "react";
@@ -25,9 +25,10 @@ import {
   type Vec2,
 } from "@/lib/okayamaTrackGeometry";
 
+/** 完成図に合わせ: S1=赤 / S2=黄 / S3=緑 */
 const SECTOR_COLORS = {
-  s1: "#3b82f6",
-  s2: "#ef4444",
+  s1: "#ef4444",
+  s2: "#eab308",
   s3: "#22c55e",
   pit: "#a1a1aa",
 };
@@ -119,30 +120,43 @@ export default function OkayamaCircuitSvg({
         </filter>
       </defs>
 
-      <path
-        d={TRACK_PATH_S1}
-        fill="none"
-        stroke="#27272a"
-        strokeWidth={TRACK_STROKE_WIDE}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d={TRACK_PATH_S2}
-        fill="none"
-        stroke="#27272a"
-        strokeWidth={TRACK_STROKE_WIDE}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d={TRACK_PATH_S3}
-        fill="none"
-        stroke="#27272a"
-        strokeWidth={TRACK_STROKE_WIDE}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+      {geom ? (
+        <path
+          d={geom.lapD}
+          fill="none"
+          stroke="#27272a"
+          strokeWidth={TRACK_STROKE_WIDE}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      ) : (
+        <>
+          <path
+            d={TRACK_PATH_S1}
+            fill="none"
+            stroke="#27272a"
+            strokeWidth={TRACK_STROKE_WIDE}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path
+            d={TRACK_PATH_S2}
+            fill="none"
+            stroke="#27272a"
+            strokeWidth={TRACK_STROKE_WIDE}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path
+            d={TRACK_PATH_S3}
+            fill="none"
+            stroke="#27272a"
+            strokeWidth={TRACK_STROKE_WIDE}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </>
+      )}
 
       <path
         d={TRACK_PATH_S1}
