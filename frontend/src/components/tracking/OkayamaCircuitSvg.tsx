@@ -284,11 +284,69 @@ export default function OkayamaCircuitSvg({
           {/* セクター境界の横断ライン（FL / S1→S2 / S2→S3 すべて統一スタイル） */}
           {timing && (
             <>
-              {boundaryCrossLine(timing.fl, timing.flTangent, "cross-fl")}
               {boundaryCrossLine(timing.s1End, timing.s1EndTangent, "cross-s1")}
               {boundaryCrossLine(timing.s2End, timing.s2EndTangent, "cross-s2")}
             </>
           )}
+
+          {/* FL（スタート/フィニッシュ）: 路面に白黒チェッカー帯 + コース外に緑クレセント＋FL ロゴ */}
+          {timing && (() => {
+            const fl = timing.fl;
+            const tan = timing.flTangent;
+            const angleDeg = (Math.atan2(tan.y, tan.x) * 180) / Math.PI;
+            const halfBand = 22;
+            const segH = 4;
+            const segs = Math.max(2, Math.round((halfBand * 2) / segH));
+            const labelPos = offsetOutside(fl, center, TIMING_LABEL_OFFSET + 12);
+            return (
+              <g key="fl-marker">
+                <g transform={`translate(${fl.x} ${fl.y}) rotate(${angleDeg})`}>
+                  <rect
+                    x={-3.5}
+                    y={-halfBand}
+                    width={7}
+                    height={halfBand * 2}
+                    fill="#0a0a0a"
+                  />
+                  {Array.from({ length: segs }).map((_, i) => (
+                    <rect
+                      key={i}
+                      x={-2.5}
+                      y={-halfBand + i * segH}
+                      width={5}
+                      height={segH}
+                      fill={i % 2 === 0 ? "#fafafa" : "#0a0a0a"}
+                    />
+                  ))}
+                </g>
+                <g transform={`translate(${labelPos.x} ${labelPos.y})`}>
+                  <path
+                    d="M 8 -10 A 12 12 0 0 0 8 10"
+                    fill="none"
+                    stroke="#22c55e"
+                    strokeWidth={5}
+                    strokeLinecap="round"
+                    filter="url(#glow)"
+                  />
+                  <text
+                    x={18}
+                    y={1}
+                    fill="#fafafa"
+                    fontSize={18}
+                    fontWeight={900}
+                    fontFamily="sans-serif"
+                    dominantBaseline="middle"
+                    style={{ paintOrder: "stroke" }}
+                    stroke="#0a0a0a"
+                    strokeWidth={3}
+                    strokeLinejoin="round"
+                  >
+                    FL
+                  </text>
+                </g>
+              </g>
+            );
+          })()}
 
           {/* セクターラベル（位置は SECTOR_LABEL_POSITIONS で上書き可） */}
           {labelPositions && (
@@ -338,42 +396,7 @@ export default function OkayamaCircuitSvg({
             </>
           )}
 
-          {/* タイミング点ラベル（FL / S1 / S2）— コース外側に押し出して路面と重ならないよう配置 */}
-          {timing &&
-            [
-              { p: timing.fl, label: "FL" },
-              { p: timing.s1End, label: "S1" },
-              { p: timing.s2End, label: "S2" },
-            ].map(({ p, label }) => {
-              const lp = offsetOutside(p, center, TIMING_LABEL_OFFSET);
-              return (
-                <g key={label}>
-                  <rect
-                    x={lp.x - 12}
-                    y={lp.y - 7}
-                    width="24"
-                    height="14"
-                    rx="2"
-                    fill="#18181b"
-                    stroke="#f59e0b"
-                    strokeWidth="1"
-                    opacity={0.92}
-                  />
-                  <text
-                    x={lp.x}
-                    y={lp.y + 1}
-                    textAnchor="middle"
-                    dominantBaseline="central"
-                    fill="#f59e0b"
-                    fontSize="9"
-                    fontWeight="bold"
-                    fontFamily="sans-serif"
-                  >
-                    {label}
-                  </text>
-                </g>
-              );
-            })}
+          {/* FL/S1/S2 の小ラベルは廃止（FL は上の独自デザイン、S1/S2 は横断ラインのみ） */}
 
           {/* マシンマーカー（ラップ上に等間隔配置） */}
           {showCarMarkers && (() => {
