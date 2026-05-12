@@ -36,8 +36,10 @@ export type OkayamaLapGeometry = {
     fl: Vec2;
     s1End: Vec2;
     s2End: Vec2;
-    /** FL 付近の単位接線（コントロールラインの傾き） */
+    /** 各境界点での単位接線（横断ラインの傾き計算に使用） */
     flTangent: Vec2;
+    s1EndTangent: Vec2;
+    s2EndTangent: Vec2;
   };
 };
 
@@ -204,10 +206,19 @@ export function buildOkayamaLapGeometry(
     const s1End = lapPath.getPointAtLength(Math.min(cutS1, totalLen));
     const s2End = lapPath.getPointAtLength(Math.min(cutS2, totalLen));
     const look = Math.min(8, totalLen * 0.004);
-    const flB = lapPath.getPointAtLength(look);
-    const dx = flB.x - fl.x;
-    const dy = flB.y - fl.y;
-    const tl = Math.hypot(dx, dy) || 1;
+
+    function tangentAt(at: number): Vec2 {
+      const a = lapPath.getPointAtLength(Math.max(0, at - look / 2));
+      const b = lapPath.getPointAtLength(Math.min(totalLen, at + look / 2));
+      const tdx = b.x - a.x;
+      const tdy = b.y - a.y;
+      const tlen = Math.hypot(tdx, tdy) || 1;
+      return { x: tdx / tlen, y: tdy / tlen };
+    }
+
+    const flTangent = tangentAt(0);
+    const s1EndTangent = tangentAt(Math.min(cutS1, totalLen));
+    const s2EndTangent = tangentAt(Math.min(cutS2, totalLen));
 
     const sectorLabelCenters = {
       s1: computePolylineCenter(smoothPolys[0]!),
@@ -228,7 +239,9 @@ export function buildOkayamaLapGeometry(
         fl: { x: fl.x, y: fl.y },
         s1End: { x: s1End.x, y: s1End.y },
         s2End: { x: s2End.x, y: s2End.y },
-        flTangent: { x: dx / tl, y: dy / tl },
+        flTangent,
+        s1EndTangent,
+        s2EndTangent,
       },
     };
   } finally {

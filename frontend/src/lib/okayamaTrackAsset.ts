@@ -37,6 +37,15 @@ export const TRACK_OFFSETS = {
   s3: { x: 1034.523, y: 411.468 },
 } as const;
 
+/**
+ * セクターラベルのワールド座標。`undefined` の場合はセクター BBox の中心を自動採用。
+ * 「12 号車の上」「56 号車の右横」など要望に応じてここで微調整する。
+ */
+export const SECTOR_LABEL_POSITIONS: { s1?: Vec2; s2?: Vec2; s3?: Vec2 } = {
+  s2: { x: 460, y: 245 },
+  s3: { x: 1530, y: 555 },
+};
+
 export type SectorAsset = { id: "s1" | "s2" | "s3"; d: string; offset: Vec2 };
 
 /** Sec1 → Sec2 → Sec3 の順序固定（一周ラップを構成） */

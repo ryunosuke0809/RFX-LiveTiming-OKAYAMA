@@ -14,6 +14,7 @@ import { getTeamByStanding, getClassByStanding } from "@/data/mock";
 import {
   OKAYAMA_TRACK_CENTER,
   OKAYAMA_TRACK_VIEWBOX,
+  SECTOR_LABEL_POSITIONS,
 } from "@/lib/okayamaTrackAsset";
 import {
   buildOkayamaLapGeometry,
@@ -35,37 +36,42 @@ const TRACK_STROKE_LINE = 9;
 const ZOOM_MIN = 0.5;
 const ZOOM_MAX = 5;
 const ZOOM_STEP = 1.2;
-const ZOOM_DEFAULT = 1.5;
+const ZOOM_DEFAULT = 1;
 const ROTATE_STEP = 15;
 const PAN_DRAG_THRESHOLD = 4;
 
-function sectorDashThrough(p: Vec2, color: string, key: string) {
-  const len = 18;
+/** セクター境界を路面に対し直交で横断するオレンジ点線 */
+const BOUNDARY_LINE_COLOR = "#f59e0b";
+/** 路面ストロークが 38px なので、はみ出すよう半分の長さを 26px に */
+const BOUNDARY_HALF_LEN = 26;
+
+/**
+ * 接線 `tangent` に直交する方向で `p` を通る横断ラインを路面の幅より広く引く。
+ * S1/S2/Sec3(FL) の境界に共通スタイル（オレンジ点線）で使う。
+ */
+function boundaryCrossLine(
+  p: Vec2,
+  tangent: Vec2,
+  key: string,
+  opts?: { dashed?: boolean; opacity?: number; strokeWidth?: number },
+) {
+  const { dashed = true, opacity = 0.85, strokeWidth = 2.5 } = opts ?? {};
+  const nx = -tangent.y * BOUNDARY_HALF_LEN;
+  const ny = tangent.x * BOUNDARY_HALF_LEN;
   return (
     <line
       key={key}
-      x1={p.x - len}
-      y1={p.y - len * 0.35}
-      x2={p.x + len}
-      y2={p.y + len * 0.35}
-      stroke={color}
-      strokeWidth="2.5"
-      opacity={0.85}
-      strokeDasharray="3 2"
+      x1={p.x - nx}
+      y1={p.y - ny}
+      x2={p.x + nx}
+      y2={p.y + ny}
+      stroke={BOUNDARY_LINE_COLOR}
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      opacity={opacity}
+      strokeDasharray={dashed ? "5 4" : undefined}
     />
   );
-}
-
-function flControlLine(timing: OkayamaLapGeometry["timing"]): {
-  x1: number;
-  y1: number;
-  x2: number;
-  y2: number;
-} {
-  const { fl, flTangent } = timing;
-  const nx = -flTangent.y * 22;
-  const ny = flTangent.x * 22;
-  return { x1: fl.x - nx, y1: fl.y - ny, x2: fl.x + nx, y2: fl.y + ny };
 }
 
 interface OkayamaCircuitSvgProps {
@@ -103,7 +109,14 @@ export default function OkayamaCircuitSvg({
   const timing = geom?.timing;
   const samples = geom?.samples ?? [];
   const sectorCenters = geom?.sectorLabelCenters;
-  const flLine = timing ? flControlLine(timing) : null;
+
+  const labelPositions = sectorCenters
+    ? {
+        s1: SECTOR_LABEL_POSITIONS.s1 ?? sectorCenters.s1,
+        s2: SECTOR_LABEL_POSITIONS.s2 ?? sectorCenters.s2,
+        s3: SECTOR_LABEL_POSITIONS.s3 ?? sectorCenters.s3,
+      }
+    : null;
 
   const onZoomIn = () => setZoom((z) => Math.min(ZOOM_MAX, z * ZOOM_STEP));
   const onZoomOut = () => setZoom((z) => Math.max(ZOOM_MIN, z / ZOOM_STEP));
@@ -256,68 +269,56 @@ export default function OkayamaCircuitSvg({
             </>
           )}
 
-          {/* スタート/フィニッシュ コントロールライン */}
-          {flLine && (
-            <line
-              x1={flLine.x1}
-              y1={flLine.y1}
-              x2={flLine.x2}
-              y2={flLine.y2}
-              stroke="#ffffff"
-              strokeWidth="3"
-              opacity={0.95}
-            />
-          )}
-
-          {/* セクター切れ目のミニライン */}
+          {/* セクター境界の横断ライン（FL / S1→S2 / S2→S3 すべて統一スタイル） */}
           {timing && (
             <>
-              {sectorDashThrough(timing.s1End, SECTOR_COLORS.s1, "dash-s1")}
-              {sectorDashThrough(timing.s2End, SECTOR_COLORS.s2, "dash-s2")}
+              {boundaryCrossLine(timing.fl, timing.flTangent, "cross-fl")}
+              {boundaryCrossLine(timing.s1End, timing.s1EndTangent, "cross-s1")}
+              {boundaryCrossLine(timing.s2End, timing.s2EndTangent, "cross-s2")}
             </>
           )}
 
-          {/* セクターラベル */}
-          {sectorCenters && (
+          {/* セクターラベル（位置は SECTOR_LABEL_POSITIONS で上書き可） */}
+          {labelPositions && (
             <>
               <text
-                x={sectorCenters.s1.x}
-                y={sectorCenters.s1.y}
+                x={labelPositions.s1.x}
+                y={labelPositions.s1.y}
                 textAnchor="middle"
                 dominantBaseline="middle"
                 fill={SECTOR_COLORS.s1}
                 fontSize="22"
                 fontWeight="bold"
                 fontFamily="sans-serif"
-                opacity={0.7}
+                opacity={0.75}
                 filter="url(#glow)"
               >
                 S1
               </text>
               <text
-                x={sectorCenters.s2.x}
-                y={sectorCenters.s2.y}
+                x={labelPositions.s2.x}
+                y={labelPositions.s2.y}
                 textAnchor="middle"
                 dominantBaseline="middle"
                 fill={SECTOR_COLORS.s2}
                 fontSize="22"
                 fontWeight="bold"
                 fontFamily="sans-serif"
-                opacity={0.7}
+                opacity={0.75}
                 filter="url(#glow)"
               >
                 S2
               </text>
               <text
-                x={sectorCenters.s3.x}
-                y={sectorCenters.s3.y}
+                x={labelPositions.s3.x}
+                y={labelPositions.s3.y}
                 textAnchor="middle"
                 dominantBaseline="middle"
                 fill={SECTOR_COLORS.s3}
                 fontSize="22"
                 fontWeight="bold"
                 fontFamily="sans-serif"
-                opacity={0.7}
+                opacity={0.75}
                 filter="url(#glow)"
               >
                 S3
