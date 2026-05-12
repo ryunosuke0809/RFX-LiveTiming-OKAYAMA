@@ -1,6 +1,4 @@
 import {
-  TRACK_PATH_PIT_IN,
-  TRACK_OFFSETS,
   TRACK_SECTORS,
   type SectorAsset,
   type Vec2,
@@ -8,13 +6,22 @@ import {
 
 const NS = "http://www.w3.org/2000/svg";
 
-const SAMPLES_PER_SECTOR = 256;
+/** 1 セクターあたりの初期サンプル数（多いほど元形状に忠実） */
+const SAMPLES_PER_SECTOR = 220;
+
+/** Chaikin スムージングの繰返し回数（多いほど角が丸くなる） */
+const SMOOTHING_ITERATIONS = 2;
+
+/** 隣接セクター間ギャップ補完の最小距離 */
+const BRIDGE_THRESHOLD = 4;
 
 export type { Vec2 } from "@/lib/okayamaTrackAsset";
 
 export type OkayamaLapGeometry = {
   /** ワールド座標で結合された一周パスの d 文字列（M/L のみ） */
   lapD: string;
+  /** スムージング済みの各セクター d 文字列（ワールド座標） */
+  sectorDs: { s1: string; s2: string; s3: string };
   totalLen: number;
   /** ラップ全体に占める各セクターの長さ累積（ワールド座標基準） */
   cutS1: number;
@@ -22,7 +29,6 @@ export type OkayamaLapGeometry = {
   /** 一周をサンプリングしたワールド座標列（マーカー位置補間用） */
   samples: Vec2[];
   sectorLabelCenters: { s1: Vec2; s2: Vec2; s3: Vec2 };
-  pitInCenter: Vec2;
   timing: {
     fl: Vec2;
     s1End: Vec2;
@@ -32,45 +38,66 @@ export type OkayamaLapGeometry = {
   };
 };
 
-function sampleSectorWorld(
-  svg: SVGSVGElement,
-  sector: SectorAsset,
-): { samples: Vec2[]; len: number; bbox: { x: number; y: number; w: number; h: number } } {
+function sampleSectorWorld(svg: SVGSVGElement, sector: SectorAsset): Vec2[] {
   const p = document.createElementNS(NS, "path") as SVGPathElement;
   p.setAttribute("d", sector.d);
   svg.appendChild(p);
   try {
     const len = p.getTotalLength();
-    if (!Number.isFinite(len) || len <= 0) {
-      return { samples: [], len: 0, bbox: { x: 0, y: 0, w: 0, h: 0 } };
-    }
+    if (!Number.isFinite(len) || len <= 0) return [];
     const samples: Vec2[] = [];
     for (let i = 0; i <= SAMPLES_PER_SECTOR; i++) {
       const pt = p.getPointAtLength((i / SAMPLES_PER_SECTOR) * len);
       samples.push({ x: pt.x + sector.offset.x, y: pt.y + sector.offset.y });
     }
-    const bb = p.getBBox();
-    return {
-      samples,
-      len,
-      bbox: { x: bb.x + sector.offset.x, y: bb.y + sector.offset.y, w: bb.width, h: bb.height },
-    };
+    return samples;
   } finally {
     svg.removeChild(p);
   }
+}
+
+/** Chaikin の角丸めアルゴリズム。両端点は固定して保つ。 */
+function chaikinSmooth(pts: Vec2[]): Vec2[] {
+  if (pts.length < 3) return pts;
+  const out: Vec2[] = [pts[0]!];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p = pts[i]!;
+    const q = pts[i + 1]!;
+    out.push({ x: 0.75 * p.x + 0.25 * q.x, y: 0.75 * p.y + 0.25 * q.y });
+    out.push({ x: 0.25 * p.x + 0.75 * q.x, y: 0.25 * p.y + 0.75 * q.y });
+  }
+  out.push(pts[pts.length - 1]!);
+  return out;
+}
+
+function smoothPolyline(pts: Vec2[], iterations = SMOOTHING_ITERATIONS): Vec2[] {
+  let cur = pts;
+  for (let i = 0; i < iterations; i++) cur = chaikinSmooth(cur);
+  return cur;
 }
 
 function bridgeBetween(prev: Vec2, next: Vec2, stepPx = 6): Vec2[] {
   const dx = next.x - prev.x;
   const dy = next.y - prev.y;
   const dist = Math.hypot(dx, dy);
-  if (dist <= stepPx) return [];
+  if (dist <= BRIDGE_THRESHOLD) return [];
   const steps = Math.ceil(dist / stepPx);
   const out: Vec2[] = [];
   for (let i = 1; i < steps; i++) {
     out.push({ x: prev.x + (dx * i) / steps, y: prev.y + (dy * i) / steps });
   }
   return out;
+}
+
+function polylineToD(points: Vec2[]): string {
+  if (points.length === 0) return "";
+  const head = points[0]!;
+  const parts: string[] = [`M ${head.x.toFixed(3)} ${head.y.toFixed(3)}`];
+  for (let i = 1; i < points.length; i++) {
+    const p = points[i]!;
+    parts.push(`L ${p.x.toFixed(3)} ${p.y.toFixed(3)}`);
+  }
+  return parts.join(" ");
 }
 
 export function pointOnLapSamples(samples: Vec2[], t: number): Vec2 {
@@ -84,32 +111,31 @@ export function pointOnLapSamples(samples: Vec2[], t: number): Vec2 {
   return { x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f };
 }
 
-function buildLapDFromPoints(points: Vec2[]): string {
-  if (points.length === 0) return "";
-  const head = points[0]!;
-  const parts: string[] = [`M ${head.x.toFixed(3)} ${head.y.toFixed(3)}`];
-  for (let i = 1; i < points.length; i++) {
-    const p = points[i]!;
-    parts.push(`L ${p.x.toFixed(3)} ${p.y.toFixed(3)}`);
+function computePolylineCenter(pts: Vec2[]): Vec2 {
+  if (pts.length === 0) return { x: 0, y: 0 };
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const p of pts) {
+    if (p.x < minX) minX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y > maxY) maxY = p.y;
   }
-  return parts.join(" ");
+  return { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
 }
 
-function bboxCenter(svg: SVGSVGElement, d: string, offset: Vec2): Vec2 {
-  const p = document.createElementNS(NS, "path") as SVGPathElement;
-  p.setAttribute("d", d);
-  svg.appendChild(p);
-  try {
-    const bb = p.getBBox();
-    return { x: bb.x + bb.width / 2 + offset.x, y: bb.y + bb.height / 2 + offset.y };
-  } finally {
-    svg.removeChild(p);
+function polylineLength(pts: Vec2[]): number {
+  let total = 0;
+  for (let i = 1; i < pts.length; i++) {
+    total += Math.hypot(pts[i]!.x - pts[i - 1]!.x, pts[i]!.y - pts[i - 1]!.y);
   }
+  return total;
 }
 
 /**
- * Sec1 → Sec2 → Sec3（順序固定）にオフセットを適用し、ワールド座標で一周パスを生成する。
- * 端点の僅かなズレは直線ブリッジで吸収する（クライアントのみ）。
+ * Sec1 → Sec2 → Sec3 の順にサンプリング → スムージング → ワールド結合し、一周パスを生成する。
  */
 export function buildOkayamaLapGeometry(
   sectors: [SectorAsset, SectorAsset, SectorAsset] = TRACK_SECTORS,
@@ -124,28 +150,28 @@ export function buildOkayamaLapGeometry(
   document.body.appendChild(svg);
 
   try {
-    const sectorWorlds = sectors.map((s) => sampleSectorWorld(svg, s));
-    if (sectorWorlds.some((sw) => sw.samples.length < 2)) return null;
+    const rawSectorPolys = sectors.map((s) => sampleSectorWorld(svg, s));
+    if (rawSectorPolys.some((p) => p.length < 2)) return null;
+
+    const smoothPolys = rawSectorPolys.map((p) => smoothPolyline(p));
+    const sectorDs = {
+      s1: polylineToD(smoothPolys[0]!),
+      s2: polylineToD(smoothPolys[1]!),
+      s3: polylineToD(smoothPolys[2]!),
+    };
 
     const merged: Vec2[] = [];
-    const sectorLengthsWorld: number[] = [];
+    const sectorEndIdx: number[] = [];
 
-    for (let i = 0; i < sectorWorlds.length; i++) {
-      const samples = sectorWorlds[i].samples;
+    for (let i = 0; i < smoothPolys.length; i++) {
+      const poly = smoothPolys[i]!;
       if (i > 0) {
         const prev = merged[merged.length - 1]!;
-        const next = samples[0]!;
+        const next = poly[0]!;
         merged.push(...bridgeBetween(prev, next));
       }
-      const startIdx = merged.length;
-      merged.push(...samples);
-      let lenAccum = 0;
-      for (let j = startIdx + 1; j < merged.length; j++) {
-        const a = merged[j - 1]!;
-        const b = merged[j]!;
-        lenAccum += Math.hypot(b.x - a.x, b.y - a.y);
-      }
-      sectorLengthsWorld.push(lenAccum);
+      merged.push(...poly);
+      sectorEndIdx.push(merged.length - 1);
     }
 
     const last = merged[merged.length - 1]!;
@@ -153,7 +179,7 @@ export function buildOkayamaLapGeometry(
     merged.push(...bridgeBetween(last, head));
     merged.push({ x: head.x, y: head.y });
 
-    const lapD = buildLapDFromPoints(merged);
+    const lapD = polylineToD(merged);
 
     const lapPath = document.createElementNS(NS, "path") as SVGPathElement;
     lapPath.setAttribute("d", lapD);
@@ -161,37 +187,15 @@ export function buildOkayamaLapGeometry(
     const totalLen = lapPath.getTotalLength();
     if (!Number.isFinite(totalLen) || totalLen <= 0) return null;
 
-    const segLengths: number[] = [];
+    const cumulative: number[] = [0];
     for (let i = 1; i < merged.length; i++) {
-      segLengths.push(
-        Math.hypot(merged[i]!.x - merged[i - 1]!.x, merged[i]!.y - merged[i - 1]!.y),
+      cumulative.push(
+        cumulative[i - 1]! +
+          Math.hypot(merged[i]!.x - merged[i - 1]!.x, merged[i]!.y - merged[i - 1]!.y),
       );
     }
-    const cumulative = [0];
-    for (const l of segLengths) cumulative.push(cumulative[cumulative.length - 1]! + l);
-
-    let cumIndex = 0;
-    function lengthAtIndex(targetIdx: number): number {
-      const idx = Math.min(Math.max(targetIdx, 0), cumulative.length - 1);
-      return cumulative[idx]!;
-    }
-
-    let counter = 0;
-    const sectorEndIdx: number[] = [];
-    for (let i = 0; i < sectorWorlds.length; i++) {
-      if (i > 0) {
-        const prev = sectorWorlds[i - 1].samples[sectorWorlds[i - 1].samples.length - 1]!;
-        const next = sectorWorlds[i].samples[0]!;
-        const dist = Math.hypot(next.x - prev.x, next.y - prev.y);
-        if (dist > 6) counter += Math.ceil(dist / 6) - 1;
-      }
-      counter += sectorWorlds[i].samples.length;
-      sectorEndIdx.push(counter - 1);
-    }
-    void cumIndex;
-
-    const cutS1 = lengthAtIndex(sectorEndIdx[0]!);
-    const cutS2 = lengthAtIndex(sectorEndIdx[1]!);
+    const cutS1 = cumulative[sectorEndIdx[0]!]!;
+    const cutS2 = cumulative[sectorEndIdx[1]!]!;
 
     const fl = lapPath.getPointAtLength(0);
     const s1End = lapPath.getPointAtLength(Math.min(cutS1, totalLen));
@@ -203,19 +207,20 @@ export function buildOkayamaLapGeometry(
     const tl = Math.hypot(dx, dy) || 1;
 
     const sectorLabelCenters = {
-      s1: bboxCenter(svg, sectors[0].d, sectors[0].offset),
-      s2: bboxCenter(svg, sectors[1].d, sectors[1].offset),
-      s3: bboxCenter(svg, sectors[2].d, sectors[2].offset),
+      s1: computePolylineCenter(smoothPolys[0]!),
+      s2: computePolylineCenter(smoothPolys[1]!),
+      s3: computePolylineCenter(smoothPolys[2]!),
     };
+    void polylineLength;
 
     return {
       lapD,
+      sectorDs,
       totalLen,
       cutS1,
       cutS2,
       samples: merged,
       sectorLabelCenters,
-      pitInCenter: bboxCenter(svg, TRACK_PATH_PIT_IN, TRACK_OFFSETS.pitIn),
       timing: {
         fl: { x: fl.x, y: fl.y },
         s1End: { x: s1End.x, y: s1End.y },
