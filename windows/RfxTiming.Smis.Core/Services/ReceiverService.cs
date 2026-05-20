@@ -116,13 +116,13 @@ public sealed class ReceiverService : IAsyncDisposable
             {
                 _parsedWriter = new JsonlSmisLogWriter(LogPaths.ParsedLogFileFor(_currentLogDate));
             }
-            UpdateStage(ref _logStatusBacking, _rawWriter is null && _parsedWriter is null
+            SetLogStatus(_rawWriter is null && _parsedWriter is null
                 ? StageStatus.Disabled
-                : StageStatus.Idle, nameof(LogStatus));
+                : StageStatus.Idle);
         }
         catch (Exception ex)
         {
-            UpdateStage(ref _logStatusBacking, StageStatus.Error, nameof(LogStatus));
+            SetLogStatus(StageStatus.Error);
             ErrorOccurred?.Invoke(this, ex);
         }
 
@@ -157,12 +157,12 @@ public sealed class ReceiverService : IAsyncDisposable
                     try
                     {
                         await _rawWriter.WriteFrameAsync(frame, cancellationToken).ConfigureAwait(false);
-                        UpdateStage(ref _logStatusBacking, StageStatus.Active, nameof(LogStatus));
+                        SetLogStatus(StageStatus.Active);
                     }
                     catch (Exception ex)
                     {
                         LogWriteErrors++;
-                        UpdateStage(ref _logStatusBacking, StageStatus.Error, nameof(LogStatus));
+                        SetLogStatus(StageStatus.Error);
                         ErrorOccurred?.Invoke(this, ex);
                     }
                 }
@@ -172,12 +172,12 @@ public sealed class ReceiverService : IAsyncDisposable
                 try
                 {
                     message = SmisXmlParser.Parse(frame.Xml);
-                    UpdateStage(ref _parseStatusBacking, StageStatus.Active, nameof(ParseStatus));
+                    SetParseStatus(StageStatus.Active);
                 }
                 catch (SmisXmlParseException)
                 {
                     ParseErrors++;
-                    UpdateStage(ref _parseStatusBacking, StageStatus.Warning, nameof(ParseStatus));
+                    SetParseStatus(StageStatus.Warning);
                 }
 
                 // 4. 解析済 JSONL 書込
@@ -190,7 +190,7 @@ public sealed class ReceiverService : IAsyncDisposable
                     catch (Exception ex)
                     {
                         LogWriteErrors++;
-                        UpdateStage(ref _logStatusBacking, StageStatus.Error, nameof(LogStatus));
+                        SetLogStatus(StageStatus.Error);
                         ErrorOccurred?.Invoke(this, ex);
                     }
                 }
@@ -209,7 +209,7 @@ public sealed class ReceiverService : IAsyncDisposable
         }
         catch (Exception ex)
         {
-            UpdateStage(ref _receiveStatusBacking, StageStatus.Error, nameof(ReceiveStatus));
+            SetReceiveStatus(StageStatus.Error);
             ErrorOccurred?.Invoke(this, ex);
         }
     }
@@ -273,7 +273,7 @@ public sealed class ReceiverService : IAsyncDisposable
             }
             catch (Exception ex)
             {
-                UpdateStage(ref _logStatusBacking, StageStatus.Error, nameof(LogStatus));
+                SetLogStatus(StageStatus.Error);
                 ErrorOccurred?.Invoke(this, ex);
             }
 
@@ -305,7 +305,7 @@ public sealed class ReceiverService : IAsyncDisposable
             _rateWindow.Restart();
         }
 
-        UpdateStage(ref _receiveStatusBacking, StageStatus.Active, nameof(ReceiveStatus));
+        SetReceiveStatus(StageStatus.Active);
     }
 
     /// <summary>接続を切断する。</summary>
@@ -345,9 +345,9 @@ public sealed class ReceiverService : IAsyncDisposable
             _parsedWriter = null;
         }
 
-        UpdateStage(ref _receiveStatusBacking, StageStatus.Idle, nameof(ReceiveStatus));
-        UpdateStage(ref _parseStatusBacking, StageStatus.Idle, nameof(ParseStatus));
-        UpdateStage(ref _logStatusBacking, StageStatus.Idle, nameof(LogStatus));
+        SetReceiveStatus(StageStatus.Idle);
+        SetParseStatus(StageStatus.Idle);
+        SetLogStatus(StageStatus.Idle);
     }
 
     public async ValueTask DisposeAsync()
@@ -381,25 +381,34 @@ public sealed class ReceiverService : IAsyncDisposable
             SmisTcpClient.ConnectionState.Disconnected => StageStatus.Idle,
             _ => StageStatus.Idle,
         };
-        UpdateStage(ref _receiveStatusBacking, next, nameof(ReceiveStatus));
+        SetReceiveStatus(next);
         StateChanged?.Invoke(this, state);
     }
 
-    // ===== Stage status backing fields =====
-    private StageStatus _receiveStatusBacking;
-    private StageStatus _parseStatusBacking;
-    private StageStatus _logStatusBacking;
+    // ===== Stage status setters =====
+    // 3 ステージごとに専用 setter を用意する。
+    // 旧実装の「ref StageStatus backing + nameof(...) で振り分け」は
+    // 一部 IDE で nameof のシンボル解決に失敗するケースがあったため、
+    // 明示的に 3 メソッドに分けて安定させている。
 
-    private void UpdateStage(ref StageStatus backing, StageStatus next, string propertyName)
+    private void SetReceiveStatus(StageStatus next)
     {
-        if (backing == next) return;
-        backing = next;
-        switch (propertyName)
-        {
-            case nameof(ReceiveStatus): ReceiveStatus = next; break;
-            case nameof(ParseStatus): ParseStatus = next; break;
-            case nameof(LogStatus): LogStatus = next; break;
-        }
+        if (ReceiveStatus == next) return;
+        ReceiveStatus = next;
+        StageHealthChanged?.Invoke(this, new StageHealth(ReceiveStatus, ParseStatus, LogStatus));
+    }
+
+    private void SetParseStatus(StageStatus next)
+    {
+        if (ParseStatus == next) return;
+        ParseStatus = next;
+        StageHealthChanged?.Invoke(this, new StageHealth(ReceiveStatus, ParseStatus, LogStatus));
+    }
+
+    private void SetLogStatus(StageStatus next)
+    {
+        if (LogStatus == next) return;
+        LogStatus = next;
         StageHealthChanged?.Invoke(this, new StageHealth(ReceiveStatus, ParseStatus, LogStatus));
     }
 }
