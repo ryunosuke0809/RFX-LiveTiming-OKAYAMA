@@ -6,7 +6,8 @@ using RfxTiming.Smis.Logging;
 namespace RfxTiming.Smis.Replay;
 
 /// <summary>
-/// SEIKO 互換ログファイル (<c>seiko_YYYYMMDD.log</c>) を読み込むパーサー。
+/// SMIS 互換ログファイル (<c>MOLA_INPUT_YYYYMMDD.log</c> / <c>seiko_YYYYMMDD.log</c>) を読み込むパーサー。
+/// 両形式とも 1 行 = タイムスタンプ (yyyy-MM-dd HH:mm:ss.fff) + スペース + XML で同一フォーマット。
 /// <para>
 /// 1 行のフォーマット: <c>yyyy-MM-dd HH:mm:ss.fff &lt;Xml.../&gt;</c>
 /// </para>

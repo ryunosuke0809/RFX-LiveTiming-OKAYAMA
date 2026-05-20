@@ -46,7 +46,7 @@ public sealed class VirtualServerService : IAsyncDisposable
         _server.Start();
     }
 
-    /// <summary>SEIKO ログファイル (<c>seiko_YYYYMMDD.log</c>) を読み込んで再生キューにセット。</summary>
+    /// <summary>SMIS 互換ログファイル (<c>MOLA_INPUT_*.log</c> / <c>seiko_*.log</c>) を読み込んで再生キューにセット。</summary>
     public Task<int> LoadLogFileAsync(string filePath, CancellationToken cancellationToken = default)
     {
         return Task.Run(() =>

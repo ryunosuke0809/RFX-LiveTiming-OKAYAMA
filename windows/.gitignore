@@ -38,6 +38,8 @@ Thumbs.db
 # Application logs (do NOT commit captured SMIS logs)
 logs/
 *.log
+MOLA_INPUT_*.log
+MOLA_INPUT_*.jsonl
 seiko_*.log
 seiko_*.jsonl
 smis_raw_*.txt

@@ -172,7 +172,7 @@
                                    TextWrapping="Wrap"
                                    Margin="0,12,0,0"
                                    LineHeight="22">
-                            <Run Text="1. ツールバーの「ログを開く...」で SEIKO 互換ログ (seiko_YYYYMMDD.log) を選択。未選択なら組み込みサンプルを使用。" /><LineBreak />
+                            <Run Text="1. ツールバーの「ログを開く...」で SMIS 互換ログ (MOLA_INPUT_*.log または seiko_*.log) を選択。未選択なら組み込みサンプルを使用。" /><LineBreak />
                             <Run Text="2. 「サーバー起動」 → ポート (既定 50000) で待受開始。" /><LineBreak />
                             <Run Text="3. MOLA_Timing-Receiver から 127.0.0.1:50000 に接続。" /><LineBreak />
                             <Run Text="4. 速度プリセットを選んで「▶ 再生」。ループ再生もチェックで切替。" /><LineBreak />

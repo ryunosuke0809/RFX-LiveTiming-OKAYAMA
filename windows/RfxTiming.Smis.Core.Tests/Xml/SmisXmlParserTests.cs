@@ -244,4 +244,34 @@ public sealed class SmisXmlParserTests
         const string xml = """<Loop ID="abc" Type="C" Order="1" Length="100" />""";
         Assert.Throws<SmisXmlParseException>(() => SmisXmlParser.Parse(xml));
     }
+
+    // 以下はリグレッションテスト
+    // 旧実装 (XmlReader + ConformanceLevel.Fragment + XElement.Load) で
+    // 「The XmlReader state should be EndOfFile after this operation」エラーが
+    // 発生していたケースが SmisXmlParseException 化されることを担保する。
+
+    [Fact]
+    public void Parse_TrailingWhitespace_DoesNotThrow()
+    {
+        const string xml = "<Passing ID=\"1\" SessionID=\"X\" LoopID=\"0\" Time=\"0\" Order=\"0\" LastPassingTime=\"0\" TeamID=\"T\" DriverNo=\"0\" LapTimeUse=\"0\" Type=\"N\" />\n\n";
+        var result = Assert.IsType<Passing>(SmisXmlParser.Parse(xml));
+        Assert.Equal("1", result.Id);
+    }
+
+    [Fact]
+    public void Parse_TrailingNullByte_DoesNotThrow()
+    {
+        // SMIS は NULL 終端だが、Frame 分割の境界処理ミスで NULL が残るケースの保険
+        string xml = "<Select SessionID=\"S\" />\0";
+        var result = Assert.IsType<Select>(SmisXmlParser.Parse(xml));
+        Assert.Equal("S", result.SessionId);
+    }
+
+    [Fact]
+    public void Parse_LeadingWhitespaceAndCrlf_DoesNotThrow()
+    {
+        const string xml = "\r\n  <Select SessionID=\"S\" />  \r\n";
+        var result = Assert.IsType<Select>(SmisXmlParser.Parse(xml));
+        Assert.Equal("S", result.SessionId);
+    }
 }

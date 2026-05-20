@@ -13,13 +13,20 @@ namespace RfxTiming.Smis.Logging;
 /// に exe を配置すること。
 /// </para>
 /// <para>
-/// 生ログのファイル名・フォーマットは他プロジェクト (SEIKO 計時系) の出力と互換になるよう
-/// <c>seiko_YYYYMMDD.log</c> / <c>{yyyy-MM-dd HH:mm:ss.fff} {XML}\n</c> に統一する。
-/// これにより蓄積された seiko_*.log をそのまま MOLA_Timing-VirtualServer で再生できる。
+/// 生ログのフォーマットは他プロジェクト (SEIKO 計時系) の出力と互換になるよう
+/// <c>{yyyy-MM-dd HH:mm:ss.fff} {XML}\n</c> に統一する。これにより蓄積された外部の
+/// <c>seiko_*.log</c> もそのまま MOLA_Timing-VirtualServer で再生できる。
+/// </para>
+/// <para>
+/// ファイル名は MOLA_Timing-Receiver で受信したログであることが分かるよう
+/// <c>MOLA_INPUT_YYYYMMDD.log</c> プレフィックスを使用する。
 /// </para>
 /// </summary>
 public static class LogPaths
 {
+    /// <summary>ファイル名プレフィックス。</summary>
+    public const string FilePrefix = "MOLA_INPUT_";
+
     /// <summary>ログ出力ルート (<c>%exe%/logs</c>)。</summary>
     public static string LogsRoot => Path.Combine(AppContext.BaseDirectory, "logs");
 
@@ -28,17 +35,17 @@ public static class LogPaths
 
     /// <summary>
     /// 日付指定の生 XML ログのファイルパスを返す。
-    /// 形式: <c>seiko_YYYYMMDD.log</c> (他プロジェクトの SEIKO 計時ログと互換)。
+    /// 形式: <c>MOLA_INPUT_YYYYMMDD.log</c> (SEIKO 互換フォーマット)。
     /// </summary>
     public static string RawLogFileFor(DateOnly date)
-        => Path.Combine(LogsRoot, $"seiko_{date:yyyyMMdd}.log");
+        => Path.Combine(LogsRoot, $"{FilePrefix}{date:yyyyMMdd}.log");
 
     /// <summary>
     /// 日付指定の解析済 JSONL ログのファイルパスを返す。
-    /// 形式: <c>seiko_YYYYMMDD.jsonl</c> (社内独自・解析済 1 行 1 JSON)。
+    /// 形式: <c>MOLA_INPUT_YYYYMMDD.jsonl</c> (社内独自・解析済 1 行 1 JSON)。
     /// </summary>
     public static string ParsedLogFileFor(DateOnly date)
-        => Path.Combine(LogsRoot, $"seiko_{date:yyyyMMdd}.jsonl");
+        => Path.Combine(LogsRoot, $"{FilePrefix}{date:yyyyMMdd}.jsonl");
 
     /// <summary>必要なフォルダーが存在することを保証する。</summary>
     public static void EnsureDirectoriesExist()

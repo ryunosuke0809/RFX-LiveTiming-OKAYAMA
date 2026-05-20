@@ -12,7 +12,7 @@
 | ユーザー向け表示・配布名・exe ファイル名 | **MOLA_Timing-Receiver** / **MOLA_Timing-VirtualServer** |
 | ソースコード・名前空間・型・変数・ファイル名 | **SMIS**（プロトコル仕様の正式名のため） |
 | プロトコル参照 | SMIS（仕様書: `docs/Specification/計測データ仕様書_20200220.pdf`） |
-| ログファイル名 | `seiko_YYYYMMDD.log` (SEIKO 互換) / `seiko_YYYYMMDD.jsonl` |
+| ログファイル名 | 生: `MOLA_INPUT_YYYYMMDD.log` (SEIKO 互換) / 解析済: `MOLA_INPUT_YYYYMMDD.jsonl` |
 
 > 「対外的には MOLA_Timing 規格のレシーバー、内部実装は SMIS プロトコル準拠」という二重の整理。下請けとしての RFX Timing の存在を露出させない方針はそのまま継続。
 
@@ -66,8 +66,8 @@ RFX-LiveTiming-OKAYAMA/
 ```mermaid
 flowchart LR
   MOLA["MOLA 計測サーバー<br/>(SMIS/TCP)"] -->|XML/UTF-8| Receiver["MOLA_Timing-Receiver<br/>(Windows / 計時室常駐)"]
-  Receiver -->|Raw stream| FileRaw["seiko_20260612.log"]
-  Receiver -->|Parsed JSONL| FileJsonl["seiko_20260612.jsonl"]
+  Receiver -->|Raw stream| FileRaw["MOLA_INPUT_20260612.log"]
+  Receiver -->|Parsed JSONL| FileJsonl["MOLA_INPUT_20260612.jsonl"]
   Receiver -->|設定・メタ| LocalDb[("local.db<br/>(SQLite)")]
   Receiver -->|WebSocket :8080| LAN["LAN クライアント<br/>(ピット内ブラウザ)"]
   Receiver -->|WebSocket over VPN| Remote["リモート確認<br/>(東京)"]
@@ -115,15 +115,15 @@ flowchart LR
 C:\MOLA_Timing\
   ├── MOLA_Timing-Receiver.exe
   ├── logs\
-  │   ├── seiko_20260613.log         (SEIKO 互換 1 行 1 メッセージ)
-  │   ├── seiko_20260613.jsonl       (解析済 JSON Lines)
+  │   ├── MOLA_INPUT_20260613.log    (SEIKO 互換 1 行 1 メッセージ)
+  │   ├── MOLA_INPUT_20260613.jsonl  (解析済 JSON Lines)
   │   └── _meta\
-  │       └── seiko_20260613.json    (SHA-256 等のメタ情報)
+  │       └── MOLA_INPUT_20260613.json (SHA-256 等のメタ情報)
   └── data\
       └── local.db                     (設定・主要テーブルのミラー、W2 後半)
 ```
 
-**生 XML ログ** (`seiko_YYYYMMDD.log`) — SEIKO 互換
+**生 XML ログ** (`MOLA_INPUT_YYYYMMDD.log`) — SEIKO 互換フォーマット
 
 各 SMIS メッセージは NULL 終端でストリームから到着するが、ファイル保存時は他プロジェクト (SEIKO 計時系) と同一の以下フォーマットで 1 メッセージ 1 行にする:
 
@@ -143,7 +143,7 @@ C:\MOLA_Timing\
 - XML 本体に万一改行・タブが含まれた場合はスペースに正規化して 1 行を保つ。
 - この形式により、社内蓄積済の `seiko_*.log` をそのまま MOLA_Timing-VirtualServer で再生可能。
 
-**解析済 JSONL ログ** (`seiko_YYYYMMDD.jsonl`)
+**解析済 JSONL ログ** (`MOLA_INPUT_YYYYMMDD.jsonl`)
 
 ```json
 {"ts":"2026-06-12T13:45:23.1234567+09:00","type":"Passing","payload":{"Id":"P0001","SessionId":"1:1:1:0:1","LoopId":0,"Time":935910,"TeamId":"1:1:0001","DriverNo":1,"LapTimeUse":true,"Type":1}}
@@ -261,7 +261,7 @@ SMIS はマスターデータ（Competition / Category / Team / Driver 等）が
 
 - **二重保存**: 生 XML と解析済 JSONL を同時保存し、片方が壊れてももう一方で復元可能
 - **書き込みフラッシュ**: 各メッセージごとに `FlushAsync` を呼び、PC ハング時もロスを最小化
-- **ファイルサイズ監視**: 100MB 超えで自動で連番ファイルへ分割（`seiko_20260612_01.log`）
+- **ファイルサイズ監視**: 100MB 超えで自動で連番ファイルへ分割（`MOLA_INPUT_20260612_01.log`）
 - **メタデータ別保存**: 各ログファイルとペアで `*.meta.json` を作成し、開始時刻 / 終了時刻 / メッセージ数 / SMIS host:port / Receiver バージョンを記録
 - **チェックサム**: ファイルクローズ時に SHA-256 を計算し meta に記録（持ち帰り後の整合性確認用）
 - **冗長化**: 設定で「USB ドライブにもミラー保存」を有効化可能（計時室 PC 故障対策）

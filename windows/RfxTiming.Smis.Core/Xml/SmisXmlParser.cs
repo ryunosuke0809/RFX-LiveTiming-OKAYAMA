@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Xml;
 using System.Xml.Linq;
 using RfxTiming.Smis.Messages;
+// XmlReader / XmlReaderSettings は使わなくなったが、System.Xml.Linq の XElement / XAttribute はこの名前空間から提供される
 
 namespace RfxTiming.Smis.Xml;
 
@@ -17,34 +18,45 @@ namespace RfxTiming.Smis.Xml;
 /// </summary>
 public static class SmisXmlParser
 {
-    private static readonly XmlReaderSettings ReaderSettings = new()
-    {
-        ConformanceLevel = ConformanceLevel.Fragment,
-        DtdProcessing = DtdProcessing.Prohibit,
-        IgnoreWhitespace = true,
-        IgnoreComments = true,
-        IgnoreProcessingInstructions = true,
-    };
-
     /// <summary>
     /// 単一の SMIS XML フラグメントをパースして DTO を返す。
+    /// <para>
+    /// SMIS の生データは XML 宣言が無く、1 フレーム = 1 要素 (NULL 終端) で来る。
+    /// <see cref="XElement.Parse(string)"/> は前後の空白を許容しつつ単一ルートを期待する
+    /// ため、Fragment モードの <see cref="XmlReader"/> よりも実データ向き。
+    /// </para>
     /// </summary>
     public static SmisMessage Parse(string xml)
     {
         ArgumentNullException.ThrowIfNull(xml);
 
+        // NULL 終端や前後の空白・改行を除去してからパース
+        string normalized = xml.Trim().TrimEnd('\0').TrimEnd();
         XElement root;
         try
         {
-            using var reader = XmlReader.Create(new StringReader(xml), ReaderSettings);
-            root = XElement.Load(reader, LoadOptions.None);
+            root = XElement.Parse(normalized, LoadOptions.None);
         }
         catch (XmlException ex)
         {
-            throw new SmisXmlParseException($"Malformed SMIS XML: {ex.Message}", ex);
+            throw new SmisXmlParseException(
+                $"Malformed SMIS XML: {ex.Message} (input head: '{Head(normalized)}')", ex);
+        }
+        catch (InvalidOperationException ex)
+        {
+            // XmlReader/XElement.Load 系で「ルート要素の後に追加内容」がある場合に発生する
+            throw new SmisXmlParseException(
+                $"SMIS XML has trailing content: {ex.Message} (input head: '{Head(normalized)}')", ex);
         }
 
         return ParseElement(root);
+    }
+
+    private static string Head(string xml)
+    {
+        if (string.IsNullOrEmpty(xml)) return string.Empty;
+        const int max = 80;
+        return xml.Length <= max ? xml : xml[..max] + "…";
     }
 
     /// <summary>

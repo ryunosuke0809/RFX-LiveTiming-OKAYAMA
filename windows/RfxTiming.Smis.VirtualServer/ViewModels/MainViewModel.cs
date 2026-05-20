@@ -228,8 +228,8 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
     {
         var dialog = new OpenFileDialog
         {
-            Title = "SEIKO 互換ログを開く",
-            Filter = "SEIKO log (*.log)|*.log|All files (*.*)|*.*",
+            Title = "SMIS 互換ログを開く (MOLA_INPUT_*.log / seiko_*.log)",
+            Filter = "SMIS compatible log (*.log)|MOLA_INPUT_*.log;seiko_*.log;*.log|All files (*.*)|*.*",
             CheckFileExists = true,
         };
 
@@ -298,7 +298,7 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
         MessageBox.Show(
             "MOLA_Timing-VirtualServer\n" +
             "Version 0.1.0\n\n" +
-            "SEIKO 互換 SMIS ログ (seiko_YYYYMMDD.log) を TCP プロトコルで再配信する開発用アプリ。\n\n" +
+            "SMIS 互換ログ (MOLA_INPUT_*.log / seiko_*.log) を TCP プロトコルで再配信する開発用アプリ。\n\n" +
             "Copyright (c) 2026 RFX Timing",
             "バージョン情報",
             MessageBoxButton.OK,
