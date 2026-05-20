@@ -17,8 +17,11 @@
 ## 前提
 
 - Windows 10 / 11 (x64)
-- .NET 8 SDK (8.0.100 以降) — [ダウンロード](https://dotnet.microsoft.com/download/dotnet/8.0)
-- Visual Studio 2022 (17.8+) もしくは JetBrains Rider 2023.3+
+- .NET 10 SDK (10.0.300 以降) — [ダウンロード](https://dotnet.microsoft.com/download/dotnet/10.0)
+- Visual Studio 2022 (17.12+) もしくは JetBrains Rider 2025.1+
+
+> .NET 10 は 2025 年 11 月リリースの LTS（2028 年 11 月までサポート）。
+> 計時室常駐アプリの基盤として最適。
 
 WPF プロジェクトは Windows でのみビルド・実行可能です（macOS / Linux ではビルド不可）。
 `RfxTiming.Smis.Core` および `RfxTiming.Smis.Core.Tests` は OS 非依存でビルド可能です。

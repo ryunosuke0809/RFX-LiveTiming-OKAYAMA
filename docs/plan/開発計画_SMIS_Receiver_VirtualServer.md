@@ -37,7 +37,7 @@ RFX-LiveTiming-OKAYAMA/
 ├── server/                         (将来の Cloud Server, Node.js — Phase 4)
 └── windows/
     └── RfxTiming.sln
-        ├── RfxTiming.Smis.Core             (.NET 8 クラスライブラリ)
+        ├── RfxTiming.Smis.Core             (.NET 10 クラスライブラリ)
         │   ├── Protocol/                    NULL 終端ストリーム分割
         │   ├── Xml/                         SMIS XML パーサー
         │   ├── Messages/                    SMIS DTO 型定義
@@ -45,15 +45,15 @@ RFX-LiveTiming-OKAYAMA/
         │   ├── Persistence/                 SQLite 設定・メタ DB
         │   ├── Networking/                  TCP クライアント / WS サーバー
         │   └── Replay/                      ログ再生エンジン
-        ├── RfxTiming.Smis.Receiver         (.NET 8 WPF — AssemblyName: MOLA_Timing-Receiver.exe)
-        └── RfxTiming.Smis.VirtualServer    (.NET 8 WPF — AssemblyName: MOLA_Timing-VirtualServer.exe)
+        ├── RfxTiming.Smis.Receiver         (.NET 10 WPF — AssemblyName: MOLA_Timing-Receiver.exe)
+        └── RfxTiming.Smis.VirtualServer    (.NET 10 WPF — AssemblyName: MOLA_Timing-VirtualServer.exe)
 ```
 
 ### 2.1 技術スタック
 
 | 項目 | 採用 | 理由 |
 |------|------|------|
-| ランタイム | .NET 8 (LTS) | Windows ネイティブ・安定、計時室常駐向け |
+| ランタイム | .NET 10 (LTS) | Windows ネイティブ・安定、2028 年 11 月までサポート |
 | UI | WPF + MVVM (CommunityToolkit.Mvvm) | 業務系で実績多数、ツールバー・設定ダイアログ実装が容易 |
 | XML パース | System.Xml.Linq | 標準ライブラリで十分、依存最小 |
 | ローカル DB | SQLite (Microsoft.Data.Sqlite) | 軽量、単一ファイル、ZIP アーカイブと相性良し |
