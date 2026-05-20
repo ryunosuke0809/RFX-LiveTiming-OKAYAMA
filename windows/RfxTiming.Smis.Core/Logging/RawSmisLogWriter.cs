@@ -5,19 +5,39 @@ using RfxTiming.Smis.Protocol;
 namespace RfxTiming.Smis.Logging;
 
 /// <summary>
-/// SMIS 生 XML フレームを 1 メッセージ 1 行のタブ区切りテキストに追記する Writer。
+/// SMIS 生 XML フレームを 1 メッセージ 1 行のテキスト形式で追記する Writer。
 /// <para>
-/// フォーマット: <c>{ISO8601 受信時刻}\t{バイト長}\t{エスケープ済 XML}\n</c>
+/// 出力フォーマットは他プロジェクト (SEIKO 計時系) のログと互換:
+/// </para>
+/// <code>
+/// 2026-03-27 13:32:36.204 &lt;Competition ID="477" NameJ="～ 巌流塾 ～" .../&gt;
+/// 2026-03-27 13:32:36.246 &lt;Category ID="477:1" NameJ="..." .../&gt;
+/// </code>
+/// <para>
+/// 仕様:
+/// <list type="bullet">
+///   <item>1 行 = 1 SMIS メッセージ。</item>
+///   <item>先頭は <c>yyyy-MM-dd HH:mm:ss.fff</c> (ローカル時刻、ミリ秒精度)。</item>
+///   <item>区切りは半角スペース 1 個。</item>
+///   <item>XML 本体は 1 行に詰める (内部の <c>\r\n</c>/<c>\t</c> はスペースに正規化)。</item>
+///   <item>行末は <c>\n</c>。</item>
+/// </list>
 /// </para>
 /// <para>
-/// 改行・タブを含む XML はエスケープして 1 行に詰めることで、テキストエディタや grep でも扱える。
+/// この形式の利点:
+/// <list type="bullet">
+///   <item>SEIKO の旧ログをそのまま MOLA_Timing-VirtualServer で再生できる。</item>
+///   <item>grep / awk / Excel でそのまま扱える。</item>
+///   <item>タイムスタンプが人間にも読めて時系列が瞬時に分かる。</item>
+/// </list>
 /// </para>
 /// </summary>
 public sealed class RawSmisLogWriter : IAsyncDisposable, IDisposable
 {
+    /// <summary>タイムスタンプの書式 (SEIKO 互換)。</summary>
+    public const string TimestampFormat = "yyyy-MM-dd HH:mm:ss.fff";
+
     private readonly StreamWriter _writer;
-    // .NET 9 の System.Threading.Lock は利用可能だが、書き込み頻度が低いため
-    // 互換性の高い object モニタロックで十分。複数 await の合間に短時間だけロックを保持する。
     private readonly object _gate = new();
     private bool _disposed;
 
@@ -54,8 +74,8 @@ public sealed class RawSmisLogWriter : IAsyncDisposable, IDisposable
         ArgumentNullException.ThrowIfNull(frame);
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        string line = FormatLine(frame);
-        // ロックは短時間: 書き込み順序の整合のためだけ。
+        string line = FormatLine(frame.ReceivedAt.LocalDateTime, frame.Xml);
+
         lock (_gate)
         {
             _writer.Write(line);
@@ -65,56 +85,57 @@ public sealed class RawSmisLogWriter : IAsyncDisposable, IDisposable
         await _writer.FlushAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    private static string FormatLine(SmisFrame frame)
+    /// <summary>任意のタイムスタンプ + XML で 1 行追記する (テスト・再エクスポート用途)。</summary>
+    public async Task WriteAsync(DateTime localTimestamp, string xml, CancellationToken cancellationToken = default)
     {
-        string ts = frame.ReceivedAt.ToString("O", CultureInfo.InvariantCulture);
-        string escapedXml = Escape(frame.Xml);
+        ArgumentNullException.ThrowIfNull(xml);
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        string line = FormatLine(localTimestamp, xml);
+        lock (_gate)
+        {
+            _writer.Write(line);
+            WrittenCount++;
+        }
+        await _writer.FlushAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>1 行を組み立てる (内部の改行・タブはスペースに正規化)。</summary>
+    public static string FormatLine(DateTime localTimestamp, string xml)
+    {
+        string ts = localTimestamp.ToString(TimestampFormat, CultureInfo.InvariantCulture);
+        string singleLineXml = NormalizeToSingleLine(xml);
         return string.Create(
             CultureInfo.InvariantCulture,
-            $"{ts}\t{frame.Bytes.Length}\t{escapedXml}\n");
+            $"{ts} {singleLineXml}\n");
     }
 
-    private static string Escape(string xml)
+    private static string NormalizeToSingleLine(string xml)
     {
-        // タブと改行を文字リテラル化 (\\t, \\n, \\r)。読み込み時に復元可能。
-        // バックスラッシュ自身もエスケープして可逆に。
-        var sb = new StringBuilder(xml.Length + 8);
+        // 内部の改行・タブはスペース 1 個に置換し、連続スペースは詰める。
+        // SEIKO 実ログでも Standings は 1 行で来るのが通常だが、
+        // 万一フォーマッターが挟んだ改行が紛れても 1 行を維持する。
+        if (!xml.AsSpan().ContainsAny('\r', '\n', '\t'))
+        {
+            return xml;
+        }
+
+        var sb = new StringBuilder(xml.Length);
+        bool prevSpace = false;
         foreach (char c in xml)
         {
-            switch (c)
+            if (c == '\r' || c == '\n' || c == '\t')
             {
-                case '\\': sb.Append("\\\\"); break;
-                case '\t': sb.Append("\\t"); break;
-                case '\n': sb.Append("\\n"); break;
-                case '\r': sb.Append("\\r"); break;
-                default: sb.Append(c); break;
-            }
-        }
-        return sb.ToString();
-    }
-
-    /// <summary>エスケープ済み行から XML 本体を復元する (再生時用)。</summary>
-    public static string Unescape(string escaped)
-    {
-        var sb = new StringBuilder(escaped.Length);
-        for (int i = 0; i < escaped.Length; i++)
-        {
-            char c = escaped[i];
-            if (c == '\\' && i + 1 < escaped.Length)
-            {
-                char next = escaped[++i];
-                sb.Append(next switch
+                if (!prevSpace)
                 {
-                    '\\' => '\\',
-                    't' => '\t',
-                    'n' => '\n',
-                    'r' => '\r',
-                    _ => next,
-                });
+                    sb.Append(' ');
+                    prevSpace = true;
+                }
             }
             else
             {
                 sb.Append(c);
+                prevSpace = c == ' ';
             }
         }
         return sb.ToString();

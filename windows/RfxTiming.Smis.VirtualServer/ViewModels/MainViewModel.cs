@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Win32;
 using RfxTiming.Smis.Networking;
 using RfxTiming.Smis.VirtualServer.Services;
 
@@ -28,10 +29,26 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
     private string _loadedLogFile = "（組み込みサンプル）";
 
     [ObservableProperty]
+    private string? _loadedLogFilePath;
+
+    [ObservableProperty]
+    private int _loadedEntryCount;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ClearLoadedLogCommand))]
+    private bool _hasLoadedLog;
+
+    [ObservableProperty]
     private int _connectedClientCount;
 
     [ObservableProperty]
     private long _totalSent;
+
+    [ObservableProperty]
+    private int _currentReplayIndex;
+
+    [ObservableProperty]
+    private int _replayTotalCount;
 
     [ObservableProperty]
     private string _lastSentInfo = "未送信";
@@ -51,13 +68,43 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
     [ObservableProperty]
     private int _listenPort = DefaultPort;
 
+    /// <summary>再生速度倍率。<c>double.PositiveInfinity</c> で待機なし。</summary>
     [ObservableProperty]
-    private double _playbackIntervalMs = 1000;
+    private double _playbackSpeed = 1.0;
+
+    [ObservableProperty]
+    private bool _loopPlayback;
+
+    /// <summary>UI 用の速度プリセット一覧。</summary>
+    public IReadOnlyList<PlaybackSpeedOption> SpeedOptions { get; } =
+    [
+        new("0.5x (低速)", 0.5),
+        new("1x (実時間)", 1.0),
+        new("2x", 2.0),
+        new("5x", 5.0),
+        new("10x", 10.0),
+        new("Max (待機なし)", double.PositiveInfinity),
+    ];
+
+    [ObservableProperty]
+    private PlaybackSpeedOption _selectedSpeedOption;
+
+    public MainViewModel()
+    {
+        _selectedSpeedOption = SpeedOptions[1]; // 1x
+        _playbackSpeed = _selectedSpeedOption.Multiplier;
+    }
+
+    partial void OnSelectedSpeedOptionChanged(PlaybackSpeedOption value)
+    {
+        PlaybackSpeed = value.Multiplier;
+    }
 
     private bool CanStartServer() => !IsServerRunning;
     private bool CanStopServer() => IsServerRunning;
     private bool CanPlay() => IsServerRunning && !IsPlaying;
     private bool CanStopPlayback() => IsServerRunning && IsPlaying;
+    private bool CanClearLoadedLog() => HasLoadedLog && !IsPlaying;
 
     [RelayCommand(CanExecute = nameof(CanStartServer))]
     private void StartServer()
@@ -75,7 +122,14 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
             _service.FrameSent += OnFrameSent;
             _service.ErrorOccurred += OnErrorOccurred;
             _service.PlaybackCompleted += OnPlaybackCompleted;
+            _service.ProgressUpdated += OnProgressUpdated;
             _service.Start();
+
+            // ロード済ログがあれば再度サービスにセット (StartServer は新規 service を作るため)
+            if (HasLoadedLog && !string.IsNullOrEmpty(LoadedLogFilePath))
+            {
+                _ = ReloadLogIntoServiceAsync(LoadedLogFilePath);
+            }
 
             IsServerRunning = true;
             PlaybackStatusText = $"待機中 (ポート {ListenPort})";
@@ -86,6 +140,20 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
             MessageBox.Show($"サーバー起動エラー: {ex.Message}", "MOLA_Timing-VirtualServer",
                 MessageBoxButton.OK, MessageBoxImage.Error);
             _service = null;
+        }
+    }
+
+    private async Task ReloadLogIntoServiceAsync(string path)
+    {
+        if (_service is null) return;
+        try
+        {
+            await _service.LoadLogFileAsync(path).ConfigureAwait(true);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"ログの再ロードに失敗: {ex.Message}", "MOLA_Timing-VirtualServer",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 
@@ -120,9 +188,11 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
         try
         {
             IsPlaying = true;
-            PlaybackStatusText = "再生中…";
+            PlaybackStatusText = HasLoadedLog
+                ? $"再生中 (SEIKO ログ × {PlaybackSpeed:0.##}x)"
+                : $"再生中 (組み込みサンプル × {PlaybackSpeed:0.##}x)";
             PlaybackStatusBrush = BrushPlaying;
-            await _service.StartPlaybackAsync(TimeSpan.FromMilliseconds(PlaybackIntervalMs))
+            await _service.StartPlaybackAsync(PlaybackSpeed, LoopPlayback)
                 .ConfigureAwait(true);
         }
         catch (Exception ex)
@@ -153,6 +223,94 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
         }
     }
 
+    [RelayCommand]
+    private async Task OpenLogFileAsync()
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = "SEIKO 互換ログを開く",
+            Filter = "SEIKO log (*.log)|*.log|All files (*.*)|*.*",
+            CheckFileExists = true,
+        };
+
+        if (dialog.ShowDialog() != true) return;
+
+        string path = dialog.FileName;
+        try
+        {
+            if (_service is null)
+            {
+                // サーバー未起動でも先にロードしておく → StartServer 後に再注入
+                int countBefore = await Task.Run(() => Replay.SeikoLogReader.ReadAll(path).Count).ConfigureAwait(true);
+                LoadedLogFilePath = path;
+                LoadedLogFile = System.IO.Path.GetFileName(path);
+                LoadedEntryCount = countBefore;
+                HasLoadedLog = true;
+                ReplayTotalCount = countBefore;
+                CurrentReplayIndex = 0;
+                MessageBox.Show(
+                    $"{LoadedEntryCount:#,##0} 件のメッセージをロードしました。\n\n「サーバー起動」→「▶ 再生」で配信開始します。",
+                    "MOLA_Timing-VirtualServer", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            int count = await _service.LoadLogFileAsync(path).ConfigureAwait(true);
+            LoadedLogFilePath = path;
+            LoadedLogFile = System.IO.Path.GetFileName(path);
+            LoadedEntryCount = count;
+            HasLoadedLog = true;
+            ReplayTotalCount = count;
+            CurrentReplayIndex = 0;
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"ログを読み込めませんでした: {ex.Message}", "MOLA_Timing-VirtualServer",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanClearLoadedLog))]
+    private void ClearLoadedLog()
+    {
+        _service?.ClearLoadedLog();
+        LoadedLogFilePath = null;
+        LoadedLogFile = "（組み込みサンプル）";
+        LoadedEntryCount = 0;
+        HasLoadedLog = false;
+        CurrentReplayIndex = 0;
+        ReplayTotalCount = 0;
+    }
+
+    [RelayCommand]
+    private void ShowComingSoon(string? featureName)
+    {
+        string name = string.IsNullOrEmpty(featureName) ? "この機能" : featureName;
+        MessageBox.Show(
+            $"{name} は今後のリリースで対応予定です。",
+            "MOLA_Timing-VirtualServer",
+            MessageBoxButton.OK,
+            MessageBoxImage.Information);
+    }
+
+    [RelayCommand]
+    private void ShowAbout()
+    {
+        MessageBox.Show(
+            "MOLA_Timing-VirtualServer\n" +
+            "Version 0.1.0\n\n" +
+            "SEIKO 互換 SMIS ログ (seiko_YYYYMMDD.log) を TCP プロトコルで再配信する開発用アプリ。\n\n" +
+            "Copyright (c) 2026 RFX Timing",
+            "バージョン情報",
+            MessageBoxButton.OK,
+            MessageBoxImage.Information);
+    }
+
+    [RelayCommand]
+    private void ExitApp()
+    {
+        Application.Current?.Shutdown();
+    }
+
     private void OnClientChanged(object? sender, EndPoint _)
     {
         Application.Current?.Dispatcher.Invoke(() =>
@@ -172,7 +330,7 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
             {
                 TotalSent = _service.TotalSent;
             }
-            string preview = xml.Length > 60 ? xml[..60] + "…" : xml;
+            string preview = xml.Length > 80 ? xml[..80] + "…" : xml;
             LastSentInfo = preview;
         });
     }
@@ -195,34 +353,13 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
         });
     }
 
-    [RelayCommand]
-    private void ShowComingSoon(string? featureName)
+    private void OnProgressUpdated(object? sender, ReplayProgress progress)
     {
-        string name = string.IsNullOrEmpty(featureName) ? "この機能" : featureName;
-        MessageBox.Show(
-            $"{name} は W4 で実装予定です。\n\n現状は組み込みサンプルの再生のみ利用可能です。",
-            "MOLA_Timing-VirtualServer",
-            MessageBoxButton.OK,
-            MessageBoxImage.Information);
-    }
-
-    [RelayCommand]
-    private void ShowAbout()
-    {
-        MessageBox.Show(
-            "MOLA_Timing-VirtualServer\n" +
-            "Version 0.1.0\n\n" +
-            "保存ログを SMIS 互換 TCP プロトコルで再配信する開発用アプリ。\n\n" +
-            "Copyright (c) 2026 RFX Timing",
-            "バージョン情報",
-            MessageBoxButton.OK,
-            MessageBoxImage.Information);
-    }
-
-    [RelayCommand]
-    private void ExitApp()
-    {
-        Application.Current?.Shutdown();
+        Application.Current?.Dispatcher.Invoke(() =>
+        {
+            CurrentReplayIndex = progress.CurrentIndex;
+            ReplayTotalCount = progress.TotalCount;
+        });
     }
 
     public async ValueTask DisposeAsync()
@@ -233,3 +370,6 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
         }
     }
 }
+
+/// <summary>速度プリセット (UI 用)。</summary>
+public sealed record PlaybackSpeedOption(string Label, double Multiplier);

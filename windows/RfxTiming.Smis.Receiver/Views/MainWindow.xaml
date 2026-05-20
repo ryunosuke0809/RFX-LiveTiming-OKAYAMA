@@ -142,7 +142,7 @@
                             <Run Text="1. MOLA_Timing-VirtualServer.exe を別ウィンドウで起動し、ポート 50000 で「▶ 再生」を押す" /><LineBreak />
                             <Run Text="2. このアプリで上のツールバーの「接続」を押す" /><LineBreak />
                             <Run Text="3. ステータスが「接続済」になり、メトリクスが増加していくのを確認" /><LineBreak />
-                            <Run Text="4. ログは exe と同じフォルダーの logs/ 配下に保存されます (smis_raw_YYYYMMDD.txt と smis_parsed_YYYYMMDD.txt)" /><LineBreak />
+                            <Run Text="4. ログは exe と同じフォルダーの logs/ 配下に保存されます (seiko_YYYYMMDD.log と seiko_YYYYMMDD.jsonl)" /><LineBreak />
                             <Run Text="5. 「ログフォルダを開く」ボタンで Explorer を開けます" />
                         </TextBlock>
 
@@ -152,8 +152,9 @@
                         <TextBlock Foreground="{StaticResource Foreground.Secondary}"
                                    TextWrapping="Wrap"
                                    Margin="0,8,0,0">
-                            <Run Text="• smis_raw_*.txt : タブ区切り (受信時刻 / バイト長 / エスケープ済 XML)" /><LineBreak />
-                            <Run Text="• smis_parsed_*.txt : JSON Lines （ts / type / payload を 1 行 1 メッセージ）" />
+                            <Run Text="• seiko_YYYYMMDD.log : SEIKO 互換 (yyyy-MM-dd HH:mm:ss.fff + 半角スペース + 1 行 XML)" /><LineBreak />
+                            <Run Text="• seiko_YYYYMMDD.jsonl : 解析済 JSON Lines（ts / type / payload を 1 行 1 メッセージ）" /><LineBreak />
+                            <Run Text="• 過去ログ (別プロジェクトの seiko_*.log) は MOLA_Timing-VirtualServer でそのまま再生可能" />
                         </TextBlock>
                     </StackPanel>
                 </ScrollViewer>

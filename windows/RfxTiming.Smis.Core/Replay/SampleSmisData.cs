@@ -46,14 +46,20 @@ public static class SampleSmisData
         """<Start SessionID="1:1:1:0:1" DateTime="2026/06/13 10:00.00" />""",
     ];
 
+    private const int RunningLapCount = 5;
+    private const int FramesPerLap = 5; // Passing×4 + Standings×1
+    private const int ExtraTerminationFrames = 1; // チェッカー
+
+    /// <summary><see cref="EnumerateRunningSamples"/> が返すフレーム総数。</summary>
+    public static int RunningSampleCount => RunningLapCount * FramesPerLap + ExtraTerminationFrames;
+
     /// <summary>
     /// 走行中のリアルタイム計測データのループ。Standings と Passing を交互に。
     /// 列挙関数として提供 (再生時に時間を進めながら使う)。
     /// </summary>
     public static IEnumerable<string> EnumerateRunningSamples()
     {
-        // 5 周ぶんを生成
-        for (int lap = 1; lap <= 5; lap++)
+        for (int lap = 1; lap <= RunningLapCount; lap++)
         {
             long baseTime = lap * 750_000L; // 75 秒 = 750000 (1/10000秒)
 

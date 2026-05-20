@@ -12,7 +12,7 @@
 | ユーザー向け表示・配布名・exe ファイル名 | **MOLA_Timing-Receiver** / **MOLA_Timing-VirtualServer** |
 | ソースコード・名前空間・型・変数・ファイル名 | **SMIS**（プロトコル仕様の正式名のため） |
 | プロトコル参照 | SMIS（仕様書: `docs/Specification/計測データ仕様書_20200220.pdf`） |
-| ログファイル名 | `smis_raw_YYYYMMDD.txt` / `smis_parsed_YYYYMMDD.txt` |
+| ログファイル名 | `seiko_YYYYMMDD.log` (SEIKO 互換) / `seiko_YYYYMMDD.jsonl` |
 
 > 「対外的には MOLA_Timing 規格のレシーバー、内部実装は SMIS プロトコル準拠」という二重の整理。下請けとしての RFX Timing の存在を露出させない方針はそのまま継続。
 
@@ -66,8 +66,8 @@ RFX-LiveTiming-OKAYAMA/
 ```mermaid
 flowchart LR
   MOLA["MOLA 計測サーバー<br/>(SMIS/TCP)"] -->|XML/UTF-8| Receiver["MOLA_Timing-Receiver<br/>(Windows / 計時室常駐)"]
-  Receiver -->|Raw stream| FileRaw["smis_raw_20260612.txt"]
-  Receiver -->|Parsed JSONL| FileJsonl["smis_parsed_20260612.txt"]
+  Receiver -->|Raw stream| FileRaw["seiko_20260612.log"]
+  Receiver -->|Parsed JSONL| FileJsonl["seiko_20260612.jsonl"]
   Receiver -->|設定・メタ| LocalDb[("local.db<br/>(SQLite)")]
   Receiver -->|WebSocket :8080| LAN["LAN クライアント<br/>(ピット内ブラウザ)"]
   Receiver -->|WebSocket over VPN| Remote["リモート確認<br/>(東京)"]
@@ -78,7 +78,7 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-  Files["保存済ログ<br/>(smis_raw_*.txt)"] --> VS["MOLA_Timing-VirtualServer<br/>(Windows / 開発機)"]
+  Files["保存済ログ<br/>(seiko_*.log, SEIKO 互換)"] --> VS["MOLA_Timing-VirtualServer<br/>(Windows / 開発機)"]
   VS -->|TCP/XML 再生| Receiver2["MOLA_Timing-Receiver<br/>(動作確認用)"]
   VS -->|TCP/XML 再生| CloudDev["Cloud Server<br/>(開発環境)"]
   CloudDev -->|WS| Browser["ブラウザ"]
@@ -115,33 +115,38 @@ flowchart LR
 C:\MOLA_Timing\
   ├── MOLA_Timing-Receiver.exe
   ├── logs\
-  │   ├── smis_raw_20260613.txt
-  │   ├── smis_parsed_20260613.txt
+  │   ├── seiko_20260613.log         (SEIKO 互換 1 行 1 メッセージ)
+  │   ├── seiko_20260613.jsonl       (解析済 JSON Lines)
   │   └── _meta\
-  │       └── smis_raw_20260613.json   (SHA-256 等のメタ情報)
+  │       └── seiko_20260613.json    (SHA-256 等のメタ情報)
   └── data\
       └── local.db                     (設定・主要テーブルのミラー、W2 後半)
 ```
 
-**生 XML ログ** (`smis_raw_YYYYMMDD.txt`)
+**生 XML ログ** (`seiko_YYYYMMDD.log`) — SEIKO 互換
 
-各 SMIS メッセージは NULL 終端でストリームから到着するが、ファイル保存時はテキスト編集可能にしたいので 1 メッセージ 1 行にする:
+各 SMIS メッセージは NULL 終端でストリームから到着するが、ファイル保存時は他プロジェクト (SEIKO 計時系) と同一の以下フォーマットで 1 メッセージ 1 行にする:
 
 ```
-{ISO8601受信時刻}\t{バイト長}\t{エスケープ済XML本体}\n
+{yyyy-MM-dd HH:mm:ss.fff} {1 行に正規化された XML 本体}\n
 ```
 
 例:
 ```
-2026-06-12T13:45:23.1234567+09:00	342	<Passing LoopId="0" Time="935910" TeamId="38" .../>
+2026-03-27 13:32:36.204 <Competition ID="477" NameJ="～ 巌流塾 ～" NameE="" StartDate="2026/03/22" EndDate="" />
+2026-03-27 13:32:36.246 <Category ID="477:1" NameJ="タイムアタッククラス" NameE="" CourseName="Autopolis International Racing Course" CourseLength="467400" />
+2026-03-27 13:32:36.981 <Standings SessionID="477:4:1:0:3" ><Standing Position="1" .../><Standing Position="2" .../></Standings>
 ```
 
-XML 本体に含まれるタブ・改行は `\t`・`\n` にエスケープする（読み込み側で復元）。
+- タイムスタンプはローカル時刻、ミリ秒精度。
+- 区切りは半角スペース 1 個、行末は `\n`。
+- XML 本体に万一改行・タブが含まれた場合はスペースに正規化して 1 行を保つ。
+- この形式により、社内蓄積済の `seiko_*.log` をそのまま MOLA_Timing-VirtualServer で再生可能。
 
-**解析済 JSONL ログ** (`smis_parsed_YYYYMMDD.txt`)
+**解析済 JSONL ログ** (`seiko_YYYYMMDD.jsonl`)
 
 ```json
-{"ts":"2026-06-12T13:45:23.1234567+09:00","type":"Passing","payload":{"loopId":0,"time":935910,"teamId":"38","driverNo":1,"passType":"N"}}
+{"ts":"2026-06-12T13:45:23.1234567+09:00","type":"Passing","payload":{"Id":"P0001","SessionId":"1:1:1:0:1","LoopId":0,"Time":935910,"TeamId":"1:1:0001","DriverNo":1,"LapTimeUse":true,"Type":1}}
 ```
 
 ### 3.3 設定項目（SQLite に保存、UI から編集）
@@ -256,7 +261,7 @@ SMIS はマスターデータ（Competition / Category / Team / Driver 等）が
 
 - **二重保存**: 生 XML と解析済 JSONL を同時保存し、片方が壊れてももう一方で復元可能
 - **書き込みフラッシュ**: 各メッセージごとに `FlushAsync` を呼び、PC ハング時もロスを最小化
-- **ファイルサイズ監視**: 100MB 超えで自動で連番ファイルへ分割（`smis_raw_20260612_01.txt`）
+- **ファイルサイズ監視**: 100MB 超えで自動で連番ファイルへ分割（`seiko_20260612_01.log`）
 - **メタデータ別保存**: 各ログファイルとペアで `*.meta.json` を作成し、開始時刻 / 終了時刻 / メッセージ数 / SMIS host:port / Receiver バージョンを記録
 - **チェックサム**: ファイルクローズ時に SHA-256 を計算し meta に記録（持ち帰り後の整合性確認用）
 - **冗長化**: 設定で「USB ドライブにもミラー保存」を有効化可能（計時室 PC 故障対策）

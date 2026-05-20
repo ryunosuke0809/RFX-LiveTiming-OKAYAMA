@@ -3,8 +3,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:RfxTiming.Smis.VirtualServer.ViewModels"
         Title="MOLA_Timing-VirtualServer"
-        Width="1280" Height="800"
-        MinWidth="900" MinHeight="600"
+        Width="1280" Height="820"
+        MinWidth="900" MinHeight="640"
         FontFamily="Segoe UI, Yu Gothic UI, Meiryo UI"
         FontSize="13"
         TextOptions.TextFormattingMode="Display"
@@ -19,9 +19,10 @@
         <!-- メニューバー -->
         <Menu DockPanel.Dock="Top">
             <MenuItem Header="_File">
-                <MenuItem Header="ログファイルから再生..."
-                          Command="{Binding ShowComingSoonCommand}"
-                          CommandParameter="ログファイル再生" />
+                <MenuItem Header="ログファイルを開く (_O)..."
+                          Command="{Binding OpenLogFileCommand}" />
+                <MenuItem Header="組み込みサンプルに戻す (_C)"
+                          Command="{Binding ClearLoadedLogCommand}" />
                 <Separator />
                 <MenuItem Header="終了 (_X)" Command="{Binding ExitAppCommand}" />
             </MenuItem>
@@ -49,16 +50,24 @@
                 <Separator />
                 <TextBlock Text="ポート:" VerticalAlignment="Center" Margin="8,0,6,0" />
                 <TextBox Text="{Binding ListenPort, UpdateSourceTrigger=PropertyChanged}"
-                         Width="80" VerticalAlignment="Center" />
+                         Width="70" VerticalAlignment="Center" />
+                <Separator />
+                <Button Content="ログを開く..." Command="{Binding OpenLogFileCommand}" />
+                <Button Content="サンプルに戻す" Command="{Binding ClearLoadedLogCommand}" />
                 <Separator />
                 <Button Content="▶ 再生" Command="{Binding PlayCommand}" />
                 <Button Content="⏹ 停止" Command="{Binding StopPlaybackCommand}" />
                 <Separator />
-                <TextBlock Text="送信間隔:" VerticalAlignment="Center" Margin="8,0,6,0" />
-                <TextBox Text="{Binding PlaybackIntervalMs, UpdateSourceTrigger=PropertyChanged}"
-                         Width="60" VerticalAlignment="Center" />
-                <TextBlock Text="ms" VerticalAlignment="Center" Margin="4,0,0,0"
-                           Foreground="{StaticResource Foreground.Secondary}" />
+                <TextBlock Text="速度:" VerticalAlignment="Center" Margin="8,0,6,0" />
+                <ComboBox ItemsSource="{Binding SpeedOptions}"
+                          DisplayMemberPath="Label"
+                          SelectedItem="{Binding SelectedSpeedOption}"
+                          Width="130" VerticalAlignment="Center" />
+                <Separator />
+                <CheckBox Content="ループ再生"
+                          IsChecked="{Binding LoopPlayback}"
+                          VerticalAlignment="Center"
+                          Foreground="{StaticResource Foreground.Primary}" />
             </ToolBar>
         </ToolBarTray>
 
@@ -85,6 +94,7 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
@@ -94,7 +104,7 @@
                        Margin="0,0,0,8" />
 
             <!-- メトリクス -->
-            <UniformGrid Grid.Row="1" Columns="3" Margin="0,0,0,16">
+            <UniformGrid Grid.Row="1" Columns="4" Margin="0,0,0,12">
                 <Border Background="{StaticResource Background.Panel}" CornerRadius="6" Padding="16" Margin="0,0,8,0">
                     <StackPanel>
                         <TextBlock Text="送信済フレーム" Foreground="{StaticResource Foreground.Secondary}" FontSize="12" />
@@ -107,16 +117,50 @@
                         <TextBlock Text="{Binding ConnectedClientCount}" FontSize="28" FontWeight="SemiBold" Margin="0,4,0,0" />
                     </StackPanel>
                 </Border>
-                <Border Background="{StaticResource Background.Panel}" CornerRadius="6" Padding="16">
+                <Border Background="{StaticResource Background.Panel}" CornerRadius="6" Padding="16" Margin="0,0,8,0">
                     <StackPanel>
                         <TextBlock Text="状態" Foreground="{StaticResource Foreground.Secondary}" FontSize="12" />
                         <TextBlock Text="{Binding PlaybackStatusText}" FontSize="16" FontWeight="SemiBold" Margin="0,8,0,0"
                                    TextTrimming="CharacterEllipsis" />
                     </StackPanel>
                 </Border>
+                <Border Background="{StaticResource Background.Panel}" CornerRadius="6" Padding="16">
+                    <StackPanel>
+                        <TextBlock Text="ロード済エントリ" Foreground="{StaticResource Foreground.Secondary}" FontSize="12" />
+                        <TextBlock Text="{Binding LoadedEntryCount, StringFormat={}{0:#,##0}}"
+                                   FontSize="28" FontWeight="SemiBold" Margin="0,4,0,0" />
+                    </StackPanel>
+                </Border>
             </UniformGrid>
 
+            <!-- 進捗バー -->
             <Border Grid.Row="2"
+                    Background="{StaticResource Background.Panel}"
+                    CornerRadius="6"
+                    Padding="16,12"
+                    Margin="0,0,0,12">
+                <StackPanel>
+                    <Grid Margin="0,0,0,6">
+                        <TextBlock Text="再生進捗"
+                                   Foreground="{StaticResource Foreground.Secondary}" FontSize="12" />
+                        <TextBlock HorizontalAlignment="Right"
+                                   Foreground="{StaticResource Foreground.Secondary}" FontSize="12">
+                            <Run Text="{Binding CurrentReplayIndex, StringFormat={}{0:#,##0}}" />
+                            <Run Text=" / " />
+                            <Run Text="{Binding ReplayTotalCount, StringFormat={}{0:#,##0}}" />
+                        </TextBlock>
+                    </Grid>
+                    <ProgressBar Height="10"
+                                 Maximum="{Binding ReplayTotalCount}"
+                                 Value="{Binding CurrentReplayIndex}"
+                                 Foreground="{StaticResource Background.Selected}"
+                                 Background="{StaticResource Background.Hover}"
+                                 BorderBrush="{StaticResource Border.Subtle}" />
+                </StackPanel>
+            </Border>
+
+            <!-- 使い方 / 最終フレーム -->
+            <Border Grid.Row="3"
                     Background="{StaticResource Background.Panel}"
                     CornerRadius="6"
                     Padding="20">
@@ -128,23 +172,29 @@
                                    TextWrapping="Wrap"
                                    Margin="0,12,0,0"
                                    LineHeight="22">
-                            <Run Text="1. ポート (既定 50000) を確認し「サーバー起動」を押す" /><LineBreak />
-                            <Run Text="2. MOLA_Timing-Receiver を起動し、127.0.0.1:50000 に「接続」する" /><LineBreak />
-                            <Run Text="3. このアプリで「▶ 再生」を押すと、組み込みサンプル (SUPER GT 想定) が送信される" /><LineBreak />
-                            <Run Text="4. Receiver 側のメッセージカウントが増え、logs/smis_raw_YYYYMMDD.txt が生成される" />
+                            <Run Text="1. ツールバーの「ログを開く...」で SEIKO 互換ログ (seiko_YYYYMMDD.log) を選択。未選択なら組み込みサンプルを使用。" /><LineBreak />
+                            <Run Text="2. 「サーバー起動」 → ポート (既定 50000) で待受開始。" /><LineBreak />
+                            <Run Text="3. MOLA_Timing-Receiver から 127.0.0.1:50000 に接続。" /><LineBreak />
+                            <Run Text="4. 速度プリセットを選んで「▶ 再生」。ループ再生もチェックで切替。" /><LineBreak />
+                            <Run Text="5. SEIKO ログの場合、行のタイムスタンプ差分どおりにディレイをかけて配信。" />
                         </TextBlock>
 
-                        <TextBlock Text="送信されるサンプルデータ"
+                        <TextBlock Text="ログフォーマット"
                                    FontSize="14" FontWeight="SemiBold"
                                    Margin="0,20,0,0" />
                         <TextBlock Foreground="{StaticResource Foreground.Secondary}"
                                    TextWrapping="Wrap"
-                                   Margin="0,8,0,0">
-                            <Run Text="• マスター: Competition / Category / Round / Session / Class×2 / Team×3 / Driver / Transponder" /><LineBreak />
-                            <Run Text="• 計測ポイント: Loop ×6" /><LineBreak />
-                            <Run Text="• Select + Start" /><LineBreak />
-                            <Run Text="• 走行ループ 5 周ぶん: Passing + Standings を 1 秒間隔で送信" /><LineBreak />
-                            <Run Text="• 最後にチェッカードフラッグの Message" />
+                                   Margin="0,8,0,0"
+                                   FontFamily="Consolas, Courier New">
+                            <Run Text="2026-03-27 13:32:36.204 &lt;Competition ID=&quot;477&quot; .../&gt;" /><LineBreak />
+                            <Run Text="2026-03-27 13:32:36.246 &lt;Category ID=&quot;477:1&quot; .../&gt;" />
+                        </TextBlock>
+                        <TextBlock Foreground="{StaticResource Foreground.Secondary}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,4,0,0"
+                                   FontSize="11">
+                            タイムスタンプ (yyyy-MM-dd HH:mm:ss.fff) + 半角スペース + 1 行 XML + 改行。
+                            別プロジェクト (SEIKO 計時系) と互換のため、過去ログをそのままここで再生できます。
                         </TextBlock>
 
                         <TextBlock Text="最終送信フレーム" FontSize="14" FontWeight="SemiBold" Margin="0,20,0,0" />

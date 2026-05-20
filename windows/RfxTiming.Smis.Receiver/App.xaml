@@ -19,24 +19,16 @@
 
             <!--
               ===== SystemColors override =====
-              Menu のドロップダウン Popup や ContextMenu の地色は
-              WPF が SystemColors.* を直接参照するため、ResourceDictionary に
-              同じキーで再定義することでアプリ内のみ上書きできる。
-              これをしないと dark テーマでも Popup だけ白く残る。
+              Menu のドロップダウン Popup は SystemColors.* を直接参照する。
+              Popup 本体は Windows 標準のライト (白) のままにして文字を黒で読みやすくするため、
+              MenuBrush 等は意図的に上書きしない。
+              ControlBrush / WindowBrush 等の dark ボタン/ダイアログ向けキーだけ上書きする。
             -->
-            <SolidColorBrush x:Key="{x:Static SystemColors.MenuBrushKey}" Color="#1A1F2E" />
-            <SolidColorBrush x:Key="{x:Static SystemColors.MenuBarBrushKey}" Color="#1A1F2E" />
-            <SolidColorBrush x:Key="{x:Static SystemColors.MenuTextBrushKey}" Color="#E6EDF3" />
-            <SolidColorBrush x:Key="{x:Static SystemColors.MenuHighlightBrushKey}" Color="#1F6FEB" />
-            <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#1F6FEB" />
-            <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="#FFFFFF" />
             <SolidColorBrush x:Key="{x:Static SystemColors.ControlBrushKey}" Color="#1A1F2E" />
             <SolidColorBrush x:Key="{x:Static SystemColors.ControlTextBrushKey}" Color="#E6EDF3" />
             <SolidColorBrush x:Key="{x:Static SystemColors.GrayTextBrushKey}" Color="#6B7280" />
             <SolidColorBrush x:Key="{x:Static SystemColors.WindowBrushKey}" Color="#0F1419" />
             <SolidColorBrush x:Key="{x:Static SystemColors.WindowTextBrushKey}" Color="#E6EDF3" />
-            <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightBrushKey}" Color="#2A3142" />
-            <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightTextBrushKey}" Color="#E6EDF3" />
 
             <!-- ===== Menu / MenuItem ダークテーマ ===== -->
             <Style TargetType="{x:Type Menu}">
@@ -44,23 +36,33 @@
                 <Setter Property="Foreground" Value="{StaticResource Foreground.Primary}" />
             </Style>
 
+            <!--
+              MenuItem の Role 別スタイル:
+              - TopLevelHeader/Item (上端): ダーク地に白文字
+              - SubmenuHeader/Item (ドロップダウン): 白地に黒文字 (Windows 標準)
+            -->
             <Style TargetType="{x:Type MenuItem}">
-                <Setter Property="Foreground" Value="{StaticResource Foreground.Primary}" />
                 <Setter Property="Background" Value="Transparent" />
                 <Setter Property="Padding" Value="8,4" />
                 <Style.Triggers>
-                    <Trigger Property="IsHighlighted" Value="True">
-                        <Setter Property="Background" Value="{StaticResource Background.Hover}" />
+                    <Trigger Property="Role" Value="TopLevelHeader">
                         <Setter Property="Foreground" Value="{StaticResource Foreground.Primary}" />
+                    </Trigger>
+                    <Trigger Property="Role" Value="TopLevelItem">
+                        <Setter Property="Foreground" Value="{StaticResource Foreground.Primary}" />
+                    </Trigger>
+                    <Trigger Property="Role" Value="SubmenuHeader">
+                        <Setter Property="Foreground" Value="Black" />
+                    </Trigger>
+                    <Trigger Property="Role" Value="SubmenuItem">
+                        <Setter Property="Foreground" Value="Black" />
                     </Trigger>
                 </Style.Triggers>
             </Style>
 
-            <!-- サブメニューのポップアップ背景 -->
+            <!-- ContextMenu 本体は Windows 標準ライトのまま、文字は黒に -->
             <Style TargetType="{x:Type ContextMenu}">
-                <Setter Property="Background" Value="{StaticResource Background.Panel}" />
-                <Setter Property="Foreground" Value="{StaticResource Foreground.Primary}" />
-                <Setter Property="BorderBrush" Value="{StaticResource Border.Subtle}" />
+                <Setter Property="Foreground" Value="Black" />
             </Style>
 
             <!-- セパレータ -->

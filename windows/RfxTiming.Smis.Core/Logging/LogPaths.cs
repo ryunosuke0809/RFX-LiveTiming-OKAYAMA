@@ -12,6 +12,11 @@ namespace RfxTiming.Smis.Logging;
 /// 計時室 PC では必ずユーザーが書き込み可能なフォルダー (例: <c>C:\MOLA_Timing\</c>)
 /// に exe を配置すること。
 /// </para>
+/// <para>
+/// 生ログのファイル名・フォーマットは他プロジェクト (SEIKO 計時系) の出力と互換になるよう
+/// <c>seiko_YYYYMMDD.log</c> / <c>{yyyy-MM-dd HH:mm:ss.fff} {XML}\n</c> に統一する。
+/// これにより蓄積された seiko_*.log をそのまま MOLA_Timing-VirtualServer で再生できる。
+/// </para>
 /// </summary>
 public static class LogPaths
 {
@@ -21,13 +26,19 @@ public static class LogPaths
     /// <summary>ローカル DB / 設定の格納ルート (<c>%exe%/data</c>)。</summary>
     public static string DataRoot => Path.Combine(AppContext.BaseDirectory, "data");
 
-    /// <summary>日付指定の生 XML ログのファイルパスを返す。</summary>
+    /// <summary>
+    /// 日付指定の生 XML ログのファイルパスを返す。
+    /// 形式: <c>seiko_YYYYMMDD.log</c> (他プロジェクトの SEIKO 計時ログと互換)。
+    /// </summary>
     public static string RawLogFileFor(DateOnly date)
-        => Path.Combine(LogsRoot, $"smis_raw_{date:yyyyMMdd}.txt");
+        => Path.Combine(LogsRoot, $"seiko_{date:yyyyMMdd}.log");
 
-    /// <summary>日付指定の解析済 JSONL ログのファイルパスを返す。</summary>
+    /// <summary>
+    /// 日付指定の解析済 JSONL ログのファイルパスを返す。
+    /// 形式: <c>seiko_YYYYMMDD.jsonl</c> (社内独自・解析済 1 行 1 JSON)。
+    /// </summary>
     public static string ParsedLogFileFor(DateOnly date)
-        => Path.Combine(LogsRoot, $"smis_parsed_{date:yyyyMMdd}.txt");
+        => Path.Combine(LogsRoot, $"seiko_{date:yyyyMMdd}.jsonl");
 
     /// <summary>必要なフォルダーが存在することを保証する。</summary>
     public static void EnsureDirectoriesExist()

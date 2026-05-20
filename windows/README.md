@@ -104,7 +104,8 @@ windows/
 岡山遠征で取得したログは **最重要資産** です。
 
 - 既定の出力先: `%AppData%\MOLA_Timing-Receiver\logs\`
-- ファイル名: `smis_raw_YYYYMMDD.txt` / `smis_parsed_YYYYMMDD.txt` / `*.meta.json`
-- リポジトリ直下の `.gitignore` で `smis_raw_*.txt` 等を除外済み
+- ファイル名: `seiko_YYYYMMDD.log` / `seiko_YYYYMMDD.jsonl` / `*.meta.json`
+- リポジトリ直下の `.gitignore` で `seiko_*.log` 等を除外済み
+- 生ログは他プロジェクト (SEIKO 計時系) と互換のため、過去ログがそのまま MOLA_Timing-VirtualServer で再生可能
 
 **実機ログは別途 USB / クラウドストレージで二重バックアップを取ること。**
