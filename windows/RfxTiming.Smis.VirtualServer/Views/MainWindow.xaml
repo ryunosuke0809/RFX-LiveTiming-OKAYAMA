@@ -18,9 +18,8 @@
 
     <DockPanel LastChildFill="True">
 
-        <!-- メニューバー -->
-        <Menu DockPanel.Dock="Top" Background="{StaticResource Background.Panel}"
-              Foreground="{StaticResource Foreground.Primary}">
+        <!-- メニューバー (テーマは App.xaml の Style が適用) -->
+        <Menu DockPanel.Dock="Top">
             <MenuItem Header="_File">
                 <MenuItem Header="ログファイルを開く (_O)..." />
                 <MenuItem Header="プレイリストを保存 (_S)..." />
@@ -48,13 +47,13 @@
         </Menu>
 
         <!-- ツールバー -->
-        <ToolBarTray DockPanel.Dock="Top" Background="{StaticResource Background.Panel}" IsLocked="True">
-            <ToolBar Background="Transparent">
-                <Button Content="ログを開く" Padding="12,4" />
+        <ToolBarTray DockPanel.Dock="Top" IsLocked="True">
+            <ToolBar>
+                <Button Content="ログを開く" />
                 <Separator />
-                <Button Content="▶ 再生" Padding="12,4" />
-                <Button Content="⏸ 一時停止" Padding="12,4" />
-                <Button Content="⏹ 停止" Padding="12,4" />
+                <Button Content="▶ 再生" />
+                <Button Content="⏸ 一時停止" />
+                <Button Content="⏹ 停止" />
                 <Separator />
                 <TextBlock Text="速度:" VerticalAlignment="Center" Margin="6,0" />
                 <ComboBox Width="80" SelectedIndex="2">
@@ -66,25 +65,25 @@
                     <ComboBoxItem Content="Max" />
                 </ComboBox>
                 <Separator />
-                <ToggleButton Content="🔁 ループ" Padding="12,4" />
+                <ToggleButton Content="🔁 ループ" />
             </ToolBar>
         </ToolBarTray>
 
         <!-- ステータスバー -->
-        <StatusBar DockPanel.Dock="Bottom"
-                   Background="{StaticResource Background.Panel}"
-                   Foreground="{StaticResource Foreground.Secondary}">
+        <StatusBar DockPanel.Dock="Bottom">
             <StatusBarItem>
                 <StackPanel Orientation="Horizontal">
                     <Ellipse Width="10" Height="10" Margin="0,0,6,0"
                              Fill="{Binding PlaybackStatusBrush}" />
-                    <TextBlock Text="{Binding PlaybackStatusText}" />
+                    <TextBlock Text="{Binding PlaybackStatusText}"
+                               Foreground="{StaticResource Foreground.Secondary}" />
                 </StackPanel>
             </StatusBarItem>
             <Separator />
             <StatusBarItem Content="{Binding LoadedLogFile, StringFormat='ログ: {0}'}" />
             <StatusBarItem HorizontalAlignment="Right">
-                <TextBlock Text="{Binding ConnectedClientCount, StringFormat='接続クライアント: {0}'}" />
+                <TextBlock Text="{Binding ConnectedClientCount, StringFormat='接続クライアント: {0}'}"
+                           Foreground="{StaticResource Foreground.Secondary}" />
             </StatusBarItem>
         </StatusBar>
 

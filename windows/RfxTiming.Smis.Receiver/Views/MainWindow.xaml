@@ -18,9 +18,8 @@
 
     <DockPanel LastChildFill="True">
 
-        <!-- メニューバー -->
-        <Menu DockPanel.Dock="Top" Background="{StaticResource Background.Panel}"
-              Foreground="{StaticResource Foreground.Primary}">
+        <!-- メニューバー (テーマは App.xaml の Style が適用) -->
+        <Menu DockPanel.Dock="Top">
             <MenuItem Header="_File">
                 <MenuItem Header="ログフォルダを開く (_O)" />
                 <MenuItem Header="ログを USB にエクスポート (_E)" />
@@ -48,33 +47,33 @@
         </Menu>
 
         <!-- ツールバー -->
-        <ToolBarTray DockPanel.Dock="Top" Background="{StaticResource Background.Panel}" IsLocked="True">
-            <ToolBar Background="Transparent">
-                <Button Content="接続" Padding="12,4" />
-                <Button Content="切断" Padding="12,4" />
+        <ToolBarTray DockPanel.Dock="Top" IsLocked="True">
+            <ToolBar>
+                <Button Content="接続" />
+                <Button Content="切断" />
                 <Separator />
-                <Button Content="記録開始" Padding="12,4" />
-                <Button Content="記録停止" Padding="12,4" />
+                <Button Content="記録開始" />
+                <Button Content="記録停止" />
                 <Separator />
-                <Button Content="設定" Padding="12,4" />
+                <Button Content="設定" />
             </ToolBar>
         </ToolBarTray>
 
         <!-- ステータスバー -->
-        <StatusBar DockPanel.Dock="Bottom"
-                   Background="{StaticResource Background.Panel}"
-                   Foreground="{StaticResource Foreground.Secondary}">
+        <StatusBar DockPanel.Dock="Bottom">
             <StatusBarItem>
                 <StackPanel Orientation="Horizontal">
                     <Ellipse Width="10" Height="10" Margin="0,0,6,0"
                              Fill="{Binding ConnectionStatusBrush}" />
-                    <TextBlock Text="{Binding ConnectionStatusText}" />
+                    <TextBlock Text="{Binding ConnectionStatusText}"
+                               Foreground="{StaticResource Foreground.Secondary}" />
                 </StackPanel>
             </StatusBarItem>
             <Separator />
             <StatusBarItem Content="{Binding CurrentOutputFile, StringFormat='出力: {0}'}" />
             <StatusBarItem HorizontalAlignment="Right">
-                <TextBlock Text="{Binding TotalMessageCount, StringFormat='本日: {0} 件'}" />
+                <TextBlock Text="{Binding TotalMessageCount, StringFormat='本日: {0} 件'}"
+                           Foreground="{StaticResource Foreground.Secondary}" />
             </StatusBarItem>
         </StatusBar>
 
