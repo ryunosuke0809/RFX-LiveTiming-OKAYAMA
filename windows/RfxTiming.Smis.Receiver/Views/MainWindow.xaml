@@ -244,10 +244,21 @@
                     <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding CurrentParsedLogPath}"
                                FontFamily="Consolas, Courier New" TextTrimming="CharacterEllipsis" Margin="0,0,0,6" />
 
-                    <Button Grid.Row="0" Grid.Column="2" Grid.RowSpan="2"
-                            Content="フォルダを開く"
-                            Command="{Binding OpenLogsFolderCommand}"
-                            Padding="14,6" VerticalAlignment="Center" Margin="12,0,0,0" />
+                    <StackPanel Grid.Row="0" Grid.Column="2" Grid.RowSpan="2" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Border Background="{StaticResource Background.Hover}"
+                                CornerRadius="10" Padding="10,4" Margin="0,0,8,0"
+                                ToolTip="日付が変わって新しい日付のログファイルに自動切替された回数 (本接続セッション中)">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="↻ 日付ロール: "
+                                           Foreground="{StaticResource Foreground.Secondary}" FontSize="11" />
+                                <TextBlock Text="{Binding LogRotationCount}"
+                                           Foreground="{StaticResource Foreground.Primary}" FontSize="11" FontWeight="SemiBold" />
+                            </StackPanel>
+                        </Border>
+                        <Button Content="フォルダを開く"
+                                Command="{Binding OpenLogsFolderCommand}"
+                                Padding="14,6" />
+                    </StackPanel>
 
                     <!-- デバッグ用最終受信メッセージ -->
                     <TextBlock Grid.Row="2" Grid.Column="0"

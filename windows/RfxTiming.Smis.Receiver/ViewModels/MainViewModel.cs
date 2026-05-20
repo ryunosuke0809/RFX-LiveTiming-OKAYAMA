@@ -1,3 +1,4 @@
+using System.IO;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -6,8 +7,8 @@ using CommunityToolkit.Mvvm.Input;
 using RfxTiming.Smis.Logging;
 using RfxTiming.Smis.Messages;
 using RfxTiming.Smis.Networking;
-using RfxTiming.Smis.Receiver.Services;
 using RfxTiming.Smis.Receiver.Views;
+using RfxTiming.Smis.Services;
 using RfxTiming.Smis.Settings;
 
 namespace RfxTiming.Smis.Receiver.ViewModels;
@@ -77,6 +78,8 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
     // ===== Output paths =====
     [ObservableProperty] private string _currentRawLogPath = "（未接続）";
     [ObservableProperty] private string _currentParsedLogPath = "（未接続）";
+    [ObservableProperty] private long _logRotationCount;
+    [ObservableProperty] private string _lastRotationText = string.Empty;
 
     // ===== Run state =====
     [ObservableProperty]
@@ -121,6 +124,7 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
             _service.ErrorOccurred += OnErrorOccurred;
             _service.MessageReceived += OnMessageReceived;
             _service.StageHealthChanged += OnStageHealthChanged;
+            _service.LogFileRotated += OnLogFileRotated;
 
             await _service.StartAsync().ConfigureAwait(true);
 
@@ -292,6 +296,25 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
         LastReceivedAtText = _service.LastReceivedAt is { } at
             ? at.ToString("HH:mm:ss.fff")
             : "—";
+        LogRotationCount = _service.LogRotationCount;
+
+        // ロールオーバーで Writer が差し替わったあとは Service の現行パスへ追従
+        string? rawNow = _service.CurrentRawLogPath;
+        string? parsedNow = _service.CurrentParsedLogPath;
+        if (rawNow is not null && rawNow != CurrentRawLogPath) CurrentRawLogPath = rawNow;
+        if (parsedNow is not null && parsedNow != CurrentParsedLogPath) CurrentParsedLogPath = parsedNow;
+    }
+
+    private void OnLogFileRotated(object? sender, LogRotationEvent e)
+    {
+        Application.Current?.Dispatcher.Invoke(() =>
+        {
+            CurrentRawLogPath = e.CurrentRawPath ?? "（無効）";
+            CurrentParsedLogPath = e.CurrentParsedPath ?? "（無効）";
+            LastRotationText =
+                $"{e.FromDate:yyyy-MM-dd} → {e.ToDate:yyyy-MM-dd} で切替済";
+            LastMessageInfo = $"日付変更を検出: ログを {Path.GetFileName(e.CurrentRawPath ?? string.Empty)} に切替";
+        });
     }
 
     private void SetStageBrush(string propertyName, StageStatus status)

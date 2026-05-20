@@ -6,7 +6,7 @@ using RfxTiming.Smis.Protocol;
 using RfxTiming.Smis.Settings;
 using RfxTiming.Smis.Xml;
 
-namespace RfxTiming.Smis.Receiver.Services;
+namespace RfxTiming.Smis.Services;
 
 /// <summary>
 /// MOLA_Timing-Receiver の中核サービス。
@@ -15,25 +15,37 @@ namespace RfxTiming.Smis.Receiver.Services;
 /// サーキット運用機向けに、3 つのパイプラインステージ
 /// (受信 → パース → ログ書込) ごとの状態を <see cref="StageStatus"/> として公開する。
 /// </para>
+/// <para>
+/// 日付が変わると自動的に新しい日付の <c>MOLA_INPUT_YYYYMMDD.log</c> ファイルへロールオーバーする
+/// (1 メッセージ受信ごとにチェック + 60 秒 Timer によるアイドル時の保険)。
+/// </para>
 /// </summary>
 public sealed class ReceiverService : IAsyncDisposable
 {
     private readonly SmisTcpClient _client;
     private readonly LoggingSettings _loggingSettings;
+    private readonly TimeProvider _timeProvider;
     private readonly Stopwatch _rateWindow = Stopwatch.StartNew();
+    private readonly SemaphoreSlim _writerSwapLock = new(1, 1);
     private long _lastRateSnapshot;
     private CancellationTokenSource? _runCts;
     private Task? _runTask;
     private RawSmisLogWriter? _rawWriter;
     private JsonlSmisLogWriter? _parsedWriter;
+    private DateOnly _currentLogDate;
+    private ITimer? _rolloverTimer;
 
-    public ReceiverService(SmisTcpClientOptions options, LoggingSettings? loggingSettings = null)
+    public ReceiverService(
+        SmisTcpClientOptions options,
+        LoggingSettings? loggingSettings = null,
+        TimeProvider? timeProvider = null)
     {
         ArgumentNullException.ThrowIfNull(options);
         _client = new SmisTcpClient(options);
         _client.StateChanged += OnTransportStateChanged;
         _client.ErrorOccurred += (_, ex) => ErrorOccurred?.Invoke(this, ex);
         _loggingSettings = loggingSettings ?? new LoggingSettings();
+        _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
     // ===== Events =====
@@ -42,30 +54,25 @@ public sealed class ReceiverService : IAsyncDisposable
     public event EventHandler<SmisMessage>? MessageReceived;
     public event EventHandler<StageHealth>? StageHealthChanged;
 
+    /// <summary>日付が変わって新しい日付のログファイルに切り替えた時に発火する。</summary>
+    public event EventHandler<LogRotationEvent>? LogFileRotated;
+
     // ===== Properties (Stage Health) =====
-    /// <summary>受信ステージ (TCP) の状態。</summary>
     public StageStatus ReceiveStatus { get; private set; } = StageStatus.Idle;
-
-    /// <summary>パースステージの状態。</summary>
     public StageStatus ParseStatus { get; private set; } = StageStatus.Idle;
-
-    /// <summary>ログ書込ステージの状態。</summary>
     public StageStatus LogStatus { get; private set; } = StageStatus.Idle;
 
     public long TotalMessages { get; private set; }
     public long ParseErrors { get; private set; }
     public long LogWriteErrors { get; private set; }
+    public long LogRotationCount { get; private set; }
 
-    /// <summary>直近 1 秒の受信レート (msg/sec)。</summary>
     public double MessagesPerSecond { get; private set; }
-
-    /// <summary>最後にメッセージを受信した時刻 (ローカル)。</summary>
     public DateTime? LastReceivedAt { get; private set; }
 
     public string? CurrentRawLogPath => _rawWriter?.FilePath;
     public string? CurrentParsedLogPath => _parsedWriter?.FilePath;
 
-    /// <summary>現時点のログファイルサイズ合計 (バイト)。</summary>
     public long CurrentLogBytes
     {
         get
@@ -92,17 +99,17 @@ public sealed class ReceiverService : IAsyncDisposable
         }
 
         LogPaths.EnsureDirectoriesExist();
-        DateOnly today = DateOnly.FromDateTime(DateTime.Now);
+        _currentLogDate = DateOnly.FromDateTime(_timeProvider.GetLocalNow().DateTime);
 
         try
         {
             if (_loggingSettings.EnableRawLog)
             {
-                _rawWriter = new RawSmisLogWriter(LogPaths.RawLogFileFor(today));
+                _rawWriter = new RawSmisLogWriter(LogPaths.RawLogFileFor(_currentLogDate));
             }
             if (_loggingSettings.EnableParsedLog)
             {
-                _parsedWriter = new JsonlSmisLogWriter(LogPaths.ParsedLogFileFor(today));
+                _parsedWriter = new JsonlSmisLogWriter(LogPaths.ParsedLogFileFor(_currentLogDate));
             }
             UpdateStage(ref _logStatusBacking, _rawWriter is null && _parsedWriter is null
                 ? StageStatus.Disabled
@@ -113,6 +120,14 @@ public sealed class ReceiverService : IAsyncDisposable
             UpdateStage(ref _logStatusBacking, StageStatus.Error, nameof(LogStatus));
             ErrorOccurred?.Invoke(this, ex);
         }
+
+        // メッセージが来ない時間帯 (深夜の小休止等) でも日付跨ぎを検出できるよう、
+        // 60 秒ごとに独立した Timer でロールオーバーチェック。
+        _rolloverTimer = _timeProvider.CreateTimer(
+            OnRolloverTimerTick,
+            state: null,
+            dueTime: TimeSpan.FromSeconds(60),
+            period: TimeSpan.FromSeconds(60));
 
         _runCts = new CancellationTokenSource();
         _runTask = RunAsync(_runCts.Token);
@@ -126,9 +141,12 @@ public sealed class ReceiverService : IAsyncDisposable
             await foreach (SmisFrame frame in _client.ReceiveFramesAsync(cancellationToken)
                 .ConfigureAwait(false))
             {
+                // 1. メッセージ毎に日付チェック (オーバーヘッドは比較のみで誤差レベル)
+                await TryRolloverIfDateChangedAsync(cancellationToken).ConfigureAwait(false);
+
                 MarkReceived();
 
-                // 1. 生 XML を即座に追記 (損失リスクを最小化)
+                // 2. 生 XML を即座に追記 (損失リスクを最小化)
                 if (_rawWriter is not null)
                 {
                     try
@@ -144,7 +162,7 @@ public sealed class ReceiverService : IAsyncDisposable
                     }
                 }
 
-                // 2. パース試行 (失敗してもログには残せている)
+                // 3. パース試行 (失敗してもログには残せている)
                 SmisMessage? message = null;
                 try
                 {
@@ -157,7 +175,7 @@ public sealed class ReceiverService : IAsyncDisposable
                     UpdateStage(ref _parseStatusBacking, StageStatus.Warning, nameof(ParseStatus));
                 }
 
-                // 3. 解析済 JSONL 書込
+                // 4. 解析済 JSONL 書込
                 if (message is not null && _parsedWriter is not null)
                 {
                     try
@@ -191,9 +209,88 @@ public sealed class ReceiverService : IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// 現在の日付と前回のログファイル作成時の日付を比較し、変わっていれば
+    /// Writer を Dispose して新しい日付のファイルに切り替える。
+    /// <para>
+    /// 通常はメッセージ受信ループと 60 秒 Timer から自動で呼ばれるが、
+    /// 強制ロールオーバー (テストや手動切替) 用に public 公開している。
+    /// </para>
+    /// </summary>
+    /// <returns>ロールオーバーが発生した場合は true。</returns>
+    public async Task<bool> TryRolloverIfDateChangedAsync(CancellationToken cancellationToken = default)
+    {
+        DateOnly today = DateOnly.FromDateTime(_timeProvider.GetLocalNow().DateTime);
+        if (today == _currentLogDate)
+        {
+            return false;
+        }
+
+        await _writerSwapLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            // 二重チェック (Timer と RunAsync の競合に備える)
+            today = DateOnly.FromDateTime(_timeProvider.GetLocalNow().DateTime);
+            if (today == _currentLogDate)
+            {
+                return false;
+            }
+
+            DateOnly previousDate = _currentLogDate;
+            string? previousRawPath = _rawWriter?.FilePath;
+            string? previousParsedPath = _parsedWriter?.FilePath;
+
+            // 古い Writer をクローズ (flush 済みで安全に切替)
+            if (_rawWriter is not null)
+            {
+                await _rawWriter.DisposeAsync().ConfigureAwait(false);
+                _rawWriter = null;
+            }
+            if (_parsedWriter is not null)
+            {
+                await _parsedWriter.DisposeAsync().ConfigureAwait(false);
+                _parsedWriter = null;
+            }
+
+            _currentLogDate = today;
+
+            // 新しい日付の Writer を作成
+            try
+            {
+                if (_loggingSettings.EnableRawLog)
+                {
+                    _rawWriter = new RawSmisLogWriter(LogPaths.RawLogFileFor(today));
+                }
+                if (_loggingSettings.EnableParsedLog)
+                {
+                    _parsedWriter = new JsonlSmisLogWriter(LogPaths.ParsedLogFileFor(today));
+                }
+            }
+            catch (Exception ex)
+            {
+                UpdateStage(ref _logStatusBacking, StageStatus.Error, nameof(LogStatus));
+                ErrorOccurred?.Invoke(this, ex);
+            }
+
+            LogRotationCount++;
+            LogFileRotated?.Invoke(this, new LogRotationEvent(
+                FromDate: previousDate,
+                ToDate: today,
+                PreviousRawPath: previousRawPath,
+                PreviousParsedPath: previousParsedPath,
+                CurrentRawPath: _rawWriter?.FilePath,
+                CurrentParsedPath: _parsedWriter?.FilePath));
+            return true;
+        }
+        finally
+        {
+            _writerSwapLock.Release();
+        }
+    }
+
     private void MarkReceived()
     {
-        LastReceivedAt = DateTime.Now;
+        LastReceivedAt = _timeProvider.GetLocalNow().DateTime;
 
         if (_rateWindow.Elapsed >= TimeSpan.FromSeconds(1))
         {
@@ -226,6 +323,12 @@ public sealed class ReceiverService : IAsyncDisposable
         _runCts = null;
         _runTask = null;
 
+        if (_rolloverTimer is not null)
+        {
+            await _rolloverTimer.DisposeAsync().ConfigureAwait(false);
+            _rolloverTimer = null;
+        }
+
         if (_rawWriter is not null)
         {
             await _rawWriter.DisposeAsync().ConfigureAwait(false);
@@ -245,6 +348,22 @@ public sealed class ReceiverService : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         await StopAsync().ConfigureAwait(false);
+        _writerSwapLock.Dispose();
+    }
+
+    /// <summary>
+    /// 60 秒 Timer から呼ばれる。async void だが try/catch で必ず捕捉する。
+    /// </summary>
+    private async void OnRolloverTimerTick(object? state)
+    {
+        try
+        {
+            await TryRolloverIfDateChangedAsync(CancellationToken.None).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            ErrorOccurred?.Invoke(this, ex);
+        }
     }
 
     private void OnTransportStateChanged(object? sender, SmisTcpClient.ConnectionState state)
@@ -283,19 +402,22 @@ public sealed class ReceiverService : IAsyncDisposable
 /// <summary>3 ステージのライト表示用ステータス。</summary>
 public enum StageStatus
 {
-    /// <summary>未稼働 (灰)。</summary>
     Idle,
-    /// <summary>準備中 / 接続試行中 (黄)。</summary>
     Warming,
-    /// <summary>正常稼働中 (緑)。</summary>
     Active,
-    /// <summary>軽微な異常 (橙)。例: パース失敗が発生したが継続中。</summary>
     Warning,
-    /// <summary>致命的な異常 (赤)。</summary>
     Error,
-    /// <summary>無効化中。</summary>
     Disabled,
 }
 
 /// <summary>3 ステージの状態スナップショット。</summary>
 public sealed record StageHealth(StageStatus Receive, StageStatus Parse, StageStatus Log);
+
+/// <summary>日付ロールオーバー発生時の情報。UI 表示やログ追跡に使う。</summary>
+public sealed record LogRotationEvent(
+    DateOnly FromDate,
+    DateOnly ToDate,
+    string? PreviousRawPath,
+    string? PreviousParsedPath,
+    string? CurrentRawPath,
+    string? CurrentParsedPath);
