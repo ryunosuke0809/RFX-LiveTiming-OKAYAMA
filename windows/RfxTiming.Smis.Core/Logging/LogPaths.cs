@@ -47,6 +47,9 @@ public static class LogPaths
     public static string ParsedLogFileFor(DateOnly date)
         => Path.Combine(LogsRoot, $"{FilePrefix}{date:yyyyMMdd}.jsonl");
 
+    /// <summary>ユーザー設定 JSON ファイルのパス (<c>%exe%/data/settings.json</c>)。</summary>
+    public static string SettingsFile => Path.Combine(DataRoot, "settings.json");
+
     /// <summary>必要なフォルダーが存在することを保証する。</summary>
     public static void EnsureDirectoriesExist()
     {

@@ -103,7 +103,8 @@ windows/
 
 岡山遠征で取得したログは **最重要資産** です。
 
-- 既定の出力先: `%AppData%\MOLA_Timing-Receiver\logs\`
+- 既定の出力先: `<exe フォルダ>\logs\` (例: `C:\MOLA_Timing\logs\`)
+- 設定ファイル: `<exe フォルダ>\data\settings.json` (Settings ダイアログで自動保存)
 - ファイル名: `MOLA_INPUT_YYYYMMDD.log` (生) / `MOLA_INPUT_YYYYMMDD.jsonl` (解析済) / `*.meta.json`
 - リポジトリ直下の `.gitignore` で `MOLA_INPUT_*.log` 等を除外済み
 - 生ログのフォーマットは他プロジェクト (SEIKO 計時系) と互換 (`{yyyy-MM-dd HH:mm:ss.fff} {1 行 XML}`)

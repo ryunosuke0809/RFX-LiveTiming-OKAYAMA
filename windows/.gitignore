@@ -44,6 +44,10 @@ seiko_*.log
 seiko_*.jsonl
 smis_raw_*.txt
 smis_parsed_*.txt
+
+# ユーザー設定 (環境固有)
+data/settings.json
+**/data/settings.json
 local.db
 local.db-*
 

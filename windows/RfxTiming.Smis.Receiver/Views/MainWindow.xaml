@@ -2,9 +2,10 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:RfxTiming.Smis.Receiver.ViewModels"
+        xmlns:conv="clr-namespace:RfxTiming.Smis.Receiver.ViewModels"
         Title="MOLA_Timing-Receiver"
-        Width="1280" Height="800"
-        MinWidth="900" MinHeight="600"
+        Width="1100" Height="680"
+        MinWidth="860" MinHeight="540"
         FontFamily="Segoe UI, Yu Gothic UI, Meiryo UI"
         FontSize="13"
         TextOptions.TextFormattingMode="Display"
@@ -14,150 +15,251 @@
         <vm:MainViewModel />
     </Window.DataContext>
 
+    <Window.Resources>
+        <conv:BoolToVisibilityConverter x:Key="BoolToVisibility" />
+    </Window.Resources>
+
     <DockPanel LastChildFill="True">
 
-        <!-- メニューバー -->
+        <!-- メニューバー (常に表示するが最小限) -->
         <Menu DockPanel.Dock="Top">
             <MenuItem Header="_File">
-                <MenuItem Header="ログフォルダを開く (_O)" Command="{Binding OpenLogsFolderCommand}" />
+                <MenuItem Header="ログフォルダを開く (_L)" Command="{Binding OpenLogsFolderCommand}" />
                 <Separator />
                 <MenuItem Header="終了 (_X)" Command="{Binding ExitAppCommand}" />
             </MenuItem>
             <MenuItem Header="_Settings">
-                <MenuItem Header="接続設定 (_C)..." Command="{Binding OpenConnectionSettingsCommand}" />
-                <MenuItem Header="保存設定 (_L)..."
-                          Command="{Binding ShowComingSoonCommand}"
-                          CommandParameter="保存設定" />
-                <MenuItem Header="配信設定 (_D)..."
-                          Command="{Binding ShowComingSoonCommand}"
-                          CommandParameter="配信設定" />
-                <MenuItem Header="クラウド送信 (_U)..."
-                          Command="{Binding ShowComingSoonCommand}"
-                          CommandParameter="クラウド送信" />
-            </MenuItem>
-            <MenuItem Header="_View">
-                <MenuItem Header="ダッシュボード (_D)" IsChecked="True" IsCheckable="True" />
+                <MenuItem Header="設定 (_O)..." Command="{Binding OpenSettingsCommand}" />
             </MenuItem>
             <MenuItem Header="_Help">
-                <MenuItem Header="SMIS プロトコル概要 (_S)"
-                          Command="{Binding ShowComingSoonCommand}"
-                          CommandParameter="SMIS プロトコル概要" />
-                <Separator />
                 <MenuItem Header="バージョン情報 (_A)..." Command="{Binding ShowAboutCommand}" />
             </MenuItem>
         </Menu>
 
-        <!-- ツールバー -->
-        <ToolBarTray DockPanel.Dock="Top" IsLocked="True">
-            <ToolBar>
-                <Button Content="接続" Command="{Binding ConnectCommand}" />
-                <Button Content="切断" Command="{Binding DisconnectCommand}" />
-                <Separator />
-                <TextBlock Text="接続先:" VerticalAlignment="Center" Margin="8,0,6,0" />
-                <TextBox Text="{Binding SmisHost, UpdateSourceTrigger=PropertyChanged}"
-                         Width="120" VerticalAlignment="Center"
-                         IsEnabled="{Binding IsRunning, Converter={x:Static vm:NotBoolConverter.Instance}}" />
-                <TextBlock Text=":" VerticalAlignment="Center" Margin="2,0" />
-                <TextBox Text="{Binding SmisPort, UpdateSourceTrigger=PropertyChanged}"
-                         Width="60" VerticalAlignment="Center"
-                         IsEnabled="{Binding IsRunning, Converter={x:Static vm:NotBoolConverter.Instance}}" />
-                <Separator />
-                <Button Content="ログフォルダを開く" Command="{Binding OpenLogsFolderCommand}" />
-            </ToolBar>
-        </ToolBarTray>
+        <!-- 主要アクションのツールバー -->
+        <Border DockPanel.Dock="Top" Background="{StaticResource Background.Panel}" Padding="14,10">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <Button Grid.Column="0"
+                        Content="▶ 接続開始"
+                        Command="{Binding ConnectCommand}"
+                        Padding="20,8" FontWeight="SemiBold" FontSize="14"
+                        Margin="0,0,8,0" />
+                <Button Grid.Column="1"
+                        Content="■ 切断"
+                        Command="{Binding DisconnectCommand}"
+                        Padding="20,8" FontSize="14" />
+
+                <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Ellipse Width="14" Height="14" Margin="0,0,8,0"
+                             Fill="{Binding HeadlineStatusBrush}" />
+                    <TextBlock Text="{Binding HeadlineStatusText}"
+                               FontSize="14" FontWeight="SemiBold"
+                               VerticalAlignment="Center"
+                               Foreground="{StaticResource Foreground.Primary}" />
+                </StackPanel>
+
+                <Button Grid.Column="4"
+                        Content="⚙ 設定"
+                        Command="{Binding OpenSettingsCommand}"
+                        Padding="14,8" Margin="16,0,0,0" />
+            </Grid>
+        </Border>
 
         <!-- ステータスバー -->
         <StatusBar DockPanel.Dock="Bottom">
             <StatusBarItem>
                 <StackPanel Orientation="Horizontal">
                     <Ellipse Width="10" Height="10" Margin="0,0,6,0"
-                             Fill="{Binding ConnectionStatusBrush}" />
-                    <TextBlock Text="{Binding ConnectionStatusText}"
+                             Fill="{Binding ReceiveStatusBrush}" />
+                    <TextBlock Text="{Binding ConnectionEndpointText, StringFormat='接続先: {0}'}"
                                Foreground="{StaticResource Foreground.Secondary}" />
                 </StackPanel>
             </StatusBarItem>
             <Separator />
-            <StatusBarItem Content="{Binding CurrentOutputFile, StringFormat='出力: {0}'}" />
+            <StatusBarItem>
+                <TextBlock Foreground="{StaticResource Foreground.Secondary}"
+                           Visibility="{Binding Display.ShowLastReceivedAtInStatusBar, Converter={StaticResource BoolToVisibility}}">
+                    <Run Text="最終受信: " />
+                    <Run Text="{Binding LastReceivedAtText}" />
+                </TextBlock>
+            </StatusBarItem>
+            <Separator />
+            <StatusBarItem>
+                <TextBlock Foreground="{StaticResource Foreground.Secondary}">
+                    <Run Text="ログ: " />
+                    <Run Text="{Binding LogSizeText}" />
+                </TextBlock>
+            </StatusBarItem>
             <StatusBarItem HorizontalAlignment="Right">
-                <TextBlock Text="{Binding TotalMessageCount, StringFormat='本日: {0} 件'}"
-                           Foreground="{StaticResource Foreground.Secondary}" />
+                <TextBlock Foreground="{StaticResource Foreground.Secondary}" FontSize="11">
+                    MOLA_Timing-Receiver v0.1.0
+                </TextBlock>
             </StatusBarItem>
         </StatusBar>
 
         <!-- メイン領域 -->
-        <Grid Margin="16">
+        <Grid Margin="14">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <TextBlock Grid.Row="0"
-                       Text="MOLA_Timing-Receiver"
-                       FontSize="24" FontWeight="SemiBold"
-                       Margin="0,0,0,8" />
+            <!-- 3 ステージのパイプライン LED -->
+            <Border Grid.Row="0"
+                    Background="{StaticResource Background.Panel}"
+                    CornerRadius="8" Padding="20"
+                    Visibility="{Binding Display.ShowPipelineDiagram, Converter={StaticResource BoolToVisibility}}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
 
-            <!-- メトリクス -->
-            <UniformGrid Grid.Row="1" Columns="4" Margin="0,0,0,16">
-                <Border Background="{StaticResource Background.Panel}" CornerRadius="6" Padding="16" Margin="0,0,8,0">
+                    <!-- 受信 -->
+                    <StackPanel Grid.Column="0" HorizontalAlignment="Center">
+                        <Ellipse Width="44" Height="44" Fill="{Binding ReceiveStatusBrush}">
+                            <Ellipse.Effect>
+                                <DropShadowEffect Color="Black" Opacity="0.35" BlurRadius="8" ShadowDepth="2" />
+                            </Ellipse.Effect>
+                        </Ellipse>
+                        <TextBlock Text="SMIS 受信" FontSize="13" FontWeight="SemiBold"
+                                   HorizontalAlignment="Center" Margin="0,8,0,2" />
+                        <TextBlock Text="{Binding ReceiveStatusText}"
+                                   FontSize="11" HorizontalAlignment="Center"
+                                   Foreground="{StaticResource Foreground.Secondary}" />
+                    </StackPanel>
+
+                    <!-- 矢印 -->
+                    <TextBlock Grid.Column="1" Text="→" FontSize="22"
+                               VerticalAlignment="Center" Foreground="{StaticResource Foreground.Secondary}"
+                               Margin="12,0" />
+
+                    <!-- パース -->
+                    <StackPanel Grid.Column="2" HorizontalAlignment="Center">
+                        <Ellipse Width="44" Height="44" Fill="{Binding ParseStatusBrush}">
+                            <Ellipse.Effect>
+                                <DropShadowEffect Color="Black" Opacity="0.35" BlurRadius="8" ShadowDepth="2" />
+                            </Ellipse.Effect>
+                        </Ellipse>
+                        <TextBlock Text="パース" FontSize="13" FontWeight="SemiBold"
+                                   HorizontalAlignment="Center" Margin="0,8,0,2" />
+                        <TextBlock Text="{Binding ParseStatusText}"
+                                   FontSize="11" HorizontalAlignment="Center"
+                                   Foreground="{StaticResource Foreground.Secondary}" />
+                    </StackPanel>
+
+                    <TextBlock Grid.Column="3" Text="→" FontSize="22"
+                               VerticalAlignment="Center" Foreground="{StaticResource Foreground.Secondary}"
+                               Margin="12,0" />
+
+                    <!-- ログ書込 -->
+                    <StackPanel Grid.Column="4" HorizontalAlignment="Center">
+                        <Ellipse Width="44" Height="44" Fill="{Binding LogStatusBrush}">
+                            <Ellipse.Effect>
+                                <DropShadowEffect Color="Black" Opacity="0.35" BlurRadius="8" ShadowDepth="2" />
+                            </Ellipse.Effect>
+                        </Ellipse>
+                        <TextBlock Text="ログ書込" FontSize="13" FontWeight="SemiBold"
+                                   HorizontalAlignment="Center" Margin="0,8,0,2" />
+                        <TextBlock Text="{Binding LogStatusText}"
+                                   FontSize="11" HorizontalAlignment="Center"
+                                   Foreground="{StaticResource Foreground.Secondary}" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- メトリクスカード -->
+            <UniformGrid Grid.Row="1" Columns="4" Margin="0,14,0,0">
+                <Border Background="{StaticResource Background.Panel}" CornerRadius="6" Padding="16" Margin="0,0,8,0"
+                        Visibility="{Binding Display.ShowMessageCount, Converter={StaticResource BoolToVisibility}}">
                     <StackPanel>
-                        <TextBlock Text="受信メッセージ" Foreground="{StaticResource Foreground.Secondary}" FontSize="12" />
-                        <TextBlock Text="{Binding TotalMessageCount}" FontSize="28" FontWeight="SemiBold" Margin="0,4,0,0" />
+                        <TextBlock Text="受信メッセージ数" Foreground="{StaticResource Foreground.Secondary}" FontSize="12" />
+                        <TextBlock Text="{Binding TotalMessageCount, StringFormat={}{0:#,##0}}"
+                                   FontSize="32" FontWeight="SemiBold" Margin="0,4,0,0" />
                     </StackPanel>
                 </Border>
-                <Border Background="{StaticResource Background.Panel}" CornerRadius="6" Padding="16" Margin="0,0,8,0">
+                <Border Background="{StaticResource Background.Panel}" CornerRadius="6" Padding="16" Margin="0,0,8,0"
+                        Visibility="{Binding Display.ShowMessageRate, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel>
+                        <TextBlock Text="受信レート" Foreground="{StaticResource Foreground.Secondary}" FontSize="12" />
+                        <TextBlock FontSize="32" FontWeight="SemiBold" Margin="0,4,0,0">
+                            <Run Text="{Binding MessagesPerSecond, StringFormat={}{0:#0.0}}" />
+                            <Run Text=" /s" FontSize="14" Foreground="{StaticResource Foreground.Secondary}" />
+                        </TextBlock>
+                    </StackPanel>
+                </Border>
+                <Border Background="{StaticResource Background.Panel}" CornerRadius="6" Padding="16" Margin="0,0,8,0"
+                        Visibility="{Binding Display.ShowParseErrors, Converter={StaticResource BoolToVisibility}}">
                     <StackPanel>
                         <TextBlock Text="パースエラー" Foreground="{StaticResource Foreground.Secondary}" FontSize="12" />
-                        <TextBlock Text="{Binding ParseErrorCount}" FontSize="28" FontWeight="SemiBold" Margin="0,4,0,0" />
+                        <TextBlock Text="{Binding ParseErrorCount, StringFormat={}{0:#,##0}}"
+                                   FontSize="32" FontWeight="SemiBold" Margin="0,4,0,0" />
                     </StackPanel>
                 </Border>
-                <Border Background="{StaticResource Background.Panel}" CornerRadius="6" Padding="16" Margin="0,0,8,0">
+                <Border Background="{StaticResource Background.Panel}" CornerRadius="6" Padding="16"
+                        Visibility="{Binding Display.ShowLogSize, Converter={StaticResource BoolToVisibility}}">
                     <StackPanel>
-                        <TextBlock Text="状態" Foreground="{StaticResource Foreground.Secondary}" FontSize="12" />
-                        <TextBlock Text="{Binding ConnectionStatusText}" FontSize="16" FontWeight="SemiBold" Margin="0,8,0,0"
-                                   TextTrimming="CharacterEllipsis" />
-                    </StackPanel>
-                </Border>
-                <Border Background="{StaticResource Background.Panel}" CornerRadius="6" Padding="16">
-                    <StackPanel>
-                        <TextBlock Text="最新メッセージ" Foreground="{StaticResource Foreground.Secondary}" FontSize="12" />
-                        <TextBlock Text="{Binding LastMessageInfo}" FontSize="14" Margin="0,8,0,0"
-                                   TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="本日のログサイズ" Foreground="{StaticResource Foreground.Secondary}" FontSize="12" />
+                        <TextBlock Text="{Binding LogSizeText}"
+                                   FontSize="32" FontWeight="SemiBold" Margin="0,4,0,0" />
                     </StackPanel>
                 </Border>
             </UniformGrid>
 
-            <Border Grid.Row="2"
-                    Background="{StaticResource Background.Panel}"
-                    CornerRadius="6"
-                    Padding="20">
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <StackPanel>
-                        <TextBlock Text="使い方"
-                                   FontSize="16" FontWeight="SemiBold" />
-                        <TextBlock Foreground="{StaticResource Foreground.Secondary}"
-                                   TextWrapping="Wrap"
-                                   Margin="0,12,0,0"
-                                   LineHeight="22">
-                            <Run Text="1. MOLA_Timing-VirtualServer.exe を別ウィンドウで起動し、ポート 50000 で「▶ 再生」を押す" /><LineBreak />
-                            <Run Text="2. このアプリで上のツールバーの「接続」を押す" /><LineBreak />
-                            <Run Text="3. ステータスが「接続済」になり、メトリクスが増加していくのを確認" /><LineBreak />
-                            <Run Text="4. ログは exe と同じフォルダーの logs/ 配下に保存されます (MOLA_INPUT_YYYYMMDD.log と MOLA_INPUT_YYYYMMDD.jsonl)" /><LineBreak />
-                            <Run Text="5. 「ログフォルダを開く」ボタンで Explorer を開けます" />
-                        </TextBlock>
+            <!-- 出力ファイルパス -->
+            <Border Grid.Row="2" Background="{StaticResource Background.Panel}" CornerRadius="6" Padding="14"
+                    Margin="0,14,0,0" VerticalAlignment="Top">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="120" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
 
-                        <TextBlock Text="出力ファイル仕様"
-                                   FontSize="14" FontWeight="SemiBold"
-                                   Margin="0,20,0,0" />
-                        <TextBlock Foreground="{StaticResource Foreground.Secondary}"
-                                   TextWrapping="Wrap"
-                                   Margin="0,8,0,0">
-                            <Run Text="• MOLA_INPUT_YYYYMMDD.log : SEIKO 互換 (yyyy-MM-dd HH:mm:ss.fff + 半角スペース + 1 行 XML)" /><LineBreak />
-                            <Run Text="• MOLA_INPUT_YYYYMMDD.jsonl : 解析済 JSON Lines（ts / type / payload を 1 行 1 メッセージ）" /><LineBreak />
-                            <Run Text="• 過去ログ (MOLA_INPUT_*.log / seiko_*.log どちらも) は MOLA_Timing-VirtualServer でそのまま再生可能" />
-                        </TextBlock>
-                    </StackPanel>
-                </ScrollViewer>
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="保存先 (生)"
+                               Foreground="{StaticResource Foreground.Secondary}" Margin="0,0,12,6" />
+                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding CurrentRawLogPath}"
+                               FontFamily="Consolas, Courier New" TextTrimming="CharacterEllipsis" Margin="0,0,0,6" />
+
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="保存先 (解析済)"
+                               Foreground="{StaticResource Foreground.Secondary}" Margin="0,0,12,6" />
+                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding CurrentParsedLogPath}"
+                               FontFamily="Consolas, Courier New" TextTrimming="CharacterEllipsis" Margin="0,0,0,6" />
+
+                    <Button Grid.Row="0" Grid.Column="2" Grid.RowSpan="2"
+                            Content="フォルダを開く"
+                            Command="{Binding OpenLogsFolderCommand}"
+                            Padding="14,6" VerticalAlignment="Center" Margin="12,0,0,0" />
+
+                    <!-- デバッグ用最終受信メッセージ -->
+                    <TextBlock Grid.Row="2" Grid.Column="0"
+                               Text="最終メッセージ"
+                               Foreground="{StaticResource Foreground.Secondary}" Margin="0,8,12,0"
+                               Visibility="{Binding Display.ShowLastMessagePreview, Converter={StaticResource BoolToVisibility}}" />
+                    <TextBlock Grid.Row="2" Grid.Column="1"
+                               Text="{Binding LastMessageInfo}"
+                               FontFamily="Consolas, Courier New" TextTrimming="CharacterEllipsis"
+                               Margin="0,8,0,0"
+                               Visibility="{Binding Display.ShowLastMessagePreview, Converter={StaticResource BoolToVisibility}}" />
+                </Grid>
             </Border>
         </Grid>
     </DockPanel>
