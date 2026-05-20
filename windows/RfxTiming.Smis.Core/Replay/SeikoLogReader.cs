@@ -1,6 +1,10 @@
+using System;
+using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Threading;
 using RfxTiming.Smis.Logging;
 
 namespace RfxTiming.Smis.Replay;
@@ -30,7 +34,7 @@ public static class SeikoLogReader
         while ((line = reader.ReadLine()) is not null)
         {
             lineNo++;
-            if (TryParseLine(line, out SeikoLogEntry? entry))
+            if (TryParseLine(line, out SeikoLogEntry entry))
             {
                 result.Add(entry);
             }
@@ -39,7 +43,14 @@ public static class SeikoLogReader
         return result;
     }
 
-    /// <summary>非同期版: 大きなログでも UI スレッドをブロックしない。</summary>
+    /// <summary>
+    /// 非同期版: 大きなログでも UI スレッドをブロックしない。
+    /// <para>
+    /// 非同期メソッドでは <see cref="StreamReader.EndOfStream"/> が同期 I/O を伴うため使用せず、
+    /// <see cref="StreamReader.ReadLineAsync(CancellationToken)"/> が <c>null</c> を返したら終端と判定する
+    /// (<see href="https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca2024">CA2024</see>)。
+    /// </para>
+    /// </summary>
     public static async IAsyncEnumerable<SeikoLogEntry> EnumerateAsync(
         string filePath,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -49,12 +60,12 @@ public static class SeikoLogReader
             bufferSize: 64 * 1024, useAsync: true);
         using var reader = new StreamReader(stream, Utf8NoBom, detectEncodingFromByteOrderMarks: true);
 
-        while (!reader.EndOfStream)
+        while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
             string? line = await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false);
             if (line is null) yield break;
-            if (TryParseLine(line, out SeikoLogEntry? entry))
+            if (TryParseLine(line, out SeikoLogEntry entry))
             {
                 yield return entry;
             }
