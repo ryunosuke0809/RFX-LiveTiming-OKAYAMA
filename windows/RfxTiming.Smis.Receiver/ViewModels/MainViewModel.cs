@@ -158,9 +158,9 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
         {
             _service = null;
             IsRunning = false;
-            SetStageBrush(nameof(ReceiveStatus), StageStatus.Idle);
-            SetStageBrush(nameof(ParseStatus), StageStatus.Idle);
-            SetStageBrush(nameof(LogStatus), StageStatus.Idle);
+            SetReceiveStageBrush(StageStatus.Idle);
+            SetParseStageBrush(StageStatus.Idle);
+            SetLogStageBrush(StageStatus.Idle);
             UpdateHeadline(StageStatus.Idle, "待機中");
         }
     }
@@ -278,9 +278,9 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
     {
         Application.Current?.Dispatcher.Invoke(() =>
         {
-            SetStageBrush(nameof(ReceiveStatus), h.Receive);
-            SetStageBrush(nameof(ParseStatus), h.Parse);
-            SetStageBrush(nameof(LogStatus), h.Log);
+            SetReceiveStageBrush(h.Receive);
+            SetParseStageBrush(h.Parse);
+            SetLogStageBrush(h.Log);
         });
     }
 
@@ -317,34 +317,36 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
         });
     }
 
-    private void SetStageBrush(string propertyName, StageStatus status)
+    private static (Brush Brush, string Text) ResolveStageVisual(StageStatus status) => status switch
     {
-        (Brush brush, string text) = status switch
-        {
-            StageStatus.Idle => (BrushIdle, "待機"),
-            StageStatus.Warming => (BrushWarming, "準備中"),
-            StageStatus.Active => (BrushActive, "稼働中"),
-            StageStatus.Warning => (BrushWarning, "警告"),
-            StageStatus.Error => (BrushError, "エラー"),
-            StageStatus.Disabled => (BrushDisabled, "OFF"),
-            _ => (BrushIdle, "—"),
-        };
+        StageStatus.Idle => (BrushIdle, "待機"),
+        StageStatus.Warming => (BrushWarming, "準備中"),
+        StageStatus.Active => (BrushActive, "稼働中"),
+        StageStatus.Warning => (BrushWarning, "警告"),
+        StageStatus.Error => (BrushError, "エラー"),
+        StageStatus.Disabled => (BrushDisabled, "OFF"),
+        _ => (BrushIdle, "—"),
+    };
 
-        switch (propertyName)
-        {
-            case nameof(ReceiveStatus):
-                ReceiveStatusBrush = brush;
-                ReceiveStatusText = text;
-                break;
-            case nameof(ParseStatus):
-                ParseStatusBrush = brush;
-                ParseStatusText = text;
-                break;
-            case nameof(LogStatus):
-                LogStatusBrush = brush;
-                LogStatusText = text;
-                break;
-        }
+    private void SetReceiveStageBrush(StageStatus status)
+    {
+        (Brush brush, string text) = ResolveStageVisual(status);
+        ReceiveStatusBrush = brush;
+        ReceiveStatusText = text;
+    }
+
+    private void SetParseStageBrush(StageStatus status)
+    {
+        (Brush brush, string text) = ResolveStageVisual(status);
+        ParseStatusBrush = brush;
+        ParseStatusText = text;
+    }
+
+    private void SetLogStageBrush(StageStatus status)
+    {
+        (Brush brush, string text) = ResolveStageVisual(status);
+        LogStatusBrush = brush;
+        LogStatusText = text;
     }
 
     private void UpdateHeadline(StageStatus status, string text)
