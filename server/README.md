@@ -76,18 +76,65 @@ server/
       repository.ts               メッセージ永続化リポジトリ
     ingest/
       ingest-server.ts            /ingest WS (Receiver からの取り込み)
+    state/
+      types.ts                    ViewModel 型 (Standing / SessionInfo 等)
+      derive.ts                   gap/interval/flag の純粋変換関数
+      session-state.ts            生のオンメモリ状態 (LiveSessionState)
+      aggregator.ts               envelope を state に適用し patch を返す
     broadcast/
       hub.ts                      フロントエンド購読者ハブ + リングバッファ
       broadcast-server.ts         /ws WS (フロントエンド向け)
     api/
       router.ts                   REST API
     types/
-      ingest.ts                   ingest メッセージ型定義
+      ingest.ts                   ingest + broadcast メッセージ型定義
   data/                           SQLite ファイル置き場 (.gitignore)
+  scripts/
+    smoke-aggregator.mjs          Aggregator スモークテストスクリプト
   package.json
   tsconfig.json
   .env.example
 ```
+
+## `/ws` で配信される JSON
+
+フロントエンドは新規接続時に `hello` → `state` (フル状態) を受け取り、以後は
+`patch` (差分) と `smis` (デバッグ用の生 envelope) を受け取って差分適用する。
+
+```ts
+// 接続直後
+{ type: "hello",  serverTime: string, circuitId: string | null }
+{ type: "state",  state: LiveStateSnapshot }
+
+// リアルタイム
+{ type: "patch",  serverTs: string, circuitId: string, patches: LiveStatePatch[] }
+{ type: "smis",   envelope: IngestEnvelope }
+```
+
+`LiveStateSnapshot` には算出済みの `standings[]` (gap / interval / status / pits /
+positionChange / bestTimeType 入り) と `fastestLap` / `trackCount` /
+`session` / `classes` / `teams` / `recentMessages` が含まれる。詳細は
+`src/state/types.ts` を参照。
+
+`LiveStatePatch` の種類:
+
+| kind              | 説明                              |
+|-------------------|----------------------------------|
+| `session`         | SessionInfo の部分更新             |
+| `flag`            | トラックフラッグ変化               |
+| `class_upsert`    | クラスマスター追加 / 更新           |
+| `team_upsert`     | チームマスター追加 / 更新           |
+| `standing_upsert` | 1 台分の Standing 行 (再計算込み)   |
+| `standing_remove` | 1 台分削除 (DNF など。未使用)       |
+| `fastest_lap`     | セッションファステスト変化           |
+| `track_count`     | on track / pit / stopped 数の集計  |
+| `message`         | レースコントロール文言                |
+
+## デバッグ用ストリームビューア
+
+ブラウザで `frontend/src/app/debug/page.tsx` (`/debug`) を開くと、
+WebSocket URL とトークンを指定して `/ws` の全 JSON をストリーム表示できる。
+6 月岡山現地での疎通確認用。
 
 ## 6 月岡山テストでの使い方
 

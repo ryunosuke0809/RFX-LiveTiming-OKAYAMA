@@ -5,6 +5,7 @@ import type { AppConfig } from "../config.js";
 import type { Logger } from "../logger.js";
 import type { TimingRepository } from "../db/repository.js";
 import type { BroadcastHub } from "../broadcast/hub.js";
+import type { SessionStateAggregator } from "../state/aggregator.js";
 import type {
     IngestEnvelope,
     IngestServerMessage,
@@ -54,6 +55,7 @@ export function attachIngestServer(
     logger: Logger,
     repository: TimingRepository,
     hub: BroadcastHub,
+    aggregator: SessionStateAggregator,
 ): WebSocketServer {
     const wss = new WebSocketServer({ noServer: true });
 
@@ -91,7 +93,7 @@ export function attachIngestServer(
                 logger.warn("ingest received binary frame, ignored");
                 return;
             }
-            handleTextFrame(ws, data.toString("utf-8"), repository, hub, logger);
+            handleTextFrame(ws, data.toString("utf-8"), repository, hub, aggregator, logger);
         });
 
         ws.on("close", () => {
@@ -127,6 +129,7 @@ function handleTextFrame(
     text: string,
     repository: TimingRepository,
     hub: BroadcastHub,
+    aggregator: SessionStateAggregator,
     logger: Logger,
 ): void {
     let parsed: unknown;
@@ -145,7 +148,17 @@ function handleTextFrame(
     }
 
     repository.insertEnvelope(envelope.value);
-    hub.broadcast(envelope.value);
+
+    let patches: ReturnType<SessionStateAggregator["apply"]> = [];
+    try {
+        patches = aggregator.apply(envelope.value);
+    } catch (err) {
+        logger.warn("aggregator threw", { error: (err as Error).message, kind: envelope.value.kind });
+    }
+
+    hub.broadcastRaw(envelope.value);
+    hub.broadcastPatches(envelope.value.circuitId, patches);
+
     send(ws, { type: "ack", seq: envelope.value.seq });
 }
 

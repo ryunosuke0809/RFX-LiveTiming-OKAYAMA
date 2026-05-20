@@ -7,6 +7,8 @@ import { BroadcastHub } from "./broadcast/hub.js";
 import { attachBroadcastServer } from "./broadcast/broadcast-server.js";
 import { attachIngestServer } from "./ingest/ingest-server.js";
 import { createApiRouter } from "./api/router.js";
+import { LiveSessionState } from "./state/session-state.js";
+import { SessionStateAggregator } from "./state/aggregator.js";
 
 const config = loadConfig();
 const logger = new Logger(config.logLevel);
@@ -22,6 +24,10 @@ logger.info("starting MOLA_Timing cloud server", {
 
 const repository = new TimingRepository(config.dataDir, logger);
 const hub = new BroadcastHub(config.recentMessageBuffer, logger);
+
+const liveState = new LiveSessionState();
+const aggregator = new SessionStateAggregator(liveState);
+hub.setSnapshotProvider(() => liveState.snapshot(new Date().toISOString()));
 
 const app = express();
 app.disable("x-powered-by");
@@ -44,7 +50,7 @@ app.get("/", (_req, res) => {
 
 const httpServer = http.createServer(app);
 
-attachIngestServer(httpServer, config, logger, repository, hub);
+attachIngestServer(httpServer, config, logger, repository, hub, aggregator);
 attachBroadcastServer(httpServer, config, logger, hub);
 
 httpServer.listen(config.port, config.host, () => {

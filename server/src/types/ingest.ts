@@ -64,10 +64,17 @@ export type IngestServerMessage =
 /**
  * フロントエンド (/ws) 向けのブロードキャスト形式。
  *
- * ingest からの envelope と同じものを type:"smis" でラップして配信する。
- * フロントエンドはこれを購読することでリアルタイムにタイミングデータを更新する。
+ * - `hello`    : 接続直後の挨拶
+ * - `state`    : フル状態スナップショット (新規接続時 + たまに送る)
+ * - `patch`    : 差分更新 (1 件以上の `LiveStatePatch`)
+ * - `smis`     : 受信した生 SMIS envelope (デバッグ用、フロント本体では通常無視)
+ * - `snapshot` : 旧 raw リプレイ (互換のため当面残す)
  */
+import type { LiveStatePatch, LiveStateSnapshot } from "../state/types.js";
+
 export type BroadcastMessage =
-    | { type: "smis"; envelope: IngestEnvelope }
     | { type: "hello"; serverTime: string; circuitId: string | null }
+    | { type: "state"; state: LiveStateSnapshot }
+    | { type: "patch"; serverTs: string; circuitId: string | null; patches: LiveStatePatch[] }
+    | { type: "smis"; envelope: IngestEnvelope }
     | { type: "snapshot"; envelopes: IngestEnvelope[] };
