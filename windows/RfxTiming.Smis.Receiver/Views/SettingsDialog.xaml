@@ -7,7 +7,101 @@
         ResizeMode="NoResize"
         ShowInTaskbar="False"
         FontFamily="Segoe UI, Yu Gothic UI, Meiryo UI"
-        FontSize="13">
+        FontSize="13"
+        Background="#F4F5F7"
+        Foreground="#1A1F2E"
+        TextOptions.TextFormattingMode="Display">
+
+    <!--
+      設定ダイアログは Windows 標準のライト UI に寄せて、
+      文字を黒系 (#1A1F2E) で読みやすくする。
+      アプリ全体は dark テーマだが、入力フォームは値が確認しやすい白ベースを採用。
+    -->
+    <Window.Resources>
+        <SolidColorBrush x:Key="Dialog.Text" Color="#1A1F2E" />
+        <SolidColorBrush x:Key="Dialog.SubText" Color="#5C636F" />
+        <SolidColorBrush x:Key="Dialog.Surface" Color="White" />
+        <SolidColorBrush x:Key="Dialog.SurfaceAlt" Color="#EEF1F5" />
+        <SolidColorBrush x:Key="Dialog.Border" Color="#D0D7DE" />
+        <SolidColorBrush x:Key="Dialog.Accent" Color="#1F6FEB" />
+
+        <!--
+          App.xaml の dark テーマ用 SystemColors override をこのダイアログ内では取り消す。
+          TabItem やデフォルトテンプレートが ControlTextBrushKey 等を参照しているため、
+          ここをライト色に戻さないとタブヘッダー文字が読めない。
+        -->
+        <SolidColorBrush x:Key="{x:Static SystemColors.ControlBrushKey}" Color="White" />
+        <SolidColorBrush x:Key="{x:Static SystemColors.ControlTextBrushKey}" Color="#1A1F2E" />
+        <SolidColorBrush x:Key="{x:Static SystemColors.GrayTextBrushKey}" Color="#9CA3AF" />
+        <SolidColorBrush x:Key="{x:Static SystemColors.WindowBrushKey}" Color="White" />
+        <SolidColorBrush x:Key="{x:Static SystemColors.WindowTextBrushKey}" Color="#1A1F2E" />
+        <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#1F6FEB" />
+        <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="White" />
+
+        <Style TargetType="{x:Type TextBlock}">
+            <Setter Property="Foreground" Value="{StaticResource Dialog.Text}" />
+        </Style>
+        <Style TargetType="{x:Type Label}">
+            <Setter Property="Foreground" Value="{StaticResource Dialog.Text}" />
+        </Style>
+        <Style TargetType="{x:Type CheckBox}">
+            <Setter Property="Foreground" Value="{StaticResource Dialog.Text}" />
+            <Setter Property="Background" Value="{StaticResource Dialog.Surface}" />
+            <Setter Property="BorderBrush" Value="{StaticResource Dialog.Border}" />
+        </Style>
+        <Style TargetType="{x:Type TextBox}">
+            <Setter Property="Foreground" Value="{StaticResource Dialog.Text}" />
+            <Setter Property="Background" Value="{StaticResource Dialog.Surface}" />
+            <Setter Property="BorderBrush" Value="{StaticResource Dialog.Border}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="6,3" />
+            <Setter Property="CaretBrush" Value="{StaticResource Dialog.Text}" />
+            <Setter Property="SelectionBrush" Value="{StaticResource Dialog.Accent}" />
+        </Style>
+        <Style TargetType="{x:Type TabControl}">
+            <Setter Property="Background" Value="{StaticResource Dialog.Surface}" />
+            <Setter Property="BorderBrush" Value="{StaticResource Dialog.Border}" />
+        </Style>
+        <Style TargetType="{x:Type TabItem}">
+            <Setter Property="Foreground" Value="{StaticResource Dialog.Text}" />
+            <Setter Property="Background" Value="{StaticResource Dialog.SurfaceAlt}" />
+            <Setter Property="Padding" Value="14,6" />
+        </Style>
+        <Style TargetType="{x:Type Separator}">
+            <Setter Property="Background" Value="{StaticResource Dialog.Border}" />
+        </Style>
+        <Style TargetType="{x:Type Button}">
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="Background" Value="{StaticResource Dialog.Accent}" />
+            <Setter Property="BorderBrush" Value="{StaticResource Dialog.Accent}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="14,6" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Button}">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#3A82F0" />
+                            </Trigger>
+                            <Trigger Property="IsCancel" Value="True">
+                                <Setter Property="Background" Value="{StaticResource Dialog.SurfaceAlt}" />
+                                <Setter Property="Foreground" Value="{StaticResource Dialog.Text}" />
+                                <Setter Property="BorderBrush" Value="{StaticResource Dialog.Border}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
 
     <DockPanel Margin="14">
 
@@ -66,9 +160,10 @@
                     <TextBox Grid.Row="5" Grid.Column="1" x:Name="MaxRetryBox" Width="120" Height="28" Padding="6,3"
                              HorizontalAlignment="Left" Margin="0,0,0,8" />
 
-                    <Border Grid.Row="6" Grid.ColumnSpan="2" Background="{StaticResource Background.Hover}"
+                    <Border Grid.Row="6" Grid.ColumnSpan="2" Background="{StaticResource Dialog.SurfaceAlt}"
+                            BorderBrush="{StaticResource Dialog.Border}" BorderThickness="1"
                             CornerRadius="4" Padding="12" Margin="0,8,0,0" VerticalAlignment="Bottom">
-                        <TextBlock Foreground="{StaticResource Foreground.Secondary}"
+                        <TextBlock Foreground="{StaticResource Dialog.SubText}"
                                    TextWrapping="Wrap"
                                    FontSize="12">
                             本番のサーキット計時室 (MOLA-Timing サーバー) に接続する場合は、計時担当に発行された
@@ -86,9 +181,8 @@
 
                         <CheckBox x:Name="ShowMessageCountBox" Content="受信メッセージ数カード" Margin="0,0,0,8" />
                         <CheckBox x:Name="ShowMessageRateBox" Content="受信レート (msg/sec) カード" Margin="0,0,0,8" />
-                        <CheckBox x:Name="ShowParseErrorsBox" Content="パースエラー数カード" Margin="0,0,0,8" />
-                        <CheckBox x:Name="ShowLogSizeBox" Content="当日ログサイズカード" Margin="0,0,0,8" />
-                        <CheckBox x:Name="ShowPipelineDiagramBox" Content="3 ステージ進行表示 (受信 → パース → ログ)" Margin="0,0,0,8" />
+                        <CheckBox x:Name="ShowParseErrorsBox" Content="エラー件数カード (パース失敗 / 書込失敗)" Margin="0,0,0,8" />
+                        <CheckBox x:Name="ShowLogSizeBox" Content="ログサイズ表示" Margin="0,0,0,8" />
                         <CheckBox x:Name="ShowLastMessagePreviewBox" Content="最終受信メッセージのプレビュー (デバッグ用)" Margin="0,0,0,8" />
 
                         <Separator Margin="0,12" />
@@ -141,9 +235,10 @@
                     <TextBlock Grid.Row="3" Grid.Column="0" Text="USB ミラー出力先" VerticalAlignment="Center" Margin="0,0,12,8" />
                     <TextBox Grid.Row="3" Grid.Column="1" x:Name="UsbMirrorPathBox" Height="28" Padding="6,3" Margin="0,0,0,8" />
 
-                    <Border Grid.Row="4" Grid.ColumnSpan="2" Background="{StaticResource Background.Hover}"
+                    <Border Grid.Row="4" Grid.ColumnSpan="2" Background="{StaticResource Dialog.SurfaceAlt}"
+                            BorderBrush="{StaticResource Dialog.Border}" BorderThickness="1"
                             CornerRadius="4" Padding="12" Margin="0,8,0,0" VerticalAlignment="Bottom">
-                        <TextBlock Foreground="{StaticResource Foreground.Secondary}"
+                        <TextBlock Foreground="{StaticResource Dialog.SubText}"
                                    TextWrapping="Wrap" FontSize="12">
                             生 XML ログは SMIS 受信から最短経路で書き出されるため、解析失敗時もデータは確実に残ります。
                             通常運用では「生 XML ログを出力」は必ず ON にしてください。
@@ -179,9 +274,10 @@
                               Content="LAN 全体に公開する (0.0.0.0)。OFF なら 127.0.0.1 のみ。"
                               Margin="0,0,0,8" />
 
-                    <Border Grid.Row="3" Grid.ColumnSpan="2" Background="{StaticResource Background.Hover}"
+                    <Border Grid.Row="3" Grid.ColumnSpan="2" Background="{StaticResource Dialog.SurfaceAlt}"
+                            BorderBrush="{StaticResource Dialog.Border}" BorderThickness="1"
                             CornerRadius="4" Padding="12" Margin="0,8,0,0" VerticalAlignment="Bottom">
-                        <TextBlock Foreground="{StaticResource Foreground.Secondary}"
+                        <TextBlock Foreground="{StaticResource Dialog.SubText}"
                                    TextWrapping="Wrap" FontSize="12">
                             WebSocket 配信は次フェーズで実装予定です。設定値は保存され、機能リリース時にそのまま使用されます。
                         </TextBlock>

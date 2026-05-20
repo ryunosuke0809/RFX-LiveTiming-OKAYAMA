@@ -31,7 +31,6 @@ public partial class SettingsDialog : Window
         ShowMessageRateBox.IsChecked = settings.Display.ShowMessageRate;
         ShowParseErrorsBox.IsChecked = settings.Display.ShowParseErrors;
         ShowLogSizeBox.IsChecked = settings.Display.ShowLogSize;
-        ShowPipelineDiagramBox.IsChecked = settings.Display.ShowPipelineDiagram;
         ShowLastMessagePreviewBox.IsChecked = settings.Display.ShowLastMessagePreview;
         ShowLastReceivedAtInStatusBarBox.IsChecked = settings.Display.ShowLastReceivedAtInStatusBar;
         AccentColorBox.Text = settings.Display.AccentColorHex;
@@ -140,7 +139,7 @@ public partial class SettingsDialog : Window
                 ShowMessageRate = ShowMessageRateBox.IsChecked == true,
                 ShowParseErrors = ShowParseErrorsBox.IsChecked == true,
                 ShowLogSize = ShowLogSizeBox.IsChecked == true,
-                ShowPipelineDiagram = ShowPipelineDiagramBox.IsChecked == true,
+                ShowPipelineDiagram = false,
                 ShowLastMessagePreview = ShowLastMessagePreviewBox.IsChecked == true,
                 ShowLastReceivedAtInStatusBar = ShowLastReceivedAtInStatusBarBox.IsChecked == true,
                 AccentColorHex = accent,
