@@ -110,6 +110,16 @@
                 <Setter Property="BorderBrush" Value="{StaticResource Border.Subtle}" />
             </Style>
 
+            <!-- TextBox -->
+            <Style TargetType="{x:Type TextBox}">
+                <Setter Property="Background" Value="{StaticResource Background.Hover}" />
+                <Setter Property="Foreground" Value="{StaticResource Foreground.Primary}" />
+                <Setter Property="BorderBrush" Value="{StaticResource Border.Subtle}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="Padding" Value="6,2" />
+                <Setter Property="CaretBrush" Value="{StaticResource Foreground.Primary}" />
+            </Style>
+
             <!-- ===== StatusBar ===== -->
             <Style TargetType="{x:Type StatusBar}">
                 <Setter Property="Background" Value="{StaticResource Background.Panel}" />

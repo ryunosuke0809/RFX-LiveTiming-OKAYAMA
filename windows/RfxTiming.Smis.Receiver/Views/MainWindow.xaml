@@ -5,8 +5,6 @@
         Title="MOLA_Timing-Receiver"
         Width="1280" Height="800"
         MinWidth="900" MinHeight="600"
-        Background="{StaticResource Background.Window}"
-        Foreground="{StaticResource Foreground.Primary}"
         FontFamily="Segoe UI, Yu Gothic UI, Meiryo UI"
         FontSize="13"
         TextOptions.TextFormattingMode="Display"
@@ -18,29 +16,24 @@
 
     <DockPanel LastChildFill="True">
 
-        <!-- メニューバー (テーマは App.xaml の Style が適用) -->
+        <!-- メニューバー -->
         <Menu DockPanel.Dock="Top">
             <MenuItem Header="_File">
-                <MenuItem Header="ログフォルダを開く (_O)" />
-                <MenuItem Header="ログを USB にエクスポート (_E)" />
+                <MenuItem Header="ログフォルダを開く (_O)" Command="{Binding OpenLogsFolderCommand}" />
                 <Separator />
                 <MenuItem Header="終了 (_X)" />
             </MenuItem>
             <MenuItem Header="_Settings">
-                <MenuItem Header="接続設定 (_C)..." />
-                <MenuItem Header="保存設定 (_L)..." />
-                <MenuItem Header="配信設定 (_D)..." />
-                <MenuItem Header="クラウド送信 (_U)..." />
-                <MenuItem Header="アラート (_A)..." />
+                <MenuItem Header="接続設定 (_C)... (W2 末で実装)" IsEnabled="False" />
+                <MenuItem Header="保存設定 (_L)... (W2 末で実装)" IsEnabled="False" />
+                <MenuItem Header="配信設定 (_D)... (W2 末で実装)" IsEnabled="False" />
+                <MenuItem Header="クラウド送信 (_U)... (W3 末で実装)" IsEnabled="False" />
             </MenuItem>
             <MenuItem Header="_View">
                 <MenuItem Header="ダッシュボード (_D)" IsChecked="True" />
-                <MenuItem Header="ライブログ (_L)" />
-                <MenuItem Header="最新 Standings (_S)" />
             </MenuItem>
             <MenuItem Header="_Help">
                 <MenuItem Header="SMIS プロトコル概要 (_S)" />
-                <MenuItem Header="トラブルシュート (_T)" />
                 <Separator />
                 <MenuItem Header="バージョン情報 (_A)..." />
             </MenuItem>
@@ -49,13 +42,19 @@
         <!-- ツールバー -->
         <ToolBarTray DockPanel.Dock="Top" IsLocked="True">
             <ToolBar>
-                <Button Content="接続" />
-                <Button Content="切断" />
+                <Button Content="接続" Command="{Binding ConnectCommand}" />
+                <Button Content="切断" Command="{Binding DisconnectCommand}" />
                 <Separator />
-                <Button Content="記録開始" />
-                <Button Content="記録停止" />
+                <TextBlock Text="接続先:" VerticalAlignment="Center" Margin="8,0,6,0" />
+                <TextBox Text="{Binding SmisHost, UpdateSourceTrigger=PropertyChanged}"
+                         Width="120" VerticalAlignment="Center"
+                         IsEnabled="{Binding IsRunning, Converter={x:Static vm:NotBoolConverter.Instance}}" />
+                <TextBlock Text=":" VerticalAlignment="Center" Margin="2,0" />
+                <TextBox Text="{Binding SmisPort, UpdateSourceTrigger=PropertyChanged}"
+                         Width="60" VerticalAlignment="Center"
+                         IsEnabled="{Binding IsRunning, Converter={x:Static vm:NotBoolConverter.Instance}}" />
                 <Separator />
-                <Button Content="設定" />
+                <Button Content="ログフォルダを開く" Command="{Binding OpenLogsFolderCommand}" />
             </ToolBar>
         </ToolBarTray>
 
@@ -77,9 +76,10 @@
             </StatusBarItem>
         </StatusBar>
 
-        <!-- メイン領域 (W2 でリアルタイムダッシュボードを実装) -->
+        <!-- メイン領域 -->
         <Grid Margin="16">
             <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
@@ -89,30 +89,66 @@
                        FontSize="24" FontWeight="SemiBold"
                        Margin="0,0,0,8" />
 
-            <Border Grid.Row="1"
+            <!-- メトリクス -->
+            <UniformGrid Grid.Row="1" Columns="4" Margin="0,0,0,16">
+                <Border Background="{StaticResource Background.Panel}" CornerRadius="6" Padding="16" Margin="0,0,8,0">
+                    <StackPanel>
+                        <TextBlock Text="受信メッセージ" Foreground="{StaticResource Foreground.Secondary}" FontSize="12" />
+                        <TextBlock Text="{Binding TotalMessageCount}" FontSize="28" FontWeight="SemiBold" Margin="0,4,0,0" />
+                    </StackPanel>
+                </Border>
+                <Border Background="{StaticResource Background.Panel}" CornerRadius="6" Padding="16" Margin="0,0,8,0">
+                    <StackPanel>
+                        <TextBlock Text="パースエラー" Foreground="{StaticResource Foreground.Secondary}" FontSize="12" />
+                        <TextBlock Text="{Binding ParseErrorCount}" FontSize="28" FontWeight="SemiBold" Margin="0,4,0,0" />
+                    </StackPanel>
+                </Border>
+                <Border Background="{StaticResource Background.Panel}" CornerRadius="6" Padding="16" Margin="0,0,8,0">
+                    <StackPanel>
+                        <TextBlock Text="状態" Foreground="{StaticResource Foreground.Secondary}" FontSize="12" />
+                        <TextBlock Text="{Binding ConnectionStatusText}" FontSize="16" FontWeight="SemiBold" Margin="0,8,0,0"
+                                   TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                </Border>
+                <Border Background="{StaticResource Background.Panel}" CornerRadius="6" Padding="16">
+                    <StackPanel>
+                        <TextBlock Text="最新メッセージ" Foreground="{StaticResource Foreground.Secondary}" FontSize="12" />
+                        <TextBlock Text="{Binding LastMessageInfo}" FontSize="14" Margin="0,8,0,0"
+                                   TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                </Border>
+            </UniformGrid>
+
+            <Border Grid.Row="2"
                     Background="{StaticResource Background.Panel}"
                     CornerRadius="6"
                     Padding="20">
-                <StackPanel>
-                    <TextBlock Text="セットアップ進行中"
-                               FontSize="16" FontWeight="SemiBold"
-                               Foreground="{StaticResource Foreground.Primary}" />
-                    <TextBlock Text="このウィンドウは W1 のスケルトンです。W2 でメッセージ種別カウント、最新 Standings、ライブログビューを実装します。"
-                               Foreground="{StaticResource Foreground.Secondary}"
-                               TextWrapping="Wrap"
-                               Margin="0,8,0,0" />
-                    <TextBlock Foreground="{StaticResource Foreground.Secondary}"
-                               TextWrapping="Wrap"
-                               Margin="0,16,0,0">
-                        <Run Text="プロトコル仕様:" FontWeight="SemiBold" />
-                        <LineBreak />
-                        <Run Text="• 内部実装は SMIS プロトコル (docs/Specification/計測データ仕様書_20200220.pdf) 準拠" />
-                        <LineBreak />
-                        <Run Text="• 対外名は MOLA_Timing-Receiver" />
-                        <LineBreak />
-                        <Run Text="• ログ保存: smis_raw_YYYYMMDD.txt (生 XML) + smis_parsed_YYYYMMDD.txt (JSONL)" />
-                    </TextBlock>
-                </StackPanel>
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+                        <TextBlock Text="使い方"
+                                   FontSize="16" FontWeight="SemiBold" />
+                        <TextBlock Foreground="{StaticResource Foreground.Secondary}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,12,0,0"
+                                   LineHeight="22">
+                            <Run Text="1. MOLA_Timing-VirtualServer.exe を別ウィンドウで起動し、ポート 50000 で「▶ 再生」を押す" /><LineBreak />
+                            <Run Text="2. このアプリで上のツールバーの「接続」を押す" /><LineBreak />
+                            <Run Text="3. ステータスが「接続済」になり、メトリクスが増加していくのを確認" /><LineBreak />
+                            <Run Text="4. ログは exe と同じフォルダーの logs/ 配下に保存されます (smis_raw_YYYYMMDD.txt と smis_parsed_YYYYMMDD.txt)" /><LineBreak />
+                            <Run Text="5. 「ログフォルダを開く」ボタンで Explorer を開けます" />
+                        </TextBlock>
+
+                        <TextBlock Text="出力ファイル仕様"
+                                   FontSize="14" FontWeight="SemiBold"
+                                   Margin="0,20,0,0" />
+                        <TextBlock Foreground="{StaticResource Foreground.Secondary}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,8,0,0">
+                            <Run Text="• smis_raw_*.txt : タブ区切り (受信時刻 / バイト長 / エスケープ済 XML)" /><LineBreak />
+                            <Run Text="• smis_parsed_*.txt : JSON Lines （ts / type / payload を 1 行 1 メッセージ）" />
+                        </TextBlock>
+                    </StackPanel>
+                </ScrollViewer>
             </Border>
         </Grid>
     </DockPanel>

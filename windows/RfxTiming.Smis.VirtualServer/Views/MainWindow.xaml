@@ -5,8 +5,6 @@
         Title="MOLA_Timing-VirtualServer"
         Width="1280" Height="800"
         MinWidth="900" MinHeight="600"
-        Background="{StaticResource Background.Window}"
-        Foreground="{StaticResource Foreground.Primary}"
         FontFamily="Segoe UI, Yu Gothic UI, Meiryo UI"
         FontSize="13"
         TextOptions.TextFormattingMode="Display"
@@ -18,26 +16,19 @@
 
     <DockPanel LastChildFill="True">
 
-        <!-- メニューバー (テーマは App.xaml の Style が適用) -->
+        <!-- メニューバー -->
         <Menu DockPanel.Dock="Top">
             <MenuItem Header="_File">
-                <MenuItem Header="ログファイルを開く (_O)..." />
-                <MenuItem Header="プレイリストを保存 (_S)..." />
+                <MenuItem Header="ログファイルから再生 (W4 で実装)" IsEnabled="False" />
                 <Separator />
                 <MenuItem Header="終了 (_X)" />
             </MenuItem>
             <MenuItem Header="_Playback">
-                <MenuItem Header="再生 (_P)" />
-                <MenuItem Header="一時停止 (_A)" />
-                <MenuItem Header="停止 (_S)" />
+                <MenuItem Header="サーバー起動 (_R)" Command="{Binding StartServerCommand}" />
+                <MenuItem Header="サーバー停止 (_T)" Command="{Binding StopServerCommand}" />
                 <Separator />
-                <MenuItem Header="シーク (_K)..." />
-                <MenuItem Header="ループ区間設定 (_L)..." />
-            </MenuItem>
-            <MenuItem Header="_Settings">
-                <MenuItem Header="配信ポート (_P)..." />
-                <MenuItem Header="再生速度 (_V)..." />
-                <MenuItem Header="複数クライアント許可 (_M)" IsCheckable="True" IsChecked="True" />
+                <MenuItem Header="再生 (_P)" Command="{Binding PlayCommand}" />
+                <MenuItem Header="停止 (_S)" Command="{Binding StopPlaybackCommand}" />
             </MenuItem>
             <MenuItem Header="_Help">
                 <MenuItem Header="使い方 (_H)" />
@@ -49,23 +40,21 @@
         <!-- ツールバー -->
         <ToolBarTray DockPanel.Dock="Top" IsLocked="True">
             <ToolBar>
-                <Button Content="ログを開く" />
+                <Button Content="サーバー起動" Command="{Binding StartServerCommand}" />
+                <Button Content="サーバー停止" Command="{Binding StopServerCommand}" />
                 <Separator />
-                <Button Content="▶ 再生" />
-                <Button Content="⏸ 一時停止" />
-                <Button Content="⏹ 停止" />
+                <TextBlock Text="ポート:" VerticalAlignment="Center" Margin="8,0,6,0" />
+                <TextBox Text="{Binding ListenPort, UpdateSourceTrigger=PropertyChanged}"
+                         Width="80" VerticalAlignment="Center" />
                 <Separator />
-                <TextBlock Text="速度:" VerticalAlignment="Center" Margin="6,0" />
-                <ComboBox Width="80" SelectedIndex="2">
-                    <ComboBoxItem Content="0.5x" />
-                    <ComboBoxItem Content="1x" />
-                    <ComboBoxItem Content="2x" />
-                    <ComboBoxItem Content="5x" />
-                    <ComboBoxItem Content="10x" />
-                    <ComboBoxItem Content="Max" />
-                </ComboBox>
+                <Button Content="▶ 再生" Command="{Binding PlayCommand}" />
+                <Button Content="⏹ 停止" Command="{Binding StopPlaybackCommand}" />
                 <Separator />
-                <ToggleButton Content="🔁 ループ" />
+                <TextBlock Text="送信間隔:" VerticalAlignment="Center" Margin="8,0,6,0" />
+                <TextBox Text="{Binding PlaybackIntervalMs, UpdateSourceTrigger=PropertyChanged}"
+                         Width="60" VerticalAlignment="Center" />
+                <TextBlock Text="ms" VerticalAlignment="Center" Margin="4,0,0,0"
+                           Foreground="{StaticResource Foreground.Secondary}" />
             </ToolBar>
         </ToolBarTray>
 
@@ -80,14 +69,14 @@
                 </StackPanel>
             </StatusBarItem>
             <Separator />
-            <StatusBarItem Content="{Binding LoadedLogFile, StringFormat='ログ: {0}'}" />
+            <StatusBarItem Content="{Binding LoadedLogFile, StringFormat='ソース: {0}'}" />
             <StatusBarItem HorizontalAlignment="Right">
                 <TextBlock Text="{Binding ConnectedClientCount, StringFormat='接続クライアント: {0}'}"
                            Foreground="{StaticResource Foreground.Secondary}" />
             </StatusBarItem>
         </StatusBar>
 
-        <!-- メイン領域 (W4-W5 で実装) -->
+        <!-- メイン領域 -->
         <Grid Margin="16">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
@@ -100,48 +89,68 @@
                        FontSize="24" FontWeight="SemiBold"
                        Margin="0,0,0,8" />
 
-            <!-- タイムラインスライダー (シーク用) -->
-            <Border Grid.Row="1"
-                    Background="{StaticResource Background.Panel}"
-                    CornerRadius="6"
-                    Padding="16"
-                    Margin="0,0,0,12">
-                <StackPanel>
-                    <TextBlock Text="タイムライン" FontWeight="SemiBold" Margin="0,0,0,6" />
-                    <Slider Minimum="0" Maximum="100" Value="0"
-                            IsSnapToTickEnabled="False"
-                            TickPlacement="None" />
-                    <Grid Margin="0,4,0,0">
-                        <TextBlock Text="00:00:00" Foreground="{StaticResource Foreground.Secondary}" />
-                        <TextBlock Text="--:--:--" Foreground="{StaticResource Foreground.Secondary}"
-                                   HorizontalAlignment="Right" />
-                    </Grid>
-                </StackPanel>
-            </Border>
+            <!-- メトリクス -->
+            <UniformGrid Grid.Row="1" Columns="3" Margin="0,0,0,16">
+                <Border Background="{StaticResource Background.Panel}" CornerRadius="6" Padding="16" Margin="0,0,8,0">
+                    <StackPanel>
+                        <TextBlock Text="送信済フレーム" Foreground="{StaticResource Foreground.Secondary}" FontSize="12" />
+                        <TextBlock Text="{Binding TotalSent}" FontSize="28" FontWeight="SemiBold" Margin="0,4,0,0" />
+                    </StackPanel>
+                </Border>
+                <Border Background="{StaticResource Background.Panel}" CornerRadius="6" Padding="16" Margin="0,0,8,0">
+                    <StackPanel>
+                        <TextBlock Text="接続クライアント数" Foreground="{StaticResource Foreground.Secondary}" FontSize="12" />
+                        <TextBlock Text="{Binding ConnectedClientCount}" FontSize="28" FontWeight="SemiBold" Margin="0,4,0,0" />
+                    </StackPanel>
+                </Border>
+                <Border Background="{StaticResource Background.Panel}" CornerRadius="6" Padding="16">
+                    <StackPanel>
+                        <TextBlock Text="状態" Foreground="{StaticResource Foreground.Secondary}" FontSize="12" />
+                        <TextBlock Text="{Binding PlaybackStatusText}" FontSize="16" FontWeight="SemiBold" Margin="0,8,0,0"
+                                   TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                </Border>
+            </UniformGrid>
 
             <Border Grid.Row="2"
                     Background="{StaticResource Background.Panel}"
                     CornerRadius="6"
                     Padding="20">
-                <StackPanel>
-                    <TextBlock Text="セットアップ進行中"
-                               FontSize="16" FontWeight="SemiBold" />
-                    <TextBlock Foreground="{StaticResource Foreground.Secondary}"
-                               TextWrapping="Wrap"
-                               Margin="0,8,0,0">
-                        <Run Text="このウィンドウは W1 のスケルトンです。" />
-                        <LineBreak />
-                        <Run Text="W4-W5 で以下を実装します:" />
-                        <LineBreak />
-                        <Run Text="• ログ読込 → TCP 配信 (SMIS 互換)" />
-                        <LineBreak />
-                        <Run Text="• 時刻通り再生・速度可変 (0.5x〜Max)・シーク・ループ" />
-                        <LineBreak />
-                        <Run Text="• マスターデータの先頭累積適用 (シーク時)" />
-                        <LineBreak />
-                        <Run Text="• 接続クライアント一覧、メッセージレートグラフ" />
-                    </TextBlock>
-                </StackPanel>
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+                        <TextBlock Text="使い方"
+                                   FontSize="16" FontWeight="SemiBold" />
+                        <TextBlock Foreground="{StaticResource Foreground.Secondary}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,12,0,0"
+                                   LineHeight="22">
+                            <Run Text="1. ポート (既定 50000) を確認し「サーバー起動」を押す" /><LineBreak />
+                            <Run Text="2. MOLA_Timing-Receiver を起動し、127.0.0.1:50000 に「接続」する" /><LineBreak />
+                            <Run Text="3. このアプリで「▶ 再生」を押すと、組み込みサンプル (SUPER GT 想定) が送信される" /><LineBreak />
+                            <Run Text="4. Receiver 側のメッセージカウントが増え、logs/smis_raw_YYYYMMDD.txt が生成される" />
+                        </TextBlock>
+
+                        <TextBlock Text="送信されるサンプルデータ"
+                                   FontSize="14" FontWeight="SemiBold"
+                                   Margin="0,20,0,0" />
+                        <TextBlock Foreground="{StaticResource Foreground.Secondary}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,8,0,0">
+                            <Run Text="• マスター: Competition / Category / Round / Session / Class×2 / Team×3 / Driver / Transponder" /><LineBreak />
+                            <Run Text="• 計測ポイント: Loop ×6" /><LineBreak />
+                            <Run Text="• Select + Start" /><LineBreak />
+                            <Run Text="• 走行ループ 5 周ぶん: Passing + Standings を 1 秒間隔で送信" /><LineBreak />
+                            <Run Text="• 最後にチェッカードフラッグの Message" />
+                        </TextBlock>
+
+                        <TextBlock Text="最終送信フレーム" FontSize="14" FontWeight="SemiBold" Margin="0,20,0,0" />
+                        <TextBlock Text="{Binding LastSentInfo}"
+                                   Foreground="{StaticResource Foreground.Secondary}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,8,0,0"
+                                   FontFamily="Consolas, Courier New" />
+                    </StackPanel>
+                </ScrollViewer>
             </Border>
         </Grid>
     </DockPanel>

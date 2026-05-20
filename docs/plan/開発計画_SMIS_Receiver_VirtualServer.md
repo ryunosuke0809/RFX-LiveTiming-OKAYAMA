@@ -109,6 +109,20 @@ flowchart LR
 
 ### 3.2 保存フォーマット詳細
 
+> **保存先の方針** — Receiver / VirtualServer ともインストーラーを使わず、単一 `.exe` をユーザーが書き込み可能な任意フォルダ（例: `C:\MOLA_Timing\`）にコピーして運用する想定。ログ・SQLite はその exe と同じフォルダーの `logs/` と `data/` サブフォルダに置く。Program Files 配下は権限エラーになるため使用しない。USB に丸ごと持ち帰り可能。
+
+```
+C:\MOLA_Timing\
+  ├── MOLA_Timing-Receiver.exe
+  ├── logs\
+  │   ├── smis_raw_20260613.txt
+  │   ├── smis_parsed_20260613.txt
+  │   └── _meta\
+  │       └── smis_raw_20260613.json   (SHA-256 等のメタ情報)
+  └── data\
+      └── local.db                     (設定・主要テーブルのミラー、W2 後半)
+```
+
 **生 XML ログ** (`smis_raw_YYYYMMDD.txt`)
 
 各 SMIS メッセージは NULL 終端でストリームから到着するが、ファイル保存時はテキスト編集可能にしたいので 1 メッセージ 1 行にする:
@@ -138,7 +152,7 @@ XML 本体に含まれるタブ・改行は `\t`・`\n` にエスケープする
 | Connection | smis.port | `5000` | SMIS サーバーポート |
 | Connection | smis.autoReconnect | `true` | 自動再接続 |
 | Connection | smis.reconnectMaxIntervalSec | `30` | 再接続間隔上限 |
-| Logging | log.outputDir | `%AppData%/MOLA_Timing-Receiver/logs` | 出力ディレクトリ |
+| Logging | log.outputDir | `<exeフォルダ>/logs` | 出力ディレクトリ（既定は exe と同じ場所の `logs/` サブフォルダ） |
 | Logging | log.format | `Both` | `RawOnly` / `ParsedOnly` / `Both` |
 | Logging | log.rotation | `Daily` | `Daily` / `Session` / `DailyAndSession` |
 | Logging | log.fileExtension | `txt` | `txt` / `jsonl` |
