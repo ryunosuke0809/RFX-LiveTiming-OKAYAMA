@@ -41,10 +41,11 @@ public partial class SettingsDialog : Window
         MaxFileSizeBox.Text = settings.Logging.MaxFileSizeMb.ToString(CultureInfo.InvariantCulture);
         UsbMirrorPathBox.Text = settings.Logging.UsbMirrorPath;
 
-        // ===== WebSocket =====
-        WsEnabledBox.IsChecked = settings.WebSocket.Enabled;
-        WsPortBox.Text = settings.WebSocket.Port.ToString(CultureInfo.InvariantCulture);
-        WsBindAllBox.IsChecked = settings.WebSocket.BindAllInterfaces;
+        // ===== クラウド配信 =====
+        CloudEnabledBox.IsChecked = settings.Cloud.Enabled;
+        CloudUrlBox.Text = settings.Cloud.IngestUrl;
+        CloudTokenBox.Text = settings.Cloud.Token;
+        CloudCircuitIdBox.Text = settings.Cloud.CircuitId;
     }
 
     /// <summary>OK で確定した設定。Cancel 時は null。</summary>
@@ -111,12 +112,25 @@ public partial class SettingsDialog : Window
             return false;
         }
 
-        // WebSocket
-        if (!TryParsePort(WsPortBox.Text, out int wsPort))
+        // クラウド配信
+        string cloudUrl = (CloudUrlBox.Text ?? string.Empty).Trim();
+        bool cloudEnabled = CloudEnabledBox.IsChecked == true;
+        if (cloudEnabled)
         {
-            error = "WebSocket ポートは 1〜65535 の整数で入力してください。";
-            focusField = nameof(WsPortBox);
-            return false;
+            if (string.IsNullOrEmpty(cloudUrl)
+                || !(cloudUrl.StartsWith("ws://", StringComparison.OrdinalIgnoreCase)
+                     || cloudUrl.StartsWith("wss://", StringComparison.OrdinalIgnoreCase)))
+            {
+                error = "クラウド配信を有効にする場合は ws:// または wss:// で始まる URL を指定してください。";
+                focusField = nameof(CloudUrlBox);
+                return false;
+            }
+        }
+
+        string circuitId = (CloudCircuitIdBox.Text ?? string.Empty).Trim();
+        if (string.IsNullOrEmpty(circuitId))
+        {
+            circuitId = "okayama";
         }
 
         string accent = (AccentColorBox.Text ?? string.Empty).Trim();
@@ -151,11 +165,17 @@ public partial class SettingsDialog : Window
                 MaxFileSizeMb = maxFileMb,
                 UsbMirrorPath = (UsbMirrorPathBox.Text ?? string.Empty).Trim(),
             },
-            WebSocket = new WebSocketSettings
+            // WebSocket (LAN ローカル配信) は今回 UI を出さずに既存値を保持する。
+            WebSocket = _input.WebSocket,
+            Cloud = new CloudSettings
             {
-                Enabled = WsEnabledBox.IsChecked == true,
-                Port = wsPort,
-                BindAllInterfaces = WsBindAllBox.IsChecked == true,
+                Enabled = cloudEnabled,
+                IngestUrl = cloudUrl,
+                Token = (CloudTokenBox.Text ?? string.Empty).Trim(),
+                CircuitId = circuitId,
+                OfflineQueueLimit = _input.Cloud.OfflineQueueLimit,
+                InitialReconnectDelayMs = _input.Cloud.InitialReconnectDelayMs,
+                MaxReconnectDelayMs = _input.Cloud.MaxReconnectDelayMs,
             },
         };
         return true;

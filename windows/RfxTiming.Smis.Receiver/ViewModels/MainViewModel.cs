@@ -4,6 +4,7 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using RfxTiming.Smis.Cloud;
 using RfxTiming.Smis.Logging;
 using RfxTiming.Smis.Messages;
 using RfxTiming.Smis.Networking;
@@ -29,6 +30,7 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
 
     private readonly DispatcherTimer _uiRefreshTimer;
     private ReceiverService? _service;
+    private CloudUploaderService? _cloudUploader;
 
     public MainViewModel()
     {
@@ -93,6 +95,14 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
     [ObservableProperty] private bool _autoReconnect = true;
     [ObservableProperty] private string _connectionEndpointText = "127.0.0.1:50000";
 
+    // ===== Cloud uploader =====
+    [ObservableProperty] private string _cloudStatusText = "OFF";
+    [ObservableProperty] private Brush _cloudStatusBrush = BrushDisabled;
+    [ObservableProperty] private string _cloudEndpointText = string.Empty;
+    [ObservableProperty] private long _cloudSentCount;
+    [ObservableProperty] private long _cloudQueueDepth;
+    [ObservableProperty] private long _cloudFailedCount;
+
     /// <summary>設定変更後に呼び出して UI に同期するためのフック。</summary>
     public void ApplyConnectionFromSettings()
     {
@@ -128,6 +138,22 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
 
             await _service.StartAsync().ConfigureAwait(true);
 
+            // クラウド配信を有効化していれば、Receiver と同タイミングで起動。
+            if (Settings.Cloud.Enabled)
+            {
+                _cloudUploader = new CloudUploaderService(Settings.Cloud);
+                _cloudUploader.StateChanged += OnCloudStateChanged;
+                _cloudUploader.ErrorOccurred += OnCloudErrorOccurred;
+                CloudEndpointText = Settings.Cloud.IngestUrl;
+                await _cloudUploader.StartAsync().ConfigureAwait(true);
+            }
+            else
+            {
+                CloudEndpointText = string.Empty;
+                CloudStatusText = "OFF";
+                CloudStatusBrush = BrushDisabled;
+            }
+
             IsRunning = true;
             CurrentRawLogPath = _service.CurrentRawLogPath ?? "（未確定）";
             CurrentParsedLogPath = _service.CurrentParsedLogPath ?? "（未確定）";
@@ -148,6 +174,10 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
         try
         {
             await _service.DisposeAsync().ConfigureAwait(true);
+            if (_cloudUploader is not null)
+            {
+                await _cloudUploader.DisposeAsync().ConfigureAwait(true);
+            }
         }
         catch (Exception ex)
         {
@@ -157,10 +187,13 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
         finally
         {
             _service = null;
+            _cloudUploader = null;
             IsRunning = false;
             SetReceiveStageBrush(StageStatus.Idle);
             SetParseStageBrush(StageStatus.Idle);
             SetLogStageBrush(StageStatus.Idle);
+            CloudStatusText = "OFF";
+            CloudStatusBrush = BrushDisabled;
             UpdateHeadline(StageStatus.Idle, "待機中");
         }
     }
@@ -268,9 +301,47 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
 
     private void OnMessageReceived(object? sender, SmisMessage message)
     {
+        // クラウド配信が有効ならキューへ。失敗してもローカルログは確実に残るので捕捉のみで握りつぶす。
+        try { _cloudUploader?.Enqueue(message); }
+        catch (Exception ex) { LastMessageInfo = $"クラウド転送エラー: {ex.Message}"; }
+
         Application.Current?.Dispatcher.Invoke(() =>
         {
             LastMessageInfo = $"最新: {message.GetType().Name}";
+        });
+    }
+
+    private void OnCloudStateChanged(object? sender, CloudConnectionState state)
+    {
+        Application.Current?.Dispatcher.Invoke(() =>
+        {
+            switch (state)
+            {
+                case CloudConnectionState.Disabled:
+                    CloudStatusText = "OFF";
+                    CloudStatusBrush = BrushDisabled;
+                    break;
+                case CloudConnectionState.Connecting:
+                    CloudStatusText = "接続中…";
+                    CloudStatusBrush = BrushWarming;
+                    break;
+                case CloudConnectionState.Connected:
+                    CloudStatusText = "配信中";
+                    CloudStatusBrush = BrushActive;
+                    break;
+                case CloudConnectionState.Reconnecting:
+                    CloudStatusText = "再接続待機";
+                    CloudStatusBrush = BrushWarning;
+                    break;
+            }
+        });
+    }
+
+    private void OnCloudErrorOccurred(object? sender, Exception ex)
+    {
+        Application.Current?.Dispatcher.Invoke(() =>
+        {
+            LastMessageInfo = $"クラウド: {ex.Message}";
         });
     }
 
@@ -297,6 +368,19 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
             ? at.ToString("HH:mm:ss.fff")
             : "—";
         LogRotationCount = _service.LogRotationCount;
+
+        if (_cloudUploader is not null)
+        {
+            CloudSentCount = _cloudUploader.SentCount;
+            CloudQueueDepth = _cloudUploader.QueueDepth;
+            CloudFailedCount = _cloudUploader.FailedCount;
+        }
+        else
+        {
+            CloudSentCount = 0;
+            CloudQueueDepth = 0;
+            CloudFailedCount = 0;
+        }
 
         // ロールオーバーで Writer が差し替わったあとは Service の現行パスへ追従
         string? rawNow = _service.CurrentRawLogPath;

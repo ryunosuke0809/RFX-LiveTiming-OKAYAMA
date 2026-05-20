@@ -25,8 +25,11 @@ public sealed class UserSettings
     /// <summary>ログ出力に関する設定。</summary>
     public LoggingSettings Logging { get; set; } = new();
 
-    /// <summary>WebSocket 配信に関する設定 (Phase 2 で利用)。</summary>
+    /// <summary>ローカル LAN 向け WebSocket 配信に関する設定 (Phase 4 で本格利用)。</summary>
     public WebSocketSettings WebSocket { get; set; } = new();
+
+    /// <summary>クラウドサーバーへの転送設定 (Phase 2: 6 月本番テスト対応)。</summary>
+    public CloudSettings Cloud { get; set; } = new();
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -138,7 +141,7 @@ public sealed class LoggingSettings
     public string UsbMirrorPath { get; set; } = string.Empty;
 }
 
-/// <summary>WebSocket 配信設定 (Phase 2)。</summary>
+/// <summary>ローカル LAN 向け WebSocket 配信設定 (Phase 4 で本格運用)。</summary>
 public sealed class WebSocketSettings
 {
     /// <summary>WebSocket 配信を有効にする。</summary>
@@ -149,4 +152,47 @@ public sealed class WebSocketSettings
 
     /// <summary>LAN 内クライアント向けに 0.0.0.0 でバインドする。false なら 127.0.0.1。</summary>
     public bool BindAllInterfaces { get; set; } = false;
+}
+
+/// <summary>
+/// クラウドサーバーへの転送設定。
+/// Receiver が解析済 SMIS メッセージを WebSocket 経由でクラウドへ送り、
+/// クラウド側がフロントエンドへブロードキャストする構成。
+/// 認証は <c>Authorization: Bearer {Token}</c> ヘッダーで行う。
+/// </summary>
+public sealed class CloudSettings
+{
+    /// <summary>クラウドへの転送を有効にする。</summary>
+    public bool Enabled { get; set; } = false;
+
+    /// <summary>
+    /// クラウドの ingest エンドポイント URL。
+    /// 例: <c>wss://livetiming.example.com/ingest</c>。
+    /// 開発時は <c>ws://localhost:4000/ingest</c>。
+    /// </summary>
+    public string IngestUrl { get; set; } = "ws://localhost:4000/ingest";
+
+    /// <summary>
+    /// 共有シークレットトークン (Bearer)。
+    /// クラウド側で <c>RECEIVER_INGEST_TOKEN</c> 環境変数と一致するか検証される。
+    /// </summary>
+    public string Token { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 送信元サーキット ID (例: <c>okayama</c>)。
+    /// クラウドが複数サーキットを束ねる際の名前空間として使う。
+    /// </summary>
+    public string CircuitId { get; set; } = "okayama";
+
+    /// <summary>
+    /// クラウド転送に失敗したメッセージを最大何件まで内部キューに保持するか。
+    /// この件数を超えるとオフライン時に古いものから破棄される (生 XML ログは保持)。
+    /// </summary>
+    public int OfflineQueueLimit { get; set; } = 5000;
+
+    /// <summary>切断時の初期再接続待機 (ms)。</summary>
+    public int InitialReconnectDelayMs { get; set; } = 1000;
+
+    /// <summary>切断時の最大再接続待機 (ms)。</summary>
+    public int MaxReconnectDelayMs { get; set; } = 30000;
 }
