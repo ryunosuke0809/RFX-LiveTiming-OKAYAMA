@@ -21,7 +21,7 @@ public sealed class JsonlSmisLogWriter : IAsyncDisposable, IDisposable
     };
 
     private readonly StreamWriter _writer;
-    private readonly Lock _gate = new();
+    private readonly object _gate = new();
     private bool _disposed;
 
     public JsonlSmisLogWriter(string filePath)

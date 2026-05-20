@@ -19,9 +19,11 @@
         <!-- メニューバー -->
         <Menu DockPanel.Dock="Top">
             <MenuItem Header="_File">
-                <MenuItem Header="ログファイルから再生 (W4 で実装)" IsEnabled="False" />
+                <MenuItem Header="ログファイルから再生..."
+                          Command="{Binding ShowComingSoonCommand}"
+                          CommandParameter="ログファイル再生" />
                 <Separator />
-                <MenuItem Header="終了 (_X)" />
+                <MenuItem Header="終了 (_X)" Command="{Binding ExitAppCommand}" />
             </MenuItem>
             <MenuItem Header="_Playback">
                 <MenuItem Header="サーバー起動 (_R)" Command="{Binding StartServerCommand}" />
@@ -31,9 +33,11 @@
                 <MenuItem Header="停止 (_S)" Command="{Binding StopPlaybackCommand}" />
             </MenuItem>
             <MenuItem Header="_Help">
-                <MenuItem Header="使い方 (_H)" />
+                <MenuItem Header="使い方 (_H)"
+                          Command="{Binding ShowComingSoonCommand}"
+                          CommandParameter="使い方ガイド" />
                 <Separator />
-                <MenuItem Header="バージョン情報 (_A)..." />
+                <MenuItem Header="バージョン情報 (_A)..." Command="{Binding ShowAboutCommand}" />
             </MenuItem>
         </Menu>
 

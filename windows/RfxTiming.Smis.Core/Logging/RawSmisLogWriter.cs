@@ -16,7 +16,9 @@ namespace RfxTiming.Smis.Logging;
 public sealed class RawSmisLogWriter : IAsyncDisposable, IDisposable
 {
     private readonly StreamWriter _writer;
-    private readonly Lock _gate = new();
+    // .NET 9 の System.Threading.Lock は利用可能だが、書き込み頻度が低いため
+    // 互換性の高い object モニタロックで十分。複数 await の合間に短時間だけロックを保持する。
+    private readonly object _gate = new();
     private bool _disposed;
 
     /// <summary>

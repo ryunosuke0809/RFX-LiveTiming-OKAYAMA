@@ -17,6 +17,21 @@
             <SolidColorBrush x:Key="Accent.Stopped" Color="#9BA1A6" />
             <SolidColorBrush x:Key="Accent.Paused" Color="#D29922" />
 
+            <!-- SystemColors override (詳細は Receiver/App.xaml のコメント参照) -->
+            <SolidColorBrush x:Key="{x:Static SystemColors.MenuBrushKey}" Color="#1A1F2E" />
+            <SolidColorBrush x:Key="{x:Static SystemColors.MenuBarBrushKey}" Color="#1A1F2E" />
+            <SolidColorBrush x:Key="{x:Static SystemColors.MenuTextBrushKey}" Color="#E6EDF3" />
+            <SolidColorBrush x:Key="{x:Static SystemColors.MenuHighlightBrushKey}" Color="#1F6FEB" />
+            <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#1F6FEB" />
+            <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="{x:Static SystemColors.ControlBrushKey}" Color="#1A1F2E" />
+            <SolidColorBrush x:Key="{x:Static SystemColors.ControlTextBrushKey}" Color="#E6EDF3" />
+            <SolidColorBrush x:Key="{x:Static SystemColors.GrayTextBrushKey}" Color="#6B7280" />
+            <SolidColorBrush x:Key="{x:Static SystemColors.WindowBrushKey}" Color="#0F1419" />
+            <SolidColorBrush x:Key="{x:Static SystemColors.WindowTextBrushKey}" Color="#E6EDF3" />
+            <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightBrushKey}" Color="#2A3142" />
+            <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightTextBrushKey}" Color="#E6EDF3" />
+
             <!-- ===== Menu / MenuItem ===== -->
             <Style TargetType="{x:Type Menu}">
                 <Setter Property="Background" Value="{StaticResource Background.Panel}" />

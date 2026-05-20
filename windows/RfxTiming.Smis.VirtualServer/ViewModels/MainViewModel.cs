@@ -195,6 +195,36 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
         });
     }
 
+    [RelayCommand]
+    private void ShowComingSoon(string? featureName)
+    {
+        string name = string.IsNullOrEmpty(featureName) ? "この機能" : featureName;
+        MessageBox.Show(
+            $"{name} は W4 で実装予定です。\n\n現状は組み込みサンプルの再生のみ利用可能です。",
+            "MOLA_Timing-VirtualServer",
+            MessageBoxButton.OK,
+            MessageBoxImage.Information);
+    }
+
+    [RelayCommand]
+    private void ShowAbout()
+    {
+        MessageBox.Show(
+            "MOLA_Timing-VirtualServer\n" +
+            "Version 0.1.0\n\n" +
+            "保存ログを SMIS 互換 TCP プロトコルで再配信する開発用アプリ。\n\n" +
+            "Copyright (c) 2026 RFX Timing",
+            "バージョン情報",
+            MessageBoxButton.OK,
+            MessageBoxImage.Information);
+    }
+
+    [RelayCommand]
+    private void ExitApp()
+    {
+        Application.Current?.Shutdown();
+    }
+
     public async ValueTask DisposeAsync()
     {
         if (_service is not null)

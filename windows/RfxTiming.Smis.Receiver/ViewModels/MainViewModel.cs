@@ -6,6 +6,7 @@ using RfxTiming.Smis.Logging;
 using RfxTiming.Smis.Messages;
 using RfxTiming.Smis.Networking;
 using RfxTiming.Smis.Receiver.Services;
+using RfxTiming.Smis.Receiver.Views;
 
 namespace RfxTiming.Smis.Receiver.ViewModels;
 
@@ -52,6 +53,9 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
     private int _smisPort = DefaultPort;
 
     [ObservableProperty]
+    private bool _autoReconnect = true;
+
+    [ObservableProperty]
     private string _lastMessageInfo = "メッセージ未受信";
 
     private bool CanConnect() => !IsRunning;
@@ -65,7 +69,7 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
             var options = new SmisTcpClientOptions(
                 Host: SmisHost,
                 Port: SmisPort,
-                AutoReconnect: true);
+                AutoReconnect: AutoReconnect);
 
             _service = new ReceiverService(options);
             _service.StateChanged += OnStateChanged;
@@ -125,6 +129,54 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
             MessageBox.Show($"フォルダーを開けませんでした: {ex.Message}", "MOLA_Timing-Receiver",
                 MessageBoxButton.OK, MessageBoxImage.Warning);
         }
+    }
+
+    [RelayCommand]
+    private void OpenConnectionSettings()
+    {
+        var dialog = new ConnectionSettingsDialog
+        {
+            Owner = Application.Current?.MainWindow,
+        };
+        dialog.LoadValues(SmisHost, SmisPort, AutoReconnect);
+
+        if (dialog.ShowDialog() == true)
+        {
+            SmisHost = dialog.Host;
+            SmisPort = dialog.Port;
+            AutoReconnect = dialog.AutoReconnect;
+        }
+    }
+
+    [RelayCommand]
+    private void ShowComingSoon(string? featureName)
+    {
+        string name = string.IsNullOrEmpty(featureName) ? "この機能" : featureName;
+        MessageBox.Show(
+            $"{name} は W2 末で実装予定です。\n\n現状は接続設定のみ利用可能です。",
+            "MOLA_Timing-Receiver",
+            MessageBoxButton.OK,
+            MessageBoxImage.Information);
+    }
+
+    [RelayCommand]
+    private void ShowAbout()
+    {
+        MessageBox.Show(
+            "MOLA_Timing-Receiver\n" +
+            "Version 0.1.0\n\n" +
+            "岡山国際サーキット計時室常駐の SMIS 受信・ロガー・ローカル WS 配信アプリ。\n" +
+            "内部実装は SMIS プロトコル準拠。\n\n" +
+            "Copyright (c) 2026 RFX Timing",
+            "バージョン情報",
+            MessageBoxButton.OK,
+            MessageBoxImage.Information);
+    }
+
+    [RelayCommand]
+    private void ExitApp()
+    {
+        Application.Current?.Shutdown();
     }
 
     private void OnStateChanged(object? sender, SmisTcpClient.ConnectionState state)

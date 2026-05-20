@@ -167,7 +167,8 @@ public sealed class SmisTcpClient
     {
         try
         {
-            await Task.Delay(delayMs, _timeProvider, cancellationToken).ConfigureAwait(false);
+            await Task.Delay(TimeSpan.FromMilliseconds(delayMs), _timeProvider, cancellationToken)
+                .ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {

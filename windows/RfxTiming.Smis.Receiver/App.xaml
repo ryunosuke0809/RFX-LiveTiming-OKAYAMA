@@ -17,6 +17,27 @@
             <SolidColorBrush x:Key="Accent.Disconnected" Color="#F85149" />
             <SolidColorBrush x:Key="Accent.Reconnecting" Color="#D29922" />
 
+            <!--
+              ===== SystemColors override =====
+              Menu のドロップダウン Popup や ContextMenu の地色は
+              WPF が SystemColors.* を直接参照するため、ResourceDictionary に
+              同じキーで再定義することでアプリ内のみ上書きできる。
+              これをしないと dark テーマでも Popup だけ白く残る。
+            -->
+            <SolidColorBrush x:Key="{x:Static SystemColors.MenuBrushKey}" Color="#1A1F2E" />
+            <SolidColorBrush x:Key="{x:Static SystemColors.MenuBarBrushKey}" Color="#1A1F2E" />
+            <SolidColorBrush x:Key="{x:Static SystemColors.MenuTextBrushKey}" Color="#E6EDF3" />
+            <SolidColorBrush x:Key="{x:Static SystemColors.MenuHighlightBrushKey}" Color="#1F6FEB" />
+            <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#1F6FEB" />
+            <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="{x:Static SystemColors.ControlBrushKey}" Color="#1A1F2E" />
+            <SolidColorBrush x:Key="{x:Static SystemColors.ControlTextBrushKey}" Color="#E6EDF3" />
+            <SolidColorBrush x:Key="{x:Static SystemColors.GrayTextBrushKey}" Color="#6B7280" />
+            <SolidColorBrush x:Key="{x:Static SystemColors.WindowBrushKey}" Color="#0F1419" />
+            <SolidColorBrush x:Key="{x:Static SystemColors.WindowTextBrushKey}" Color="#E6EDF3" />
+            <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightBrushKey}" Color="#2A3142" />
+            <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightTextBrushKey}" Color="#E6EDF3" />
+
             <!-- ===== Menu / MenuItem ダークテーマ ===== -->
             <Style TargetType="{x:Type Menu}">
                 <Setter Property="Background" Value="{StaticResource Background.Panel}" />
@@ -118,6 +139,14 @@
                 <Setter Property="BorderThickness" Value="1" />
                 <Setter Property="Padding" Value="6,2" />
                 <Setter Property="CaretBrush" Value="{StaticResource Foreground.Primary}" />
+                <Setter Property="SelectionBrush" Value="{StaticResource Background.Selected}" />
+            </Style>
+
+            <!-- CheckBox -->
+            <Style TargetType="{x:Type CheckBox}">
+                <Setter Property="Foreground" Value="{StaticResource Foreground.Primary}" />
+                <Setter Property="Background" Value="{StaticResource Background.Hover}" />
+                <Setter Property="BorderBrush" Value="{StaticResource Border.Subtle}" />
             </Style>
 
             <!-- ===== StatusBar ===== -->
