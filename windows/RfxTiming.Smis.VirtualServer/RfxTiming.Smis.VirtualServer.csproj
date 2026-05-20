@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>RfxTiming.Smis.VirtualServer</RootNamespace>
+    <AssemblyName>MOLA_Timing-VirtualServer</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Description>
+      MOLA_Timing-VirtualServer — 開発機で保存ログを SMIS 互換 TCP プロトコルで再配信するアプリ。
+    </Description>
+    <UseWindowsForms>false</UseWindowsForms>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\RfxTiming.Smis.Core\RfxTiming.Smis.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.3.2" />
+  </ItemGroup>
+
+</Project>

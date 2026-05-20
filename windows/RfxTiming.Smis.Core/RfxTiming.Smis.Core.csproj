@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>RfxTiming.Smis</RootNamespace>
+    <AssemblyName>RfxTiming.Smis.Core</AssemblyName>
+    <Description>
+      SMIS (SEIKO Motorsports Information Service) protocol parser and DTO library.
+      Shared by MOLA_Timing-Receiver and MOLA_Timing-VirtualServer.
+    </Description>
+  </PropertyGroup>
+
+</Project>

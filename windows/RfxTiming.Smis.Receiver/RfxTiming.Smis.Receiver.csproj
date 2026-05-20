@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>RfxTiming.Smis.Receiver</RootNamespace>
+    <AssemblyName>MOLA_Timing-Receiver</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Description>
+      MOLA_Timing-Receiver — 岡山国際サーキット計時室常駐の SMIS 受信・ロガー・ローカル WS 配信アプリ。
+    </Description>
+    <UseWindowsForms>false</UseWindowsForms>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\RfxTiming.Smis.Core\RfxTiming.Smis.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.3.2" />
+  </ItemGroup>
+
+</Project>

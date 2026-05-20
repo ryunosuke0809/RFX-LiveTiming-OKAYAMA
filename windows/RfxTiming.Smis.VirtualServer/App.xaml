@@ -1,0 +1,16 @@
+<Application x:Class="RfxTiming.Smis.VirtualServer.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             StartupUri="Views/MainWindow.xaml">
+    <Application.Resources>
+        <ResourceDictionary>
+            <SolidColorBrush x:Key="Background.Window" Color="#0F1419" />
+            <SolidColorBrush x:Key="Background.Panel" Color="#1A1F2E" />
+            <SolidColorBrush x:Key="Foreground.Primary" Color="#E6EDF3" />
+            <SolidColorBrush x:Key="Foreground.Secondary" Color="#9BA1A6" />
+            <SolidColorBrush x:Key="Accent.Playing" Color="#3FB950" />
+            <SolidColorBrush x:Key="Accent.Stopped" Color="#9BA1A6" />
+            <SolidColorBrush x:Key="Accent.Paused" Color="#D29922" />
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

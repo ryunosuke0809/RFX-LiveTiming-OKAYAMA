@@ -1,0 +1,120 @@
+<Window x:Class="RfxTiming.Smis.Receiver.Views.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:RfxTiming.Smis.Receiver.ViewModels"
+        Title="MOLA_Timing-Receiver"
+        Width="1280" Height="800"
+        MinWidth="900" MinHeight="600"
+        Background="{StaticResource Background.Window}"
+        Foreground="{StaticResource Foreground.Primary}"
+        FontFamily="Segoe UI, Yu Gothic UI, Meiryo UI"
+        FontSize="13"
+        TextOptions.TextFormattingMode="Display"
+        TextOptions.TextRenderingMode="ClearType">
+
+    <Window.DataContext>
+        <vm:MainViewModel />
+    </Window.DataContext>
+
+    <DockPanel LastChildFill="True">
+
+        <!-- メニューバー -->
+        <Menu DockPanel.Dock="Top" Background="{StaticResource Background.Panel}"
+              Foreground="{StaticResource Foreground.Primary}">
+            <MenuItem Header="_File">
+                <MenuItem Header="ログフォルダを開く (_O)" />
+                <MenuItem Header="ログを USB にエクスポート (_E)" />
+                <Separator />
+                <MenuItem Header="終了 (_X)" />
+            </MenuItem>
+            <MenuItem Header="_Settings">
+                <MenuItem Header="接続設定 (_C)..." />
+                <MenuItem Header="保存設定 (_L)..." />
+                <MenuItem Header="配信設定 (_D)..." />
+                <MenuItem Header="クラウド送信 (_U)..." />
+                <MenuItem Header="アラート (_A)..." />
+            </MenuItem>
+            <MenuItem Header="_View">
+                <MenuItem Header="ダッシュボード (_D)" IsChecked="True" />
+                <MenuItem Header="ライブログ (_L)" />
+                <MenuItem Header="最新 Standings (_S)" />
+            </MenuItem>
+            <MenuItem Header="_Help">
+                <MenuItem Header="SMIS プロトコル概要 (_S)" />
+                <MenuItem Header="トラブルシュート (_T)" />
+                <Separator />
+                <MenuItem Header="バージョン情報 (_A)..." />
+            </MenuItem>
+        </Menu>
+
+        <!-- ツールバー -->
+        <ToolBarTray DockPanel.Dock="Top" Background="{StaticResource Background.Panel}" IsLocked="True">
+            <ToolBar Background="Transparent">
+                <Button Content="接続" Padding="12,4" />
+                <Button Content="切断" Padding="12,4" />
+                <Separator />
+                <Button Content="記録開始" Padding="12,4" />
+                <Button Content="記録停止" Padding="12,4" />
+                <Separator />
+                <Button Content="設定" Padding="12,4" />
+            </ToolBar>
+        </ToolBarTray>
+
+        <!-- ステータスバー -->
+        <StatusBar DockPanel.Dock="Bottom"
+                   Background="{StaticResource Background.Panel}"
+                   Foreground="{StaticResource Foreground.Secondary}">
+            <StatusBarItem>
+                <StackPanel Orientation="Horizontal">
+                    <Ellipse Width="10" Height="10" Margin="0,0,6,0"
+                             Fill="{Binding ConnectionStatusBrush}" />
+                    <TextBlock Text="{Binding ConnectionStatusText}" />
+                </StackPanel>
+            </StatusBarItem>
+            <Separator />
+            <StatusBarItem Content="{Binding CurrentOutputFile, StringFormat='出力: {0}'}" />
+            <StatusBarItem HorizontalAlignment="Right">
+                <TextBlock Text="{Binding TotalMessageCount, StringFormat='本日: {0} 件'}" />
+            </StatusBarItem>
+        </StatusBar>
+
+        <!-- メイン領域 (W2 でリアルタイムダッシュボードを実装) -->
+        <Grid Margin="16">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <TextBlock Grid.Row="0"
+                       Text="MOLA_Timing-Receiver"
+                       FontSize="24" FontWeight="SemiBold"
+                       Margin="0,0,0,8" />
+
+            <Border Grid.Row="1"
+                    Background="{StaticResource Background.Panel}"
+                    CornerRadius="6"
+                    Padding="20">
+                <StackPanel>
+                    <TextBlock Text="セットアップ進行中"
+                               FontSize="16" FontWeight="SemiBold"
+                               Foreground="{StaticResource Foreground.Primary}" />
+                    <TextBlock Text="このウィンドウは W1 のスケルトンです。W2 でメッセージ種別カウント、最新 Standings、ライブログビューを実装します。"
+                               Foreground="{StaticResource Foreground.Secondary}"
+                               TextWrapping="Wrap"
+                               Margin="0,8,0,0" />
+                    <TextBlock Foreground="{StaticResource Foreground.Secondary}"
+                               TextWrapping="Wrap"
+                               Margin="0,16,0,0">
+                        <Run Text="プロトコル仕様:" FontWeight="SemiBold" />
+                        <LineBreak />
+                        <Run Text="• 内部実装は SMIS プロトコル (docs/Specification/計測データ仕様書_20200220.pdf) 準拠" />
+                        <LineBreak />
+                        <Run Text="• 対外名は MOLA_Timing-Receiver" />
+                        <LineBreak />
+                        <Run Text="• ログ保存: smis_raw_YYYYMMDD.txt (生 XML) + smis_parsed_YYYYMMDD.txt (JSONL)" />
+                    </TextBlock>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </DockPanel>
+</Window>

@@ -1,0 +1,149 @@
+<Window x:Class="RfxTiming.Smis.VirtualServer.Views.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:RfxTiming.Smis.VirtualServer.ViewModels"
+        Title="MOLA_Timing-VirtualServer"
+        Width="1280" Height="800"
+        MinWidth="900" MinHeight="600"
+        Background="{StaticResource Background.Window}"
+        Foreground="{StaticResource Foreground.Primary}"
+        FontFamily="Segoe UI, Yu Gothic UI, Meiryo UI"
+        FontSize="13"
+        TextOptions.TextFormattingMode="Display"
+        TextOptions.TextRenderingMode="ClearType">
+
+    <Window.DataContext>
+        <vm:MainViewModel />
+    </Window.DataContext>
+
+    <DockPanel LastChildFill="True">
+
+        <!-- メニューバー -->
+        <Menu DockPanel.Dock="Top" Background="{StaticResource Background.Panel}"
+              Foreground="{StaticResource Foreground.Primary}">
+            <MenuItem Header="_File">
+                <MenuItem Header="ログファイルを開く (_O)..." />
+                <MenuItem Header="プレイリストを保存 (_S)..." />
+                <Separator />
+                <MenuItem Header="終了 (_X)" />
+            </MenuItem>
+            <MenuItem Header="_Playback">
+                <MenuItem Header="再生 (_P)" />
+                <MenuItem Header="一時停止 (_A)" />
+                <MenuItem Header="停止 (_S)" />
+                <Separator />
+                <MenuItem Header="シーク (_K)..." />
+                <MenuItem Header="ループ区間設定 (_L)..." />
+            </MenuItem>
+            <MenuItem Header="_Settings">
+                <MenuItem Header="配信ポート (_P)..." />
+                <MenuItem Header="再生速度 (_V)..." />
+                <MenuItem Header="複数クライアント許可 (_M)" IsCheckable="True" IsChecked="True" />
+            </MenuItem>
+            <MenuItem Header="_Help">
+                <MenuItem Header="使い方 (_H)" />
+                <Separator />
+                <MenuItem Header="バージョン情報 (_A)..." />
+            </MenuItem>
+        </Menu>
+
+        <!-- ツールバー -->
+        <ToolBarTray DockPanel.Dock="Top" Background="{StaticResource Background.Panel}" IsLocked="True">
+            <ToolBar Background="Transparent">
+                <Button Content="ログを開く" Padding="12,4" />
+                <Separator />
+                <Button Content="▶ 再生" Padding="12,4" />
+                <Button Content="⏸ 一時停止" Padding="12,4" />
+                <Button Content="⏹ 停止" Padding="12,4" />
+                <Separator />
+                <TextBlock Text="速度:" VerticalAlignment="Center" Margin="6,0" />
+                <ComboBox Width="80" SelectedIndex="2">
+                    <ComboBoxItem Content="0.5x" />
+                    <ComboBoxItem Content="1x" />
+                    <ComboBoxItem Content="2x" />
+                    <ComboBoxItem Content="5x" />
+                    <ComboBoxItem Content="10x" />
+                    <ComboBoxItem Content="Max" />
+                </ComboBox>
+                <Separator />
+                <ToggleButton Content="🔁 ループ" Padding="12,4" />
+            </ToolBar>
+        </ToolBarTray>
+
+        <!-- ステータスバー -->
+        <StatusBar DockPanel.Dock="Bottom"
+                   Background="{StaticResource Background.Panel}"
+                   Foreground="{StaticResource Foreground.Secondary}">
+            <StatusBarItem>
+                <StackPanel Orientation="Horizontal">
+                    <Ellipse Width="10" Height="10" Margin="0,0,6,0"
+                             Fill="{Binding PlaybackStatusBrush}" />
+                    <TextBlock Text="{Binding PlaybackStatusText}" />
+                </StackPanel>
+            </StatusBarItem>
+            <Separator />
+            <StatusBarItem Content="{Binding LoadedLogFile, StringFormat='ログ: {0}'}" />
+            <StatusBarItem HorizontalAlignment="Right">
+                <TextBlock Text="{Binding ConnectedClientCount, StringFormat='接続クライアント: {0}'}" />
+            </StatusBarItem>
+        </StatusBar>
+
+        <!-- メイン領域 (W4-W5 で実装) -->
+        <Grid Margin="16">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <TextBlock Grid.Row="0"
+                       Text="MOLA_Timing-VirtualServer"
+                       FontSize="24" FontWeight="SemiBold"
+                       Margin="0,0,0,8" />
+
+            <!-- タイムラインスライダー (シーク用) -->
+            <Border Grid.Row="1"
+                    Background="{StaticResource Background.Panel}"
+                    CornerRadius="6"
+                    Padding="16"
+                    Margin="0,0,0,12">
+                <StackPanel>
+                    <TextBlock Text="タイムライン" FontWeight="SemiBold" Margin="0,0,0,6" />
+                    <Slider Minimum="0" Maximum="100" Value="0"
+                            IsSnapToTickEnabled="False"
+                            TickPlacement="None" />
+                    <Grid Margin="0,4,0,0">
+                        <TextBlock Text="00:00:00" Foreground="{StaticResource Foreground.Secondary}" />
+                        <TextBlock Text="--:--:--" Foreground="{StaticResource Foreground.Secondary}"
+                                   HorizontalAlignment="Right" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Row="2"
+                    Background="{StaticResource Background.Panel}"
+                    CornerRadius="6"
+                    Padding="20">
+                <StackPanel>
+                    <TextBlock Text="セットアップ進行中"
+                               FontSize="16" FontWeight="SemiBold" />
+                    <TextBlock Foreground="{StaticResource Foreground.Secondary}"
+                               TextWrapping="Wrap"
+                               Margin="0,8,0,0">
+                        <Run Text="このウィンドウは W1 のスケルトンです。" />
+                        <LineBreak />
+                        <Run Text="W4-W5 で以下を実装します:" />
+                        <LineBreak />
+                        <Run Text="• ログ読込 → TCP 配信 (SMIS 互換)" />
+                        <LineBreak />
+                        <Run Text="• 時刻通り再生・速度可変 (0.5x〜Max)・シーク・ループ" />
+                        <LineBreak />
+                        <Run Text="• マスターデータの先頭累積適用 (シーク時)" />
+                        <LineBreak />
+                        <Run Text="• 接続クライアント一覧、メッセージレートグラフ" />
+                    </TextBlock>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </DockPanel>
+</Window>

@@ -1,0 +1,51 @@
+# Build output
+bin/
+obj/
+out/
+publish/
+
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Rider
+.idea/
+*.DotSettings.user
+
+# VS Code
+.vscode/
+
+# NuGet
+*.nupkg
+**/packages/
+**/.nuget/
+
+# Test result
+TestResults/
+*.trx
+*.coverage
+*.coveragexml
+
+# Misc
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Application logs (do NOT commit captured SMIS logs)
+logs/
+*.log
+smis_raw_*.txt
+smis_parsed_*.txt
+local.db
+local.db-*
+
+# Published binaries
+*.exe
+*.dll
+*.pdb
+*.deps.json
+*.runtimeconfig.json
