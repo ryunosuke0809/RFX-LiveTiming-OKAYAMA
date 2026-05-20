@@ -23,11 +23,22 @@ export default function SplashScreen({ onFinish }: SplashScreenProps) {
     };
   }, [onFinish]);
 
+  // fade-out フェーズに入ったら即座に下層へタッチを通す。
+  // （onFinish 内で例外が起きても画面のタッチが塞がれないように）
+  const isFadingOut = phase === "fade-out";
+
   return (
     <div
       className={`fixed inset-0 z-[100] flex flex-col items-center justify-center bg-[#0a0a0d] transition-opacity duration-500 ${
-        phase === "fade-out" ? "opacity-0 pointer-events-none" : "opacity-100"
+        isFadingOut ? "opacity-0 pointer-events-none" : "opacity-100"
       }`}
+      onClick={() => {
+        // ユーザーが待ちきれずタップした場合はすぐに閉じる（モバイル UX 配慮）
+        if (!isFadingOut) {
+          setPhase("fade-out");
+          setTimeout(() => onFinish(), 400);
+        }
+      }}
     >
       {/* ロゴ */}
       <div

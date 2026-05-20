@@ -58,10 +58,23 @@ function randomTimeType(): TimeType {
 }
 
 export default function TimingPage() {
-  const [showSplash, setShowSplash] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return !sessionStorage.getItem("splash_shown");
-  });
+  // SSR と CSR で同じ初期値（false）にして hydration mismatch を防ぎ、
+  // クライアント側で sessionStorage を try/catch で参照する。
+  // iOS の Private モード等で sessionStorage が SecurityError を投げると、
+  // 初期化に失敗して SplashScreen がずっと表示され画面全体のタッチを塞ぐため。
+  const [showSplash, setShowSplash] = useState(false);
+
+  useEffect(() => {
+    try {
+      if (!sessionStorage.getItem("splash_shown")) {
+        setShowSplash(true);
+      }
+    } catch {
+      // sessionStorage が使えない環境では一度表示するが、確実に閉じるよう
+      // フェイルセーフのタイマーで強制的に閉じる。
+      setShowSplash(true);
+    }
+  }, []);
   const [sessionInfo, setSessionInfo] = useState<SessionInfo>(mockSessionInfo);
   const [standings, setStandings] = useState<Standing[]>(mockStandings);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -165,7 +178,11 @@ export default function TimingPage() {
 
   const handleSplashFinish = useCallback(() => {
     setShowSplash(false);
-    sessionStorage.setItem("splash_shown", "1");
+    try {
+      sessionStorage.setItem("splash_shown", "1");
+    } catch {
+      // Private mode 等で setItem が QuotaExceededError を投げても無視する
+    }
   }, []);
 
   return (

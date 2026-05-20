@@ -8,7 +8,7 @@
  * 同じくスムージング済みの `lapD` に沿って動く。ズームと回転は viewBox 中心を基準に <g> で適用。
  */
 
-import { useCallback, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import type { Standing } from "@/types/smis";
 import { getTeamByStanding, getClassByStanding } from "@/data/mock";
 import {
@@ -101,7 +101,12 @@ export default function OkayamaCircuitSvg({
   onMarkerClick,
   className = "",
 }: OkayamaCircuitSvgProps) {
-  const [geom, setGeom] = useState<OkayamaLapGeometry | null>(null);
+  // ジオメトリは純粋関数（SSR 時は document が無く null）なので useMemo で導出する。
+  // （useEffect + setState はカスケード再レンダーを誘発するため避ける）
+  const geom = useMemo<OkayamaLapGeometry | null>(
+    () => buildOkayamaLapGeometry(),
+    [],
+  );
   const [zoom, setZoom] = useState(ZOOM_DEFAULT);
   const [rotation, setRotation] = useState(0);
   const [pan, setPan] = useState<Vec2>({ x: 0, y: 0 });
@@ -113,10 +118,6 @@ export default function OkayamaCircuitSvg({
     moved: boolean;
   } | null>(null);
   const panBlockClickRef = useRef(false);
-
-  useLayoutEffect(() => {
-    setGeom(buildOkayamaLapGeometry());
-  }, []);
 
   const timing = geom?.timing;
   const samples = geom?.samples ?? [];
@@ -152,26 +153,39 @@ export default function OkayamaCircuitSvg({
     return { x: t.x, y: t.y };
   }, []);
 
+  // ポインターイベントは <svg> ではなくラッパーの <div>(HTMLElement) で受ける。
+  // iOS Safari は SVGSVGElement の setPointerCapture が不安定で、ドラッグ中の
+  // pointermove が届かず「タッチが効かない」ように見える症状の主因になる。
   const handlePointerDown = useCallback(
-    (e: React.PointerEvent<SVGSVGElement>) => {
+    (e: React.PointerEvent<HTMLDivElement>) => {
       if (e.button !== 0 && e.pointerType === "mouse") return;
       const start = screenToSvg(e.clientX, e.clientY);
       dragRef.current = { startSvg: start, panAtStart: pan, moved: false };
       panBlockClickRef.current = false;
-      (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
+      // setPointerCapture はドラッグ確定後にのみ取得する。
+      // ここで取得すると、軽いタップ時に pointerup/click が子要素(マシンマーカー)に
+      // 届かなくなり、タッチ操作が一切効かないように見える。
     },
     [pan, screenToSvg],
   );
 
   const handlePointerMove = useCallback(
-    (e: React.PointerEvent<SVGSVGElement>) => {
+    (e: React.PointerEvent<HTMLDivElement>) => {
       const drag = dragRef.current;
       if (!drag) return;
       const cur = screenToSvg(e.clientX, e.clientY);
       const dx = cur.x - drag.startSvg.x;
       const dy = cur.y - drag.startSvg.y;
       if (!drag.moved && Math.hypot(dx, dy) < PAN_DRAG_THRESHOLD) return;
-      drag.moved = true;
+      if (!drag.moved) {
+        // 閾値を初めて超えた瞬間にキャプチャ取得（ドラッグ確定）
+        drag.moved = true;
+        try {
+          e.currentTarget.setPointerCapture(e.pointerId);
+        } catch {
+          /* noop */
+        }
+      }
       panBlockClickRef.current = true;
       setPan({ x: drag.panAtStart.x + dx, y: drag.panAtStart.y + dy });
     },
@@ -179,12 +193,15 @@ export default function OkayamaCircuitSvg({
   );
 
   const handlePointerUp = useCallback(
-    (e: React.PointerEvent<SVGSVGElement>) => {
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      const wasDragging = dragRef.current?.moved ?? false;
       dragRef.current = null;
-      try {
-        (e.currentTarget as Element).releasePointerCapture?.(e.pointerId);
-      } catch {
-        /* noop */
+      if (wasDragging) {
+        try {
+          e.currentTarget.releasePointerCapture(e.pointerId);
+        } catch {
+          /* noop */
+        }
       }
       if (panBlockClickRef.current) {
         setTimeout(() => {
@@ -203,17 +220,24 @@ export default function OkayamaCircuitSvg({
     `translate(${-center.x} ${-center.y})`;
 
   return (
-    <div className={`relative w-full h-full overflow-hidden ${className}`}>
+    <div
+      className={`relative w-full h-full overflow-hidden select-none cursor-grab active:cursor-grabbing ${className}`}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
+      style={{
+        // touch-action: none をラッパー側に置くことで iOS Safari でも
+        // ブラウザの既定ジェスチャ（パン/ピンチ）に奪われずポインタを受け取れる。
+        touchAction: "none",
+      }}
+    >
       <svg
         ref={svgRef}
         viewBox={OKAYAMA_TRACK_VIEWBOX}
-        className="w-full h-full select-none touch-none"
+        className="w-full h-full select-none"
         preserveAspectRatio="xMidYMid meet"
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
-        style={{ cursor: dragRef.current ? "grabbing" : "grab" }}
+        style={{ touchAction: "none", pointerEvents: "auto" }}
       >
         <defs>
           <filter id="glow">
@@ -330,16 +354,8 @@ export default function OkayamaCircuitSvg({
                     />
                   ))}
                 </g>
-                {/* クレセント＋FL を視覚中心が labelPos に来るように左寄せ配置 */}
+                {/* FL を視覚中心が labelPos に来るように左寄せ配置 */}
                 <g transform={`translate(${labelPos.x} ${labelPos.y})`}>
-                  <path
-                    d="M -10 -8 A 10 10 0 0 1 -10 8"
-                    fill="none"
-                    stroke="#22c55e"
-                    strokeWidth={5}
-                    strokeLinecap="round"
-                    filter="url(#glow)"
-                  />
                   <text
                     x={6}
                     y={1}

@@ -22,8 +22,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -34,9 +33,9 @@ export default function RootLayout({
   return (
     <html
       lang="ja"
-      className={`${titillium.variable} ${robotoMono.variable} h-full antialiased`}
+      className={`${titillium.variable} ${robotoMono.variable} antialiased`}
     >
-      <body className="h-full flex flex-col bg-[#0c0c0f] text-zinc-200 overflow-hidden">
+      <body className="flex flex-col bg-[#0c0c0f] text-zinc-200 overflow-hidden app-shell">
         {children}
       </body>
     </html>
