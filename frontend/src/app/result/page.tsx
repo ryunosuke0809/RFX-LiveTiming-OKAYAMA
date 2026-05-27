@@ -191,9 +191,16 @@ export default function ResultPage() {
         </div>
       </header>
 
-      {/* メインコンテンツ */}
+      {/* メインコンテンツ
+          Individual タブはラップテーブルを画面いっぱいに伸ばしたいので overflow-hidden + flex で
+          子側 (IndividualView) がスクロール領域を管理する。
+          Classification / Calendar は縦に長いコンテンツを外側スクロールで読む。 */}
       <div
-        className="flex-1 overflow-auto transition-all duration-300"
+        className={`flex-1 transition-all duration-300 ${
+          activeTab === "individual"
+            ? "overflow-hidden flex flex-col min-h-0"
+            : "overflow-auto"
+        }`}
         style={{ paddingLeft: menuOpen ? "220px" : "40px" }}
       >
         {activeTab === "classification" && (
@@ -483,27 +490,36 @@ function IndividualView({
               </button>
             </div>
 
-            {/* サマリー: スマホ 2 列、sm 以上 3 列、lg 以上 5 列。Best Sectors は常に全幅で見やすく */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3 mb-3 sm:mb-4 flex-shrink-0">
-              <SummaryCard label="Position" value={`P${target.position}`} sub={`PIC ${target.classPosition}`} />
-              <SummaryCard label="Best Lap" value={formatTime(personalData.bestLapTime)} sub={personalData.bestLap > 0 ? `Lap ${personalData.bestLap}` : "---"} accent />
-              <SummaryCard label="Average" value={formatTime(personalData.avgLapTime)} sub="valid laps" />
-              <SummaryCard label="Laps" value={String(personalData.laps.length)} sub={`${personalData.totalPits} pits`} />
-              <div className="col-span-2 sm:col-span-3 lg:col-span-1 bg-zinc-800/60 rounded-lg px-3 py-2 sm:py-2.5 border border-zinc-700/50">
-                <div className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">Best Sectors</div>
-                <div className="grid grid-cols-3 gap-1.5 mt-1.5 text-xs font-mono">
-                  <span className="text-fuchsia-400 font-bold truncate">{formatTime(personalData.bestS1)}</span>
-                  <span className="text-fuchsia-400 font-bold truncate">{formatTime(personalData.bestS2)}</span>
-                  <span className="text-fuchsia-400 font-bold truncate">{formatTime(personalData.bestS3)}</span>
-                  <span className="text-[10px] text-zinc-600">S1</span>
-                  <span className="text-[10px] text-zinc-600">S2</span>
-                  <span className="text-[10px] text-zinc-600">S3</span>
+            {/* サマリー: スマホは 4 列を 1 行で並べ、Best Sectors は 1 行下に全幅。
+                高さを抑えてラップテーブルに最大の領域を残す。 */}
+            <div className="grid grid-cols-4 lg:grid-cols-5 gap-1.5 sm:gap-3 mb-2 sm:mb-4 flex-shrink-0">
+              <SummaryCard label="Position" value={`P${target.position}`} sub={`PIC ${target.classPosition}`} compact />
+              <SummaryCard label="Best Lap" value={formatTime(personalData.bestLapTime)} sub={personalData.bestLap > 0 ? `Lap ${personalData.bestLap}` : "---"} accent compact />
+              <SummaryCard label="Average" value={formatTime(personalData.avgLapTime)} sub="valid laps" compact />
+              <SummaryCard label="Laps" value={String(personalData.laps.length)} sub={`${personalData.totalPits} pits`} compact />
+              <div className="col-span-4 lg:col-span-1 bg-zinc-800/60 rounded-lg px-2 sm:px-3 py-1.5 sm:py-2.5 border border-zinc-700/50">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-[9px] sm:text-[10px] text-zinc-500 uppercase tracking-wider font-semibold flex-shrink-0">Best Sectors</div>
+                  <div className="flex items-center gap-2 sm:gap-3 text-[11px] sm:text-xs font-mono">
+                    <span className="flex items-baseline gap-1">
+                      <span className="text-[9px] text-zinc-600">S1</span>
+                      <span className="text-fuchsia-400 font-bold">{formatTime(personalData.bestS1)}</span>
+                    </span>
+                    <span className="flex items-baseline gap-1">
+                      <span className="text-[9px] text-zinc-600">S2</span>
+                      <span className="text-fuchsia-400 font-bold">{formatTime(personalData.bestS2)}</span>
+                    </span>
+                    <span className="flex items-baseline gap-1">
+                      <span className="text-[9px] text-zinc-600">S3</span>
+                      <span className="text-fuchsia-400 font-bold">{formatTime(personalData.bestS3)}</span>
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* ラップテーブル: 横スクロールを必ず確保し、列幅は min-w で詰める */}
-            <div className="flex-1 overflow-auto border border-zinc-700 rounded-xl min-h-0">
+            {/* ラップテーブル: flex-1 で残りの高さを全部使う。横スクロールも維持。 */}
+            <div className="flex-1 overflow-auto border border-zinc-700 rounded-xl min-h-[200px]">
               <table className="w-full border-collapse text-[11px] sm:text-xs min-w-[440px]">
                 <thead className="sticky top-0 z-10">
                   <tr className="bg-zinc-800 border-b border-zinc-700">
@@ -689,12 +705,46 @@ function CalendarView({
 
 // ========== Shared UI ==========
 
-function SummaryCard({ label, value, sub, accent = false }: { label: string; value: string; sub: string; accent?: boolean }) {
+function SummaryCard({
+  label,
+  value,
+  sub,
+  accent = false,
+  compact = false,
+}: {
+  label: string;
+  value: string;
+  sub: string;
+  accent?: boolean;
+  compact?: boolean;
+}) {
   return (
-    <div className="bg-zinc-800/60 rounded-lg px-3 py-2.5 border border-zinc-700/50">
-      <div className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">{label}</div>
-      <div className={`text-lg font-bold font-mono mt-0.5 leading-none ${accent ? "text-fuchsia-400" : "text-white"}`}>{value || "---"}</div>
-      <div className="text-[10px] text-zinc-600 mt-1">{sub}</div>
+    <div
+      className={`bg-zinc-800/60 rounded-lg border border-zinc-700/50 ${
+        compact ? "px-2 sm:px-3 py-1.5 sm:py-2.5" : "px-3 py-2.5"
+      }`}
+    >
+      <div
+        className={`text-zinc-500 uppercase tracking-wider font-semibold ${
+          compact ? "text-[9px] sm:text-[10px]" : "text-[10px]"
+        }`}
+      >
+        {label}
+      </div>
+      <div
+        className={`font-bold font-mono leading-none ${accent ? "text-fuchsia-400" : "text-white"} ${
+          compact ? "text-sm sm:text-lg mt-0.5" : "text-lg mt-0.5"
+        } truncate`}
+      >
+        {value || "---"}
+      </div>
+      <div
+        className={`text-zinc-600 ${
+          compact ? "text-[9px] sm:text-[10px] mt-0.5 sm:mt-1 truncate" : "text-[10px] mt-1"
+        }`}
+      >
+        {sub}
+      </div>
     </div>
   );
 }
