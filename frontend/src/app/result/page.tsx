@@ -490,30 +490,36 @@ function IndividualView({
               </button>
             </div>
 
-            {/* サマリー: スマホは 4 列を 1 行で並べ、Best Sectors は 1 行下に全幅。
-                高さを抑えてラップテーブルに最大の領域を残す。 */}
-            <div className="grid grid-cols-4 lg:grid-cols-5 gap-1.5 sm:gap-3 mb-2 sm:mb-4 flex-shrink-0">
-              <SummaryCard label="Position" value={`P${target.position}`} sub={`PIC ${target.classPosition}`} compact />
-              <SummaryCard label="Best Lap" value={formatTime(personalData.bestLapTime)} sub={personalData.bestLap > 0 ? `Lap ${personalData.bestLap}` : "---"} accent compact />
-              <SummaryCard label="Average" value={formatTime(personalData.avgLapTime)} sub="valid laps" compact />
-              <SummaryCard label="Laps" value={String(personalData.laps.length)} sub={`${personalData.totalPits} pits`} compact />
-              <div className="col-span-4 lg:col-span-1 bg-zinc-800/60 rounded-lg px-2 sm:px-3 py-1.5 sm:py-2.5 border border-zinc-700/50">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="text-[9px] sm:text-[10px] text-zinc-500 uppercase tracking-wider font-semibold flex-shrink-0">Best Sectors</div>
-                  <div className="flex items-center gap-2 sm:gap-3 text-[11px] sm:text-xs font-mono">
-                    <span className="flex items-baseline gap-1">
-                      <span className="text-[9px] text-zinc-600">S1</span>
-                      <span className="text-fuchsia-400 font-bold">{formatTime(personalData.bestS1)}</span>
-                    </span>
-                    <span className="flex items-baseline gap-1">
-                      <span className="text-[9px] text-zinc-600">S2</span>
-                      <span className="text-fuchsia-400 font-bold">{formatTime(personalData.bestS2)}</span>
-                    </span>
-                    <span className="flex items-baseline gap-1">
-                      <span className="text-[9px] text-zinc-600">S3</span>
-                      <span className="text-fuchsia-400 font-bold">{formatTime(personalData.bestS3)}</span>
-                    </span>
-                  </div>
+            {/* サマリー
+                スマホ (< md): カードを横スクロールの chips に分解して 1 行で表示。
+                  - grid だと SideMenu 開時に各カードが 30〜80px まで狭まり値が切れるため。
+                  - 横スクロールで指で送れば全項目見えるし、縦方向は ~46px しか使わない。
+                PC (md ≥): 従来の grid（lg で 5 列、md で 3 列）。 */}
+            <div className="md:hidden flex gap-1.5 overflow-x-auto pb-1.5 mb-2 flex-shrink-0 -mx-3 px-3">
+              <MetricChip label="Pos" value={`P${target.position}`} />
+              <MetricChip label="PIC" value={String(target.classPosition)} />
+              <MetricChip label="Best" value={formatTime(personalData.bestLapTime)} accent />
+              <MetricChip label="Avg" value={formatTime(personalData.avgLapTime)} />
+              <MetricChip label="Laps" value={String(personalData.laps.length)} />
+              <MetricChip label="Pits" value={String(personalData.totalPits)} />
+              <MetricChip label="S1" value={formatTime(personalData.bestS1)} accent />
+              <MetricChip label="S2" value={formatTime(personalData.bestS2)} accent />
+              <MetricChip label="S3" value={formatTime(personalData.bestS3)} accent />
+            </div>
+            <div className="hidden md:grid grid-cols-3 lg:grid-cols-5 gap-3 mb-4 flex-shrink-0">
+              <SummaryCard label="Position" value={`P${target.position}`} sub={`PIC ${target.classPosition}`} />
+              <SummaryCard label="Best Lap" value={formatTime(personalData.bestLapTime)} sub={personalData.bestLap > 0 ? `Lap ${personalData.bestLap}` : "---"} accent />
+              <SummaryCard label="Average" value={formatTime(personalData.avgLapTime)} sub="valid laps" />
+              <SummaryCard label="Laps" value={String(personalData.laps.length)} sub={`${personalData.totalPits} pits`} />
+              <div className="col-span-3 lg:col-span-1 bg-zinc-800/60 rounded-lg px-3 py-2.5 border border-zinc-700/50">
+                <div className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">Best Sectors</div>
+                <div className="grid grid-cols-3 gap-2 mt-1.5 text-xs font-mono">
+                  <span className="text-fuchsia-400 font-bold">{formatTime(personalData.bestS1)}</span>
+                  <span className="text-fuchsia-400 font-bold">{formatTime(personalData.bestS2)}</span>
+                  <span className="text-fuchsia-400 font-bold">{formatTime(personalData.bestS3)}</span>
+                  <span className="text-[10px] text-zinc-600">S1</span>
+                  <span className="text-[10px] text-zinc-600">S2</span>
+                  <span className="text-[10px] text-zinc-600">S3</span>
                 </div>
               </div>
             </div>
@@ -710,41 +716,41 @@ function SummaryCard({
   value,
   sub,
   accent = false,
-  compact = false,
 }: {
   label: string;
   value: string;
   sub: string;
   accent?: boolean;
-  compact?: boolean;
 }) {
   return (
-    <div
-      className={`bg-zinc-800/60 rounded-lg border border-zinc-700/50 ${
-        compact ? "px-2 sm:px-3 py-1.5 sm:py-2.5" : "px-3 py-2.5"
-      }`}
-    >
-      <div
-        className={`text-zinc-500 uppercase tracking-wider font-semibold ${
-          compact ? "text-[9px] sm:text-[10px]" : "text-[10px]"
-        }`}
-      >
-        {label}
-      </div>
-      <div
-        className={`font-bold font-mono leading-none ${accent ? "text-fuchsia-400" : "text-white"} ${
-          compact ? "text-sm sm:text-lg mt-0.5" : "text-lg mt-0.5"
-        } truncate`}
-      >
+    <div className="bg-zinc-800/60 rounded-lg px-3 py-2.5 border border-zinc-700/50">
+      <div className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">{label}</div>
+      <div className={`text-lg font-bold font-mono mt-0.5 leading-none ${accent ? "text-fuchsia-400" : "text-white"}`}>{value || "---"}</div>
+      <div className="text-[10px] text-zinc-600 mt-1">{sub}</div>
+    </div>
+  );
+}
+
+/**
+ * スマホ用のコンパクトな横並び指標。
+ * 1 行の高さ ~40px に収まり、各 chip は値の長さに応じて自然に伸びるため切れない。
+ * 全体は overflow-x-auto で横スクロール可能。
+ */
+function MetricChip({
+  label,
+  value,
+  accent = false,
+}: {
+  label: string;
+  value: string;
+  accent?: boolean;
+}) {
+  return (
+    <div className="flex items-baseline gap-1 px-2 py-1 rounded-md border border-zinc-700/50 bg-zinc-800/60 flex-shrink-0 whitespace-nowrap">
+      <span className="text-[9px] text-zinc-500 uppercase tracking-wider font-semibold">{label}</span>
+      <span className={`text-xs font-bold font-mono ${accent ? "text-fuchsia-400" : "text-white"}`}>
         {value || "---"}
-      </div>
-      <div
-        className={`text-zinc-600 ${
-          compact ? "text-[9px] sm:text-[10px] mt-0.5 sm:mt-1 truncate" : "text-[10px] mt-1"
-        }`}
-      >
-        {sub}
-      </div>
+      </span>
     </div>
   );
 }
