@@ -22,9 +22,11 @@ body {
 }
 
 html,
-body,
-.app-shell > * {
-  /* SideMenu/StatusBar など fixed/absolute 要素のタッチを iOS で確実に受け取る */
+body {
+  /* SideMenu/StatusBar など fixed/absolute 要素のタッチを iOS で確実に受け取る。
+     manipulation はダブルタップズームを抑制しつつタップ反応を速くする。
+     子要素で touch-action: none を inline 指定したい場面（トラッキング地図など）は
+     その要素側で上書きする想定。 */
   touch-action: manipulation;
 }
 
@@ -34,6 +36,18 @@ body {
   font-weight: 600;
   /* iOS でリンク/ボタン押下時のグレーハイライトを抑止しつつ、タッチ自体は受ける */
   -webkit-tap-highlight-color: transparent;
+  /* iOS Safari でのバウンス（ラバーバンド）スクロールを抑止し、固定レイアウトを保つ */
+  overscroll-behavior: none;
+}
+
+/* トラッキング地図のような自前ジェスチャ領域は、祖先の touch-action: manipulation の
+   影響を受けないよう touch-action: none を確実に適用する。
+   pinch-zoom や pan を奪わず、ブラウザの既定ジェスチャと干渉しない。 */
+.touch-pan-zoom {
+  touch-action: none;
+}
+.touch-pan-zoom * {
+  touch-action: none;
 }
 
 /* ルート直下のページコンテナが h-full / flex で組まれている前提を維持する */

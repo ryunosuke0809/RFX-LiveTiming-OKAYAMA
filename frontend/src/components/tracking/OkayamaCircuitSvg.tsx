@@ -118,6 +118,16 @@ export default function OkayamaCircuitSvg({
     moved: boolean;
   } | null>(null);
   const panBlockClickRef = useRef(false);
+  // 2本指ピンチ用: 現在押されているポインタを pointerId で管理する。
+  // iOS Safari でもピンチ操作で trackmap をズーム/パンできるようにするため、
+  // 1点ドラッグと 2点ピンチを同じハンドラ系で扱う。
+  const pointersRef = useRef<Map<number, { svg: Vec2; client: Vec2 }>>(new Map());
+  const pinchRef = useRef<{
+    startDist: number;
+    startCenterSvg: Vec2;
+    startZoom: number;
+    startPan: Vec2;
+  } | null>(null);
 
   const timing = geom?.timing;
   const samples = geom?.samples ?? [];
@@ -156,24 +166,88 @@ export default function OkayamaCircuitSvg({
   // ポインターイベントは <svg> ではなくラッパーの <div>(HTMLElement) で受ける。
   // iOS Safari は SVGSVGElement の setPointerCapture が不安定で、ドラッグ中の
   // pointermove が届かず「タッチが効かない」ように見える症状の主因になる。
+  //
+  // 1点 → ドラッグでパン / マーカーをタップして選択
+  // 2点 → ピンチでズーム + 中心移動でパン
   const handlePointerDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
       if (e.button !== 0 && e.pointerType === "mouse") return;
-      const start = screenToSvg(e.clientX, e.clientY);
-      dragRef.current = { startSvg: start, panAtStart: pan, moved: false };
-      panBlockClickRef.current = false;
-      // setPointerCapture はドラッグ確定後にのみ取得する。
-      // ここで取得すると、軽いタップ時に pointerup/click が子要素(マシンマーカー)に
-      // 届かなくなり、タッチ操作が一切効かないように見える。
+      const svgPt = screenToSvg(e.clientX, e.clientY);
+      pointersRef.current.set(e.pointerId, {
+        svg: svgPt,
+        client: { x: e.clientX, y: e.clientY },
+      });
+
+      if (pointersRef.current.size === 1) {
+        dragRef.current = { startSvg: svgPt, panAtStart: pan, moved: false };
+        pinchRef.current = null;
+        panBlockClickRef.current = false;
+        // setPointerCapture はドラッグ確定後にのみ取得する。
+        // ここで取得すると、軽いタップ時に pointerup/click が子要素(マシンマーカー)に
+        // 届かなくなり、タッチ操作が一切効かないように見える。
+      } else if (pointersRef.current.size === 2) {
+        // 2本目が触れた瞬間にピンチ確定: 以降はドラッグ扱いせず、両点中心を基準にズーム
+        const pts = Array.from(pointersRef.current.values());
+        const dx = pts[1].client.x - pts[0].client.x;
+        const dy = pts[1].client.y - pts[0].client.y;
+        const startDist = Math.hypot(dx, dy);
+        const cx = (pts[0].client.x + pts[1].client.x) / 2;
+        const cy = (pts[0].client.y + pts[1].client.y) / 2;
+        pinchRef.current = {
+          startDist: Math.max(1, startDist),
+          startCenterSvg: screenToSvg(cx, cy),
+          startZoom: zoom,
+          startPan: pan,
+        };
+        dragRef.current = null;
+        panBlockClickRef.current = true;
+        try {
+          e.currentTarget.setPointerCapture(e.pointerId);
+        } catch {
+          /* noop */
+        }
+      }
     },
-    [pan, screenToSvg],
+    [pan, screenToSvg, zoom],
   );
 
   const handlePointerMove = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
+      const ptr = pointersRef.current.get(e.pointerId);
+      if (!ptr) return;
+      ptr.client = { x: e.clientX, y: e.clientY };
+      ptr.svg = screenToSvg(e.clientX, e.clientY);
+
+      if (pointersRef.current.size >= 2 && pinchRef.current) {
+        const pts = Array.from(pointersRef.current.values());
+        const dx = pts[1].client.x - pts[0].client.x;
+        const dy = pts[1].client.y - pts[0].client.y;
+        const dist = Math.max(1, Math.hypot(dx, dy));
+        const scale = dist / pinchRef.current.startDist;
+        const nextZoom = Math.max(
+          ZOOM_MIN,
+          Math.min(ZOOM_MAX, pinchRef.current.startZoom * scale),
+        );
+        // 2点中心の SVG 座標を固定したまま zoom が変わるよう pan を補正
+        const cx = (pts[0].client.x + pts[1].client.x) / 2;
+        const cy = (pts[0].client.y + pts[1].client.y) / 2;
+        const centerSvgNow = screenToSvg(cx, cy);
+        const startCenter = pinchRef.current.startCenterSvg;
+        const startPan = pinchRef.current.startPan;
+        // 視覚的にピンチ中心が動かないように pan を微調整
+        const nextPan = {
+          x: startPan.x + (centerSvgNow.x - startCenter.x) * nextZoom,
+          y: startPan.y + (centerSvgNow.y - startCenter.y) * nextZoom,
+        };
+        panBlockClickRef.current = true;
+        setZoom(nextZoom);
+        setPan(nextPan);
+        return;
+      }
+
       const drag = dragRef.current;
       if (!drag) return;
-      const cur = screenToSvg(e.clientX, e.clientY);
+      const cur = ptr.svg;
       const dx = cur.x - drag.startSvg.x;
       const dy = cur.y - drag.startSvg.y;
       if (!drag.moved && Math.hypot(dx, dy) < PAN_DRAG_THRESHOLD) return;
@@ -195,8 +269,21 @@ export default function OkayamaCircuitSvg({
   const handlePointerUp = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
       const wasDragging = dragRef.current?.moved ?? false;
-      dragRef.current = null;
-      if (wasDragging) {
+      const wasPinching = pinchRef.current !== null;
+      pointersRef.current.delete(e.pointerId);
+
+      if (pointersRef.current.size < 2) {
+        pinchRef.current = null;
+      }
+      if (pointersRef.current.size === 0) {
+        dragRef.current = null;
+      } else if (pointersRef.current.size === 1 && wasPinching) {
+        // ピンチ→片手放しに移行した場合は残り1点を新たなドラッグ起点に
+        const [last] = Array.from(pointersRef.current.values());
+        dragRef.current = { startSvg: last.svg, panAtStart: pan, moved: false };
+      }
+
+      if (wasDragging || wasPinching) {
         try {
           e.currentTarget.releasePointerCapture(e.pointerId);
         } catch {
@@ -209,7 +296,7 @@ export default function OkayamaCircuitSvg({
         }, 0);
       }
     },
-    [],
+    [pan],
   );
 
   const center = OKAYAMA_TRACK_CENTER;
@@ -221,7 +308,7 @@ export default function OkayamaCircuitSvg({
 
   return (
     <div
-      className={`relative w-full h-full overflow-hidden select-none cursor-grab active:cursor-grabbing ${className}`}
+      className={`relative w-full h-full overflow-hidden select-none cursor-grab active:cursor-grabbing touch-pan-zoom ${className}`}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
@@ -229,7 +316,9 @@ export default function OkayamaCircuitSvg({
       style={{
         // touch-action: none をラッパー側に置くことで iOS Safari でも
         // ブラウザの既定ジェスチャ（パン/ピンチ）に奪われずポインタを受け取れる。
+        // クラス touch-pan-zoom (globals.css) は子孫の SVG 要素にも touch-action: none を再適用する保険。
         touchAction: "none",
+        WebkitUserSelect: "none",
       }}
     >
       <svg
@@ -237,7 +326,7 @@ export default function OkayamaCircuitSvg({
         viewBox={OKAYAMA_TRACK_VIEWBOX}
         className="w-full h-full select-none"
         preserveAspectRatio="xMidYMid meet"
-        style={{ touchAction: "none", pointerEvents: "auto" }}
+        style={{ touchAction: "none", pointerEvents: "auto", display: "block" }}
       >
         <defs>
           <filter id="glow">

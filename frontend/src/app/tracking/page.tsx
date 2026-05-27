@@ -39,20 +39,20 @@ export default function TrackingPage() {
 
       {/* ヘッダー */}
       <header
-        className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-zinc-900 via-zinc-800/80 to-zinc-900 border-b border-zinc-700 transition-all duration-300"
+        className="flex items-center justify-between gap-2 px-3 sm:px-4 py-2 sm:py-3 bg-gradient-to-r from-zinc-900 via-zinc-800/80 to-zinc-900 border-b border-zinc-700 transition-all duration-300"
         style={{ paddingLeft: menuOpen ? "230px" : "56px" }}
       >
-        <div>
-          <h1 className="text-lg font-bold text-white tracking-wide">Tracking</h1>
-          <p className="text-xs text-zinc-500 mt-0.5">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-base sm:text-lg font-bold text-white tracking-wide truncate">Tracking</h1>
+          <p className="text-[10px] sm:text-xs text-zinc-500 mt-0.5 truncate">
             {mockSessionInfo.competition.nameE} — {mockSessionInfo.session.nameE}
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
           {highlighted.size > 0 && (
             <button
               onClick={clearHighlights}
-              className="px-3 py-1 rounded-md text-[10px] font-semibold bg-zinc-700 text-zinc-300 hover:bg-zinc-600 hover:text-white transition-colors"
+              className="px-2 sm:px-3 py-1 rounded-md text-[10px] font-semibold bg-zinc-700 text-zinc-300 hover:bg-zinc-600 hover:text-white transition-colors"
             >
               Clear ({highlighted.size})
             </button>
@@ -65,7 +65,7 @@ export default function TrackingPage() {
           <button
             type="button"
             onClick={() => setEntriesOpen((v) => !v)}
-            className={`px-3 py-1 rounded-md text-[10px] font-semibold border transition-colors ${
+            className={`px-2 sm:px-3 py-1 rounded-md text-[10px] font-semibold border transition-colors whitespace-nowrap ${
               entriesOpen
                 ? "bg-amber-600 border-amber-500 text-white"
                 : "bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700"
@@ -77,12 +77,13 @@ export default function TrackingPage() {
         </div>
       </header>
 
-      {/* メイン: ページ全域がコースマップ。サイドパネルはトグルでオーバーレイ表示 */}
+      {/* メイン: ページ全域がコースマップ。サイドパネルはトグルでオーバーレイ表示
+          SideMenu と被らないよう padding-left を取り、その中で flex-1 で OkayamaCircuitSvg が自然にフィットする */}
       <div
-        className="relative flex-1 overflow-hidden transition-all duration-300"
+        className="relative flex flex-1 overflow-hidden transition-all duration-300"
         style={{ paddingLeft: menuOpen ? "220px" : "40px" }}
       >
-        <div className="absolute inset-0" style={{ left: menuOpen ? 220 : 40 }}>
+        <div className="relative flex-1 min-w-0">
           <OkayamaCircuitSvg
             standings={filteredStandings}
             showCarMarkers
@@ -91,9 +92,10 @@ export default function TrackingPage() {
           />
         </div>
 
-        {/* 右サイドパネル: 車両一覧（オーバーレイ） */}
+        {/* 右サイドパネル: 車両一覧（オーバーレイ）
+            スマホでは max-w で画面幅の8割までに制限してマップが完全に隠れないようにする */}
         <aside
-          className={`absolute top-0 right-0 h-full w-64 bg-zinc-900/85 backdrop-blur-md border-l border-zinc-800 flex flex-col overflow-hidden transition-transform duration-200 z-20 shadow-2xl ${
+          className={`absolute top-0 right-0 h-full w-64 max-w-[80vw] bg-zinc-900/85 backdrop-blur-md border-l border-zinc-800 flex flex-col overflow-hidden transition-transform duration-200 z-20 shadow-2xl ${
             entriesOpen ? "translate-x-0" : "translate-x-full"
           }`}
           aria-hidden={!entriesOpen}
