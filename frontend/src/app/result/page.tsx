@@ -163,23 +163,23 @@ export default function ResultPage() {
         onClassFilterChange={setClassFilter}
       />
 
-      {/* ヘッダー */}
+      {/* ヘッダー: スマホでは Title 行とタブ行を縦並びにして折り返す */}
       <header
-        className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-zinc-900 via-zinc-800/80 to-zinc-900 border-b border-zinc-700 transition-all duration-300"
+        className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-3 bg-gradient-to-r from-zinc-900 via-zinc-800/80 to-zinc-900 border-b border-zinc-700 transition-all duration-300"
         style={{ paddingLeft: menuOpen ? "230px" : "56px" }}
       >
-        <div>
-          <h1 className="text-lg font-bold text-white tracking-wide">Results</h1>
-          <p className="text-xs text-zinc-500 mt-0.5">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-base sm:text-lg font-bold text-white tracking-wide truncate">Results</h1>
+          <p className="text-[10px] sm:text-xs text-zinc-500 mt-0.5 truncate">
             {mockSessionInfo.competition.nameE}
           </p>
         </div>
-        <div className="flex items-center gap-1 bg-zinc-800 rounded-lg p-0.5">
+        <div className="flex items-center gap-1 bg-zinc-800 rounded-lg p-0.5 flex-shrink-0 self-start sm:self-auto">
           {tabs.map((t) => (
             <button
               key={t.key}
               onClick={() => setActiveTab(t.key)}
-              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+              className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md text-[11px] sm:text-xs font-semibold transition-colors whitespace-nowrap ${
                 activeTab === t.key
                   ? "bg-amber-600 text-white"
                   : "text-zinc-400 hover:text-zinc-200"
@@ -253,23 +253,23 @@ function ClassificationView({
   onRowClick: (s: Standing) => void;
 }) {
   return (
-    <div className="p-4">
-      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
+    <div className="p-3 sm:p-4">
+      <div className="flex items-center justify-between mb-3 sm:mb-4 flex-wrap gap-2">
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap min-w-0">
+          <div className="flex items-center gap-2 flex-shrink-0">
             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             <span className="text-xs text-emerald-400 font-semibold uppercase tracking-wider">Live</span>
           </div>
-          <span className="text-sm text-zinc-300 font-medium">{mockSessionInfo.session.nameE}</span>
-          <span className="text-xs text-zinc-600">|</span>
-          <span className="text-xs text-zinc-500">{mockSessionInfo.category.courseName}</span>
+          <span className="text-xs sm:text-sm text-zinc-300 font-medium truncate">{mockSessionInfo.session.nameE}</span>
+          <span className="text-xs text-zinc-600 hidden sm:inline">|</span>
+          <span className="text-xs text-zinc-500 truncate hidden sm:inline">{mockSessionInfo.category.courseName}</span>
         </div>
         <button
           onClick={onDownload}
-          className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-bold uppercase tracking-wider transition-colors"
+          className="flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-bold uppercase tracking-wider transition-colors flex-shrink-0"
         >
           <DownloadIcon />
-          Download CSV
+          <span className="hidden sm:inline">Download </span>CSV
         </button>
       </div>
 
@@ -280,8 +280,8 @@ function ClassificationView({
         </div>
       )}
 
-      <div className="overflow-x-auto">
-        <table className="w-full border-collapse" style={{ fontSize: "var(--timing-fs)" }}>
+      <div className="overflow-x-auto -mx-3 sm:mx-0 px-3 sm:px-0">
+        <table className="w-full border-collapse min-w-[760px]" style={{ fontSize: "var(--timing-fs)" }}>
           <thead>
             <tr className="border-b-2 border-red-700 bg-zinc-800">
               {["P","PIC","No.","Class","Team","Best Time","Lap","Gap","Last Lap","S1","S2","S3","Pits","Laps"].map((h) => (
@@ -355,9 +355,11 @@ function IndividualView({
   const cls = target ? getClassByStanding(target) : null;
 
   return (
-    <div className="p-4 flex gap-4 h-full min-h-0">
-      {/* 左: ドライバー選択リスト */}
-      <div className="w-72 flex-shrink-0 flex flex-col border border-zinc-700 rounded-xl bg-zinc-900/80 overflow-hidden">
+    // スマホは縦並び、md (768px) 以上で左右 2 ペイン。
+    // スマホでの選択リストは水平 chips（横スクロール）に切り替えて、画面幅を奪わない。
+    <div className="p-3 sm:p-4 flex flex-col md:flex-row md:gap-4 gap-3 h-full min-h-0">
+      {/* PC: 左サイドの縦リスト */}
+      <div className="hidden md:flex w-72 flex-shrink-0 flex-col border border-zinc-700 rounded-xl bg-zinc-900/80 overflow-hidden">
         <div className="px-4 py-2.5 border-b border-zinc-700 bg-zinc-800/50">
           <span className="text-xs text-zinc-400 uppercase tracking-wider font-semibold">Select Driver</span>
         </div>
@@ -395,36 +397,78 @@ function IndividualView({
         </div>
       </div>
 
-      {/* 右: 個別リザルト詳細 */}
+      {/* スマホ: 水平スクロールの chips リスト */}
+      <div className="md:hidden flex-shrink-0 border border-zinc-700 rounded-xl bg-zinc-900/80 overflow-hidden">
+        <div className="px-3 py-1.5 border-b border-zinc-700 bg-zinc-800/50 flex items-center justify-between">
+          <span className="text-[10px] text-zinc-400 uppercase tracking-wider font-semibold">Select Driver</span>
+          <span className="text-[10px] text-zinc-500">{standings.length} drivers</span>
+        </div>
+        <div className="flex gap-1.5 px-2 py-2 overflow-x-auto">
+          {standings.map((s) => {
+            const t = getTeamByStanding(s);
+            const c = getClassByStanding(s);
+            if (!t) return null;
+            const isActive = target?.teamId === s.teamId;
+            return (
+              <button
+                key={s.teamId}
+                onClick={() => onSelectTarget(isActive ? null : s)}
+                className={`flex items-center gap-1.5 px-2 py-1.5 rounded-md border flex-shrink-0 transition-colors ${
+                  isActive
+                    ? "bg-amber-600/20 border-amber-500 text-white"
+                    : "bg-zinc-800/60 border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+                }`}
+              >
+                <span
+                  className="w-6 h-6 rounded flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0"
+                  style={{ backgroundColor: c?.color || "#71717a" }}
+                >
+                  {t.no}
+                </span>
+                <div className="flex flex-col items-start min-w-0">
+                  <span className={`text-[11px] leading-tight truncate max-w-[120px] ${isActive ? "font-bold" : ""}`}>
+                    {t.nameE}
+                  </span>
+                  <span className="text-[9px] text-zinc-500 font-mono leading-tight">
+                    {formatTime(s.bestTime) || "---"}
+                  </span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 右 (PC) / 下 (スマホ): 個別リザルト詳細 */}
       <div className="flex-1 flex flex-col min-w-0 min-h-0">
         {!target || !personalData || !team ? (
-          <div className="flex-1 flex items-center justify-center">
+          <div className="flex-1 flex items-center justify-center py-10">
             <div className="text-center text-zinc-600">
-              <svg className="w-16 h-16 mx-auto mb-3 text-zinc-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-3 text-zinc-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
               </svg>
-              <p className="text-sm">Select a driver to view individual results</p>
+              <p className="text-xs sm:text-sm">Select a driver to view individual results</p>
             </div>
           </div>
         ) : (
           <>
-            {/* ドライバー情報ヘッダー */}
-            <div className="flex items-center justify-between px-4 py-3 border border-zinc-700 rounded-xl bg-zinc-900/80 mb-4 flex-shrink-0">
-              <div className="flex items-center gap-3">
+            {/* ドライバー情報ヘッダー: スマホでは縦並び＆メタ情報を折り返し可能に */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-3 sm:px-4 py-2.5 sm:py-3 border border-zinc-700 rounded-xl bg-zinc-900/80 mb-3 sm:mb-4 flex-shrink-0">
+              <div className="flex items-start sm:items-center gap-3 min-w-0">
                 <span
-                  className="w-11 h-11 rounded-lg flex items-center justify-center text-white text-lg font-bold"
+                  className="w-10 h-10 sm:w-11 sm:h-11 rounded-lg flex items-center justify-center text-white text-base sm:text-lg font-bold flex-shrink-0"
                   style={{ backgroundColor: cls?.color || "#71717a" }}
                 >
                   {team.no}
                 </span>
-                <div>
-                  <div className="text-white font-bold text-sm">{team.nameE}</div>
-                  <div className="flex items-center gap-2 text-xs text-zinc-400">
-                    <span>{team.drivers[1]?.nameE || "---"}</span>
+                <div className="min-w-0">
+                  <div className="text-white font-bold text-sm truncate">{team.nameE}</div>
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] sm:text-xs text-zinc-400">
+                    <span className="truncate max-w-[180px]">{team.drivers[1]?.nameE || "---"}</span>
                     <span className="text-zinc-600">|</span>
                     <span>{cls?.nameE}</span>
                     <span className="text-zinc-600">|</span>
-                    <span>{team.machine}</span>
+                    <span className="truncate max-w-[140px]">{team.machine}</span>
                     <span className="text-zinc-600">|</span>
                     <span>{team.tire}</span>
                   </div>
@@ -432,46 +476,44 @@ function IndividualView({
               </div>
               <button
                 onClick={() => onDownload(target)}
-                className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-bold uppercase tracking-wider transition-colors flex-shrink-0"
+                className="flex items-center justify-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-bold uppercase tracking-wider transition-colors flex-shrink-0 self-end sm:self-auto"
               >
                 <DownloadIcon />
                 CSV
               </button>
             </div>
 
-            {/* サマリー */}
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-4 flex-shrink-0">
+            {/* サマリー: スマホ 2 列、sm 以上 3 列、lg 以上 5 列。Best Sectors は常に全幅で見やすく */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3 mb-3 sm:mb-4 flex-shrink-0">
               <SummaryCard label="Position" value={`P${target.position}`} sub={`PIC ${target.classPosition}`} />
               <SummaryCard label="Best Lap" value={formatTime(personalData.bestLapTime)} sub={personalData.bestLap > 0 ? `Lap ${personalData.bestLap}` : "---"} accent />
               <SummaryCard label="Average" value={formatTime(personalData.avgLapTime)} sub="valid laps" />
               <SummaryCard label="Laps" value={String(personalData.laps.length)} sub={`${personalData.totalPits} pits`} />
-              <div className="bg-zinc-800/60 rounded-lg px-3 py-2.5 border border-zinc-700/50">
+              <div className="col-span-2 sm:col-span-3 lg:col-span-1 bg-zinc-800/60 rounded-lg px-3 py-2 sm:py-2.5 border border-zinc-700/50">
                 <div className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">Best Sectors</div>
-                <div className="flex items-center gap-2 mt-1.5 text-xs font-mono">
-                  <span className="text-fuchsia-400 font-bold">{formatTime(personalData.bestS1)}</span>
-                  <span className="text-fuchsia-400 font-bold">{formatTime(personalData.bestS2)}</span>
-                  <span className="text-fuchsia-400 font-bold">{formatTime(personalData.bestS3)}</span>
-                </div>
-                <div className="flex items-center gap-2 mt-0.5 text-[10px] text-zinc-600">
-                  <span className="w-12">S1</span>
-                  <span className="w-12">S2</span>
-                  <span className="w-12">S3</span>
+                <div className="grid grid-cols-3 gap-1.5 mt-1.5 text-xs font-mono">
+                  <span className="text-fuchsia-400 font-bold truncate">{formatTime(personalData.bestS1)}</span>
+                  <span className="text-fuchsia-400 font-bold truncate">{formatTime(personalData.bestS2)}</span>
+                  <span className="text-fuchsia-400 font-bold truncate">{formatTime(personalData.bestS3)}</span>
+                  <span className="text-[10px] text-zinc-600">S1</span>
+                  <span className="text-[10px] text-zinc-600">S2</span>
+                  <span className="text-[10px] text-zinc-600">S3</span>
                 </div>
               </div>
             </div>
 
-            {/* ラップテーブル */}
+            {/* ラップテーブル: 横スクロールを必ず確保し、列幅は min-w で詰める */}
             <div className="flex-1 overflow-auto border border-zinc-700 rounded-xl min-h-0">
-              <table className="w-full border-collapse text-xs">
+              <table className="w-full border-collapse text-[11px] sm:text-xs min-w-[440px]">
                 <thead className="sticky top-0 z-10">
                   <tr className="bg-zinc-800 border-b border-zinc-700">
-                    <th className="py-2 px-3 text-center text-zinc-400 font-semibold uppercase tracking-wider w-14">Lap</th>
-                    <th className="py-2 px-3 text-right text-zinc-400 font-semibold uppercase tracking-wider">Lap Time</th>
-                    <th className="py-2 px-3 text-right text-zinc-400 font-semibold uppercase tracking-wider">S1</th>
-                    <th className="py-2 px-3 text-right text-zinc-400 font-semibold uppercase tracking-wider">S2</th>
-                    <th className="py-2 px-3 text-right text-zinc-400 font-semibold uppercase tracking-wider">S3</th>
-                    <th className="py-2 px-3 text-center text-zinc-400 font-semibold uppercase tracking-wider w-14">Pos</th>
-                    <th className="py-2 px-3 text-center text-zinc-400 font-semibold uppercase tracking-wider w-10">Pit</th>
+                    <th className="py-1.5 sm:py-2 px-2 sm:px-3 text-center text-zinc-400 font-semibold uppercase tracking-wider w-12 sm:w-14">Lap</th>
+                    <th className="py-1.5 sm:py-2 px-2 sm:px-3 text-right text-zinc-400 font-semibold uppercase tracking-wider">Time</th>
+                    <th className="py-1.5 sm:py-2 px-2 sm:px-3 text-right text-zinc-400 font-semibold uppercase tracking-wider">S1</th>
+                    <th className="py-1.5 sm:py-2 px-2 sm:px-3 text-right text-zinc-400 font-semibold uppercase tracking-wider">S2</th>
+                    <th className="py-1.5 sm:py-2 px-2 sm:px-3 text-right text-zinc-400 font-semibold uppercase tracking-wider">S3</th>
+                    <th className="py-1.5 sm:py-2 px-2 sm:px-3 text-center text-zinc-400 font-semibold uppercase tracking-wider w-10 sm:w-14">Pos</th>
+                    <th className="py-1.5 sm:py-2 px-2 sm:px-3 text-center text-zinc-400 font-semibold uppercase tracking-wider w-8 sm:w-10">Pit</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -482,23 +524,23 @@ function IndividualView({
                         lap.lap % 2 === 0 ? "bg-zinc-900/40" : ""
                       } ${lap.isPit ? "bg-blue-900/10" : ""}`}
                     >
-                      <td className="py-1.5 px-3 text-center font-mono text-zinc-400">{lap.lap}</td>
-                      <td className={`py-1.5 px-3 text-right font-mono font-bold ${TIME_COLORS[lap.lapTimeType]}`}>
+                      <td className="py-1 sm:py-1.5 px-2 sm:px-3 text-center font-mono text-zinc-400">{lap.lap}</td>
+                      <td className={`py-1 sm:py-1.5 px-2 sm:px-3 text-right font-mono font-bold ${TIME_COLORS[lap.lapTimeType]}`}>
                         {formatTime(lap.lapTime)}
                       </td>
-                      <td className={`py-1.5 px-3 text-right font-mono ${TIME_COLORS[lap.s1Type]}`}>
+                      <td className={`py-1 sm:py-1.5 px-2 sm:px-3 text-right font-mono ${TIME_COLORS[lap.s1Type]}`}>
                         {formatTime(lap.s1)}
                       </td>
-                      <td className={`py-1.5 px-3 text-right font-mono ${TIME_COLORS[lap.s2Type]}`}>
+                      <td className={`py-1 sm:py-1.5 px-2 sm:px-3 text-right font-mono ${TIME_COLORS[lap.s2Type]}`}>
                         {formatTime(lap.s2)}
                       </td>
-                      <td className={`py-1.5 px-3 text-right font-mono ${TIME_COLORS[lap.s3Type]}`}>
+                      <td className={`py-1 sm:py-1.5 px-2 sm:px-3 text-right font-mono ${TIME_COLORS[lap.s3Type]}`}>
                         {formatTime(lap.s3)}
                       </td>
-                      <td className="py-1.5 px-3 text-center font-mono text-zinc-500">
+                      <td className="py-1 sm:py-1.5 px-2 sm:px-3 text-center font-mono text-zinc-500">
                         {lap.position > 0 ? lap.position : ""}
                       </td>
-                      <td className="py-1.5 px-3 text-center">
+                      <td className="py-1 sm:py-1.5 px-2 sm:px-3 text-center">
                         {lap.isPit && <span className="text-cyan-400 font-bold text-[10px]">P</span>}
                       </td>
                     </tr>
@@ -528,26 +570,26 @@ function CalendarView({
   onViewSession: (session: string) => void;
 }) {
   return (
-    <div className="p-4 max-w-4xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
+    <div className="p-3 sm:p-4 max-w-4xl mx-auto">
+      <div className="flex items-center justify-between mb-4 sm:mb-6">
         <button onClick={onPrevMonth} className="p-2 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
         </button>
-        <h2 className="text-xl font-bold text-white tracking-wide">{monthNames[month]} {year}</h2>
+        <h2 className="text-base sm:text-xl font-bold text-white tracking-wide">{monthNames[month]} {year}</h2>
         <button onClick={onNextMonth} className="p-2 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
         </button>
       </div>
 
-      <div className="grid grid-cols-7 gap-1 mb-2">
+      <div className="grid grid-cols-7 gap-0.5 sm:gap-1 mb-1 sm:mb-2">
         {dayNames.map((d) => (
-          <div key={d} className="text-center text-xs text-zinc-500 font-semibold uppercase py-2">{d}</div>
+          <div key={d} className="text-center text-[10px] sm:text-xs text-zinc-500 font-semibold uppercase py-1 sm:py-2">{d}</div>
         ))}
       </div>
 
-      <div className="grid grid-cols-7 gap-1">
+      <div className="grid grid-cols-7 gap-0.5 sm:gap-1">
         {days.map((day, idx) => {
-          if (day === null) return <div key={`empty-${idx}`} className="h-20" />;
+          if (day === null) return <div key={`empty-${idx}`} className="h-14 sm:h-20" />;
           const dateKey = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
           const events = getEventsForDate(year, month, day);
           const hasEvents = events.length > 0;
@@ -557,17 +599,18 @@ function CalendarView({
             <button
               key={day}
               onClick={() => onSelectDate(isSelected ? null : dateKey)}
-              className={`h-20 rounded-lg border transition-all text-left p-2 flex flex-col ${
+              className={`h-14 sm:h-20 rounded-md sm:rounded-lg border transition-all text-left p-1 sm:p-2 flex flex-col overflow-hidden ${
                 isSelected ? "border-amber-500 bg-amber-600/10"
                 : hasEvents ? "border-zinc-700 bg-zinc-800/60 hover:border-amber-600/50 hover:bg-zinc-800"
                 : "border-zinc-800/50 bg-zinc-900/30 hover:bg-zinc-900/50"
               }`}
             >
-              <span className={`text-sm font-bold ${isToday ? "text-amber-400" : isSelected ? "text-white" : hasEvents ? "text-zinc-200" : "text-zinc-600"}`}>{day}</span>
+              <span className={`text-xs sm:text-sm font-bold ${isToday ? "text-amber-400" : isSelected ? "text-white" : hasEvents ? "text-zinc-200" : "text-zinc-600"}`}>{day}</span>
               {hasEvents && (
-                <div className="mt-1 flex flex-col gap-0.5 overflow-hidden">
-                  {events.slice(0, 2).map((ev) => (<span key={ev} className="text-[9px] text-amber-400/80 truncate leading-tight">{ev}</span>))}
-                  {events.length > 2 && <span className="text-[9px] text-zinc-500">+{events.length - 2} more</span>}
+                <div className="mt-0.5 sm:mt-1 flex flex-col gap-0.5 overflow-hidden">
+                  <span className="sm:hidden w-1 h-1 rounded-full bg-amber-400" />
+                  {events.slice(0, 2).map((ev) => (<span key={ev} className="hidden sm:inline text-[9px] text-amber-400/80 truncate leading-tight">{ev}</span>))}
+                  {events.length > 2 && <span className="hidden sm:inline text-[9px] text-zinc-500">+{events.length - 2} more</span>}
                 </div>
               )}
             </button>
@@ -606,10 +649,10 @@ function CalendarView({
         </div>
       )}
 
-      <div className="mt-8">
+      <div className="mt-6 sm:mt-8">
         <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-wider mb-3">Past Events</h3>
-        <div className="rounded-xl border border-zinc-700 bg-zinc-900/80 overflow-hidden">
-          <table className="w-full">
+        <div className="rounded-xl border border-zinc-700 bg-zinc-900/80 overflow-x-auto">
+          <table className="w-full min-w-[480px]">
             <thead>
               <tr className="border-b border-zinc-700 bg-zinc-800/50">
                 <th className="py-2.5 px-4 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider">Date</th>
