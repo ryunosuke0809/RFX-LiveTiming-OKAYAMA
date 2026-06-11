@@ -11,6 +11,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RfxTiming.Smis.Receiver", "
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RfxTiming.Smis.VirtualServer", "RfxTiming.Smis.VirtualServer\RfxTiming.Smis.VirtualServer.csproj", "{10C13872-527D-4915-9583-79F93D496552}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RfxTiming.Smis.LogReparser", "RfxTiming.Smis.LogReparser\RfxTiming.Smis.LogReparser.csproj", "{A4E2B8C1-9F3D-4E71-B2A8-1C5D6E7F8091}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -33,6 +35,10 @@ Global
 		{10C13872-527D-4915-9583-79F93D496552}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{10C13872-527D-4915-9583-79F93D496552}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{10C13872-527D-4915-9583-79F93D496552}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A4E2B8C1-9F3D-4E71-B2A8-1C5D6E7F8091}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A4E2B8C1-9F3D-4E71-B2A8-1C5D6E7F8091}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A4E2B8C1-9F3D-4E71-B2A8-1C5D6E7F8091}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A4E2B8C1-9F3D-4E71-B2A8-1C5D6E7F8091}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

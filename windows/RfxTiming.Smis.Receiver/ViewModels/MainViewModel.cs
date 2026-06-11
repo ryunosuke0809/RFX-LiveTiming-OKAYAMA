@@ -11,6 +11,7 @@ using RfxTiming.Smis.Networking;
 using RfxTiming.Smis.Receiver.Views;
 using RfxTiming.Smis.Services;
 using RfxTiming.Smis.Settings;
+using RfxTiming.Smis.Xml;
 
 namespace RfxTiming.Smis.Receiver.ViewModels;
 
@@ -82,6 +83,9 @@ public partial class MainViewModel : ObservableObject, IAsyncDisposable
     [ObservableProperty] private string _currentParsedLogPath = "（未接続）";
     [ObservableProperty] private long _logRotationCount;
     [ObservableProperty] private string _lastRotationText = string.Empty;
+
+    public string BuildInfoText { get; } =
+        $"MOLA_Timing-Receiver v0.1.0 · Parser {SmisXmlParser.ParserProfile}";
 
     // ===== Run state =====
     [ObservableProperty]

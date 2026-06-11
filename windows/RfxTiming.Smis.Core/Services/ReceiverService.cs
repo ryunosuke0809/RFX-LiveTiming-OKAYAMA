@@ -168,39 +168,41 @@ public sealed class ReceiverService : IAsyncDisposable
                 }
 
                 // 3. パース試行 (失敗してもログには残せている)
-                SmisMessage? message = null;
+                IReadOnlyList<SmisMessage> messages;
                 try
                 {
-                    message = SmisXmlParser.Parse(frame.Xml);
+                    messages = SmisXmlParser.ParseMessages(frame.Xml);
                     SetParseStatus(StageStatus.Active);
                 }
                 catch (SmisXmlParseException)
                 {
                     ParseErrors++;
+                    messages = Array.Empty<SmisMessage>();
                     SetParseStatus(StageStatus.Warning);
                 }
 
-                // 4. 解析済 JSONL 書込
-                if (message is not null && _parsedWriter is not null)
+                // 4. 解析済 JSONL 書込 (1 フレームに複数ルートが含まれる場合は要素ごとに 1 行)
+                foreach (SmisMessage message in messages)
                 {
-                    try
+                    if (_parsedWriter is not null)
                     {
-                        await _parsedWriter.WriteMessageAsync(frame, message, cancellationToken).ConfigureAwait(false);
+                        try
+                        {
+                            await _parsedWriter.WriteMessageAsync(frame, message, cancellationToken)
+                                .ConfigureAwait(false);
+                        }
+                        catch (Exception ex)
+                        {
+                            LogWriteErrors++;
+                            SetLogStatus(StageStatus.Error);
+                            ErrorOccurred?.Invoke(this, ex);
+                        }
                     }
-                    catch (Exception ex)
-                    {
-                        LogWriteErrors++;
-                        SetLogStatus(StageStatus.Error);
-                        ErrorOccurred?.Invoke(this, ex);
-                    }
+
+                    MessageReceived?.Invoke(this, message);
                 }
 
                 TotalMessages++;
-
-                if (message is not null)
-                {
-                    MessageReceived?.Invoke(this, message);
-                }
             }
         }
         catch (OperationCanceledException)

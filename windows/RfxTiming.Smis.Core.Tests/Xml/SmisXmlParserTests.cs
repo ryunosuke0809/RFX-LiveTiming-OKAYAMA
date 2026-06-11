@@ -274,4 +274,127 @@ public sealed class SmisXmlParserTests
         var result = Assert.IsType<Select>(SmisXmlParser.Parse(xml));
         Assert.Equal("S", result.SessionId);
     }
+
+    // 岡山 MOLA 実機ログ (exports/archive/2026:06:11) 由来のリグレッション
+
+    [Fact]
+    public void ParseMessages_MolaCompetition_StartDataeTypo_ReturnsCompetition()
+    {
+        const string xml =
+            """<Competition ID="1" NameJ="2026 seven × seven FIA-F4 JAPANESE CHAMPIONSHIP" NameE="" StartDatae="2026/06/11" "2026/06/12" />""";
+
+        var result = Assert.IsType<Competition>(SmisXmlParser.ParseMessages(xml).Single());
+        Assert.Equal("2026/06/11", result.StartDate);
+        Assert.Equal("2026/06/12", result.EndDate);
+    }
+
+    [Fact]
+    public void ParseMessages_MolaTeamBatch_ReturnsMultipleTeams()
+    {
+        const string xml =
+            """<Team ID="1:1:1" ClassID="1:1:0" No="2" NameJ="RAGNO MOTOR SPORTS" NameE="" Engine="" Machine="" Tire="" Nation="" ><Driver No="0" NameJ="RAGNO MOTOR SPORTS" NameE="RAGNO MOTOR SPORTS" Nation="" ></Driver><Driver No="1" NameJ="岡澤 圭吾" NameE="岡澤 圭吾" Nation="" ></Driver></Team><Team ID="1:1:2" ClassID="1:1:0" No="3" NameJ="TEAM 5ZIGEN F4" NameE="" Engine="" Machine="" Tire="" Nation="" ><Driver No="0" NameJ="TEAM 5ZIGEN F4" NameE="TEAM 5ZIGEN F4" Nation="" ></Driver><Driver No="1" NameJ="山本 聖渚" NameE="山本 聖渚" Nation="" ></Driver></Team>""";
+
+        IReadOnlyList<SmisMessage> messages = SmisXmlParser.ParseMessages(xml);
+        Assert.Equal(2, messages.Count);
+        var first = Assert.IsType<Team>(messages[0]);
+        Assert.Equal("1:1:1", first.Id);
+        Assert.Equal("RAGNO MOTOR SPORTS", first.NameJ);
+        Assert.Equal(2, first.Drivers.Count);
+    }
+
+    [Fact]
+    public void ParseMessages_MolaLoopBatch_ReturnsMultipleLoops()
+    {
+        const string xml =
+            """<Loop ID="10" Type="P" Order="1" Length="" /><Loop ID="1" Type="C" Order="2" Length="200000" /><Loop ID="0" Type="C" Order="5" Length="370300" />""";
+
+        IReadOnlyList<SmisMessage> messages = SmisXmlParser.ParseMessages(xml);
+        Assert.Equal(3, messages.Count);
+        Assert.All(messages, m => Assert.IsType<Loop>(m));
+    }
+
+    [Fact]
+    public void Parse_MultiRootFrame_ThrowsSmisXmlParseException()
+    {
+        const string xml =
+            """<Select SessionID="1:1:1:1:1" /><Start SessionID="1:1:1:1:1" DateTime="2026/06/11 14:45.00 " />""";
+
+        Assert.Throws<SmisXmlParseException>(() => SmisXmlParser.Parse(xml));
+        Assert.Equal(2, SmisXmlParser.ParseMessages(xml).Count);
+    }
+
+    [Fact]
+    public void ParseMessages_OkayamaArchiveLog_StartupFramesHaveNoParseFailures()
+    {
+        string? logPath = ResolveOkayamaArchiveLogPath();
+        if (logPath is null)
+        {
+            return;
+        }
+
+        string[] lines = File.ReadAllLines(logPath);
+        int parseFailures = 0;
+        int teamCount = 0;
+
+        foreach (string line in lines)
+        {
+            if (!TryExtractXml(line, out string xml))
+            {
+                continue;
+            }
+
+            try
+            {
+                IReadOnlyList<SmisMessage> messages = SmisXmlParser.ParseMessages(xml);
+                teamCount += messages.OfType<Team>().Count();
+            }
+            catch (SmisXmlParseException)
+            {
+                parseFailures++;
+            }
+        }
+
+        Assert.Equal(0, parseFailures);
+        Assert.True(teamCount >= 31, $"Expected Team master data, got {teamCount}.");
+    }
+
+    private static string? ResolveOkayamaArchiveLogPath()
+    {
+        DirectoryInfo? dir = new(Directory.GetCurrentDirectory());
+        while (dir is not null)
+        {
+            string archiveDir = Path.Combine(dir.FullName, "exports", "archive");
+            if (Directory.Exists(archiveDir))
+            {
+                foreach (string candidate in Directory.EnumerateFiles(archiveDir, "MOLA_INPUT_*.log", SearchOption.AllDirectories))
+                {
+                    return candidate;
+                }
+            }
+
+            dir = dir.Parent;
+        }
+
+        return null;
+    }
+
+    private static bool TryExtractXml(string line, out string xml)
+    {
+        int space = line.IndexOf(' ');
+        if (space < 0)
+        {
+            xml = string.Empty;
+            return false;
+        }
+
+        space = line.IndexOf(' ', space + 1);
+        if (space < 0)
+        {
+            xml = string.Empty;
+            return false;
+        }
+
+        xml = line[(space + 1)..];
+        return xml.StartsWith('<', StringComparison.Ordinal);
+    }
 }

@@ -100,9 +100,8 @@
                 </TextBlock>
             </StatusBarItem>
             <StatusBarItem HorizontalAlignment="Right">
-                <TextBlock Foreground="{StaticResource Foreground.Secondary}" FontSize="11">
-                    MOLA_Timing-Receiver v0.1.0
-                </TextBlock>
+                <TextBlock Foreground="{StaticResource Foreground.Secondary}" FontSize="11"
+                           Text="{Binding BuildInfoText}" />
             </StatusBarItem>
         </StatusBar>
 

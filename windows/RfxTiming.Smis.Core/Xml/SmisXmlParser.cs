@@ -1,8 +1,8 @@
 using System.Globalization;
+using System.Text.RegularExpressions;
 using System.Xml;
 using System.Xml.Linq;
 using RfxTiming.Smis.Messages;
-// XmlReader / XmlReaderSettings は使わなくなったが、System.Xml.Linq の XElement / XAttribute はこの名前空間から提供される
 
 namespace RfxTiming.Smis.Xml;
 
@@ -15,27 +15,140 @@ namespace RfxTiming.Smis.Xml;
 /// 未定義の要素名は <see cref="UnknownMessage"/> として保持し、ログを失わない。
 /// パース不能 (XML 構文エラー) は <see cref="SmisXmlParseException"/> を投げる。
 /// </para>
+/// <para>
+/// 岡山 MOLA 実機では、接続時の <c>Team</c> / <c>Transponder</c> / <c>Loop</c> 等が
+/// 1 NULL フレーム内に複数ルート要素として連結されて送られる。
+/// <see cref="ParseMessages(string)"/> はそのバッチも展開する。
+/// </para>
 /// </summary>
 public static class SmisXmlParser
 {
+    /// <summary>Receiver UI 等で配布ビルドを識別するためのパーサープロファイル名。</summary>
+    public const string ParserProfile = "mola-batch-v2";
+
+    private static readonly Regex MolaMissingEndDateRegex = new(
+        """StartDate="([^"]*)"\s+"([^"]*)"\s*/>""",
+        RegexOptions.CultureInvariant | RegexOptions.Compiled);
+
     /// <summary>
-    /// 単一の SMIS XML フラグメントをパースして DTO を返す。
-    /// <para>
-    /// SMIS の生データは XML 宣言が無く、1 フレーム = 1 要素 (NULL 終端) で来る。
-    /// <see cref="XElement.Parse(string)"/> は前後の空白を許容しつつ単一ルートを期待する
-    /// ため、Fragment モードの <see cref="XmlReader"/> よりも実データ向き。
-    /// </para>
+    /// 単一ルート要素の SMIS XML をパースして DTO を返す。
+    /// 複数ルートが含まれる場合は <see cref="SmisXmlParseException"/> を投げる。
     /// </summary>
     public static SmisMessage Parse(string xml)
     {
+        IReadOnlyList<SmisMessage> messages = ParseMessages(xml);
+        if (messages.Count == 0)
+        {
+            throw new SmisXmlParseException(
+                $"Empty SMIS XML frame (input head: '{Head(NormalizeFrame(xml))}')");
+        }
+
+        if (messages.Count > 1)
+        {
+            throw new SmisXmlParseException(
+                $"SMIS frame contains {messages.Count} root elements; use {nameof(ParseMessages)} instead.");
+        }
+
+        return messages[0];
+    }
+
+    /// <summary>
+    /// 1 NULL フレーム分の XML から 0 個以上の SMIS メッセージを取り出す。
+    /// 単一ルート・複数ルートのどちらにも対応する。
+    /// </summary>
+    public static IReadOnlyList<SmisMessage> ParseMessages(string xml)
+    {
         ArgumentNullException.ThrowIfNull(xml);
 
-        // NULL 終端や前後の空白・改行を除去してからパース
+        string normalized = NormalizeFrame(xml);
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return Array.Empty<SmisMessage>();
+        }
+
+        if (TryParseSingleRoot(normalized, out XElement? root))
+        {
+            return new[] { ParseElement(root) };
+        }
+
+        return ParseFragmentRoots(normalized);
+    }
+
+    private static string Head(string xml)
+    {
+        if (string.IsNullOrEmpty(xml)) return string.Empty;
+        const int max = 80;
+        return xml.Length <= max ? xml : xml[..max] + "…";
+    }
+
+    private static string NormalizeFrame(string xml)
+    {
         string normalized = xml.Trim().TrimEnd('\0').TrimEnd();
-        XElement root;
+        return NormalizeMolaSenderQuirks(normalized);
+    }
+
+    /// <summary>
+    /// 岡山 MOLA 実機で観測された送信側の既知の揺れを補正する。
+    /// </summary>
+    private static string NormalizeMolaSenderQuirks(string xml)
+    {
+        if (xml.Contains("StartDatae=", StringComparison.Ordinal))
+        {
+            xml = xml.Replace("StartDatae=", "StartDate=", StringComparison.Ordinal);
+        }
+
+        return MolaMissingEndDateRegex.Replace(xml, """StartDate="$1" EndDate="$2" />""");
+    }
+
+    private static bool TryParseSingleRoot(string normalized, out XElement root)
+    {
         try
         {
             root = XElement.Parse(normalized, LoadOptions.None);
+            return true;
+        }
+        catch (XmlException)
+        {
+            root = null!;
+            return false;
+        }
+        catch (InvalidOperationException)
+        {
+            root = null!;
+            return false;
+        }
+    }
+
+    private static List<SmisMessage> ParseFragmentRoots(string normalized)
+    {
+        // 岡山 MOLA 実機ログでは Team/Transponder/Loop が連結された 1 フレームになる。
+        // 仮想ラッパー方式が最も安定している (Fragment XmlReader は環境によって失敗する)。
+        if (TryParseWrappedBatch(normalized, out List<SmisMessage>? wrapped))
+        {
+            return wrapped;
+        }
+
+        var messages = new List<SmisMessage>();
+        var settings = new XmlReaderSettings
+        {
+            ConformanceLevel = ConformanceLevel.Fragment,
+            DtdProcessing = DtdProcessing.Prohibit,
+            IgnoreWhitespace = true,
+        };
+
+        try
+        {
+            using XmlReader reader = XmlReader.Create(new StringReader(normalized), settings);
+            while (reader.Read())
+            {
+                if (reader.NodeType != XmlNodeType.Element)
+                {
+                    continue;
+                }
+
+                XElement el = (XElement)XNode.ReadFrom(reader)!;
+                messages.Add(ParseElement(el));
+            }
         }
         catch (XmlException ex)
         {
@@ -44,19 +157,53 @@ public static class SmisXmlParser
         }
         catch (InvalidOperationException ex)
         {
-            // XmlReader/XElement.Load 系で「ルート要素の後に追加内容」がある場合に発生する
             throw new SmisXmlParseException(
-                $"SMIS XML has trailing content: {ex.Message} (input head: '{Head(normalized)}')", ex);
+                $"SMIS XML fragment parse failed: {ex.Message} (input head: '{Head(normalized)}')", ex);
         }
 
-        return ParseElement(root);
+        if (messages.Count == 0)
+        {
+            throw new SmisXmlParseException(
+                $"No SMIS elements in frame (input head: '{Head(normalized)}')");
+        }
+
+        return messages;
     }
 
-    private static string Head(string xml)
+    /// <summary>
+    /// 複数ルート要素を <c>&lt;SmisBatch&gt;</c> で包んで読む。
+    /// MOLA 実機のマスターデータ一括送信向け。
+    /// </summary>
+    private static bool TryParseWrappedBatch(string normalized, out List<SmisMessage> messages)
     {
-        if (string.IsNullOrEmpty(xml)) return string.Empty;
-        const int max = 80;
-        return xml.Length <= max ? xml : xml[..max] + "…";
+        messages = new List<SmisMessage>();
+        try
+        {
+            XElement batch = XElement.Parse(
+                $"<SmisBatch>{normalized}</SmisBatch>",
+                LoadOptions.None);
+            foreach (XElement child in batch.Elements())
+            {
+                messages.Add(ParseElement(child));
+            }
+        }
+        catch (XmlException)
+        {
+            messages = new List<SmisMessage>();
+            return false;
+        }
+        catch (InvalidOperationException)
+        {
+            messages = new List<SmisMessage>();
+            return false;
+        }
+        catch (SmisXmlParseException)
+        {
+            messages = new List<SmisMessage>();
+            return false;
+        }
+
+        return messages.Count > 0;
     }
 
     /// <summary>
