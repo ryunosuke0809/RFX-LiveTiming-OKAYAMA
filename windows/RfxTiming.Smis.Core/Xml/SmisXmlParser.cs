@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Text.RegularExpressions;
 using System.Xml;
 using System.Xml.Linq;
 using RfxTiming.Smis.Messages;
@@ -26,9 +25,10 @@ public static class SmisXmlParser
     /// <summary>Receiver UI 等で配布ビルドを識別するためのパーサープロファイル名。</summary>
     public const string ParserProfile = "mola-batch-v2";
 
-    private static readonly Regex MolaMissingEndDateRegex = new(
+    private static readonly System.Text.RegularExpressions.Regex MolaMissingEndDateRegex = new(
         """StartDate="([^"]*)"\s+"([^"]*)"\s*/>""",
-        RegexOptions.CultureInvariant | RegexOptions.Compiled);
+        System.Text.RegularExpressions.RegexOptions.CultureInvariant
+            | System.Text.RegularExpressions.RegexOptions.Compiled);
 
     /// <summary>
     /// 単一ルート要素の SMIS XML をパースして DTO を返す。
