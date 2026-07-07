@@ -154,3 +154,67 @@ body {
 .sector-flash-ob { --sector-color: rgba(216, 60, 246, 0.7); }
 .sector-flash-pb { --sector-color: rgba(34, 197, 94, 0.7); }
 .sector-flash-cur { --sector-color: rgba(255, 255, 255, 0.4); }
+
+/* タイミング表 — sticky 列は border-collapse: collapse だと透け・重なりが起きる */
+.timing-table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+/* 横スクロール領域 — 左端のすき間から裏のセルが見えないよう背景を揃える */
+.timing-table-scroll {
+  overflow: auto;
+  background-color: #0c0c0f;
+}
+
+/* Result 等 — テーブルのみ横スクロール（ツールバーは固定） */
+.timing-table-scroll-x {
+  overflow-x: auto;
+  overflow-y: visible;
+  background-color: #0c0c0f;
+}
+
+/* 横スクロール時に POS / PIC / No. / Class を左固定（不透明背景で下のセルを隠す） */
+.timing-sticky-col {
+  position: sticky;
+  z-index: 5;
+  background-color: var(--timing-sticky-bg, #18181b);
+}
+thead .timing-sticky-col {
+  z-index: 25;
+  background-color: #27272a;
+}
+/* 先頭 sticky 列の左側すき間を不透明に埋める */
+.timing-sticky-col-first {
+  overflow: visible;
+}
+.timing-sticky-col-first::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 100%;
+  width: 100vw;
+  background-color: inherit;
+  pointer-events: none;
+}
+.timing-sticky-even {
+  --timing-sticky-bg: #18181b;
+  background-color: #18181b;
+}
+.timing-sticky-odd {
+  --timing-sticky-bg: #131316;
+  background-color: #131316;
+}
+tr.group:hover .timing-sticky-even,
+tr.group:hover .timing-sticky-odd {
+  --timing-sticky-bg: #2a2a2f;
+  background-color: #2a2a2f;
+}
+.timing-sticky-col-last {
+  box-shadow: 6px 0 12px 0 rgba(12, 12, 15, 0.98), 2px 0 4px rgba(0, 0, 0, 0.55);
+}
+.timing-table tbody td:not(.timing-sticky-col) {
+  position: relative;
+  z-index: 1;
+}

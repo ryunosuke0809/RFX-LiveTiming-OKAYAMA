@@ -5,6 +5,7 @@ import SideMenu from "@/components/layout/SideMenu";
 import OkayamaCircuitSvg from "@/components/tracking/OkayamaCircuitSvg";
 import { mockClasses, mockSessionInfo, mockStandings, getTeamByStanding, getClassByStanding } from "@/data/mock";
 import { formatTime } from "@/lib/format";
+import { useLiveTiming } from "@/hooks/useLiveTiming";
 
 export default function TrackingPage() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -12,9 +13,20 @@ export default function TrackingPage() {
   const [highlighted, setHighlighted] = useState<Set<string>>(new Set());
   const [entriesOpen, setEntriesOpen] = useState(false);
 
+  // ライブ接続 (/ws)。データ受信時は mock の代わりにライブ順位を使う。
+  const live = useLiveTiming();
+  const isLive = live.hasData;
+  const baseStandings = isLive ? live.standings : mockStandings;
+  const classes = isLive ? live.classes : mockClasses;
+  const competitionName = isLive && live.sessionInfo ? live.sessionInfo.competition.nameE : mockSessionInfo.competition.nameE;
+  const sessionName = isLive && live.sessionInfo ? live.sessionInfo.session.nameE : mockSessionInfo.session.nameE;
+
   const filteredStandings = classFilter
-    ? mockStandings.filter((s) => getClassByStanding(s)?.nameE === classFilter)
-    : mockStandings;
+    ? baseStandings.filter((s) => getClassByStanding(s)?.nameE === classFilter)
+    : baseStandings;
+
+  // IN PIT の車両はコースマップから消え、こちらの PitIn リストに表示する。
+  const pitStandings = filteredStandings.filter((s) => s.status === "in_pit");
 
   const toggleHighlight = useCallback((teamId: string) => {
     setHighlighted((prev) => {
@@ -32,7 +44,7 @@ export default function TrackingPage() {
       <SideMenu
         isOpen={menuOpen}
         onClose={() => setMenuOpen(!menuOpen)}
-        classes={mockClasses}
+        classes={classes}
         activeClassFilter={classFilter}
         onClassFilterChange={setClassFilter}
       />
@@ -45,7 +57,7 @@ export default function TrackingPage() {
         <div className="min-w-0 flex-1">
           <h1 className="text-base sm:text-lg font-bold text-white tracking-wide truncate">Tracking</h1>
           <p className="text-[10px] sm:text-xs text-zinc-500 mt-0.5 truncate">
-            {mockSessionInfo.competition.nameE} — {mockSessionInfo.session.nameE}
+            {competitionName} — {sessionName}
           </p>
         </div>
         <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
@@ -90,6 +102,46 @@ export default function TrackingPage() {
             highlightedTeamIds={highlighted}
             onMarkerClick={toggleHighlight}
           />
+
+          {/* PitIn リスト: IN PIT 中の車両はマップから消え、ここに一覧表示する。 */}
+          {pitStandings.length > 0 && (
+            <div className="absolute bottom-2 right-2 z-10 w-44 max-w-[70vw] bg-zinc-900/85 backdrop-blur-md border border-zinc-700 rounded-lg overflow-hidden shadow-2xl">
+              <div className="px-2.5 py-1.5 border-b border-zinc-700 bg-red-900/30 flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-red-500" />
+                <span className="text-[11px] text-red-300 uppercase tracking-wider font-bold">
+                  Pit In — {pitStandings.length}
+                </span>
+              </div>
+              <div className="max-h-48 overflow-y-auto">
+                {pitStandings.map((s) => {
+                  const team = getTeamByStanding(s);
+                  const cls = getClassByStanding(s);
+                  if (!team) return null;
+                  const isActive = highlighted.has(s.teamId);
+                  return (
+                    <button
+                      key={s.teamId}
+                      onClick={() => toggleHighlight(s.teamId)}
+                      className={`flex items-center gap-2 px-2.5 py-1 border-b border-zinc-800/50 transition-colors text-left w-full ${
+                        isActive ? "bg-amber-600/10" : "hover:bg-zinc-800/60"
+                      }`}
+                    >
+                      <span
+                        className="w-5 h-5 rounded flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0"
+                        style={{ backgroundColor: cls?.color || "#71717a" }}
+                      >
+                        {team.no}
+                      </span>
+                      <span className="text-[11px] text-zinc-300 truncate flex-1">
+                        {team.nameE}
+                      </span>
+                      <span className="text-[9px] text-red-400 font-bold uppercase flex-shrink-0">Pit</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* 右サイドパネル: 車両一覧（オーバーレイ）

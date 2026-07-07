@@ -21,6 +21,7 @@ import {
   getMockPersonalData,
 } from "@/data/mock";
 import { formatLocalTime } from "@/lib/format";
+import { useLiveTiming } from "@/hooks/useLiveTiming";
 import type { SessionInfo, Standing, TimeType, SectorTime } from "@/types/smis";
 
 function shufflePositions(standings: Standing[]): Standing[] {
@@ -91,16 +92,28 @@ export default function TimingPage() {
   const secIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const sfKeyRef = useRef(0);
 
+  // ライブ接続 (/ws)。データを受信したら mock を上書きする。未接続なら mock 表示のまま。
+  const live = useLiveTiming();
+  const isLive = live.hasData;
+
+  useEffect(() => {
+    if (isLive) setStandings(live.standings);
+  }, [isLive, live.standings]);
+
+  useEffect(() => {
+    if (isLive && live.sessionInfo) setSessionInfo(live.sessionInfo);
+  }, [isLive, live.sessionInfo]);
+
   useEffect(() => {
     const timer = setInterval(() => {
       setSessionInfo((prev) => ({
         ...prev,
         localTime: formatLocalTime(),
-        remainingTime: Math.max(0, prev.remainingTime - 1),
+        remainingTime: isLive ? prev.remainingTime : Math.max(0, prev.remainingTime - 1),
       }));
     }, 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [isLive]);
 
   const doShuffle = useCallback(() => {
     setStandings((prev) => shufflePositions(prev));
@@ -174,7 +187,11 @@ export default function TimingPage() {
     };
   }, []);
 
-  const trackCount = getMockTrackCount(standings);
+  const trackCount = isLive ? live.trackCount : getMockTrackCount(standings);
+  const classes = isLive ? live.classes : mockClasses;
+  const fastestLap = isLive && live.fastestLap ? live.fastestLap : mockFastestLap;
+  // ライブ時はセッション種別 (予選=time / 決勝=race) に従う。
+  const effectiveRaceMode = isLive ? live.isRace : isRaceMode;
 
   const handleSplashFinish = useCallback(() => {
     setShowSplash(false);
@@ -191,13 +208,20 @@ export default function TimingPage() {
       <SideMenu
         isOpen={menuOpen}
         onClose={() => setMenuOpen(!menuOpen)}
-        classes={mockClasses}
+        classes={classes}
         activeClassFilter={classFilter}
         onClassFilterChange={setClassFilter}
       />
 
       <div className="transition-all duration-300" style={{ paddingLeft: menuOpen ? "220px" : "40px" }}>
-        <TimingHeader sessionInfo={sessionInfo} />
+        <TimingHeader
+          sessionInfo={sessionInfo}
+          isLive={isLive}
+          elapsedSec={live.sessionElapsedSec}
+          durationSec={0}
+          leaderLap={live.leaderLap}
+          maxLaps={live.sessionLaps}
+        />
       </div>
 
       {/* DEMOコントロール — 一時的にコメントアウト
@@ -274,7 +298,7 @@ export default function TimingPage() {
             standings={standings}
             classFilter={classFilter}
             flashKey={flashKey}
-            isRaceMode={isRaceMode}
+            isRaceMode={effectiveRaceMode}
             sectorFlashes={sectorFlashes}
             onRowClick={(standing) => setSelectedStanding(standing)}
           />
@@ -283,7 +307,7 @@ export default function TimingPage() {
 
       <div className="transition-all duration-300" style={{ paddingLeft: menuOpen ? "220px" : "40px" }}>
         <StatusBar
-          fastestLap={mockFastestLap}
+          fastestLap={fastestLap}
           weather={mockWeather}
           trackCount={trackCount}
         />
@@ -292,9 +316,9 @@ export default function TimingPage() {
       {selectedStanding && (
         <DriverDetailPanel
           standing={selectedStanding}
-          team={getTeamByStanding(selectedStanding)}
-          carClass={getClassByStanding(selectedStanding)}
-          personalData={getMockPersonalData(selectedStanding)}
+          team={isLive ? live.getTeamById(selectedStanding.teamId) : getTeamByStanding(selectedStanding)}
+          carClass={isLive ? live.getClassById(selectedStanding.classId) : getClassByStanding(selectedStanding)}
+          personalData={isLive ? live.getPersonalData(selectedStanding.teamId) : getMockPersonalData(selectedStanding)}
           onClose={() => setSelectedStanding(null)}
         />
       )}

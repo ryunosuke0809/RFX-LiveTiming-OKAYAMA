@@ -51,6 +51,8 @@ export interface StandingVm {
     sectorNo: number;
     sectorTime: number | null;
     order: number;
+    /** 各区間で最後に計測されたタイム [S1,S2,S3] (Tracking の移動時間などの参照用)。 */
+    refSectors: Array<number | null>;
 
     // 算出フィールド
     gap: string; // "—" / "+2L" / "+1.234"
@@ -82,6 +84,8 @@ export interface SessionInfoVm {
     flag: TrackFlag;
     sessionStartedAt: string | null;
     sessionRemainingSec: number | null;
+    /** true=周回レース (race)、false=ベストタイム (予選/専有走行)。gap 表示の切替に使う。 */
+    isRace: boolean;
 }
 
 export interface FastestLapVm {
@@ -130,8 +134,25 @@ export interface RaceControlMessageVm {
  * フロントエンドは新規接続時にこれを 1 回受け取り、画面の初期描画を行う。
  * 以後の差分は `LiveStatePatch` で送られる。
  */
+/** 1 周分のラップデータ (個別ドライバー表示用)。frontend の LapData と一致。 */
+export interface LapDataVm {
+    lap: number;
+    lapTime: number | null;
+    s1: number | null;
+    s2: number | null;
+    s3: number | null;
+    s1Type: TimeType;
+    s2Type: TimeType;
+    s3Type: TimeType;
+    lapTimeType: TimeType;
+    isPit: boolean;
+    position: number;
+}
+
 export interface LiveStateSnapshot {
     serverTs: string;
+    /** 直近データのタイムスタンプ (ISO)。経過時間計算用。 */
+    dataTs: string | null;
     circuitId: string | null;
     session: SessionInfoVm | null;
     standings: StandingVm[];
@@ -140,6 +161,8 @@ export interface LiveStateSnapshot {
     classes: CarClassVm[];
     teams: TeamSummaryVm[];
     recentMessages: RaceControlMessageVm[];
+    /** teamId → 完了周のラップ履歴 (個別ドライバー表示用)。 */
+    driverLaps: Record<string, LapDataVm[]>;
 }
 
 /**
@@ -147,6 +170,7 @@ export interface LiveStateSnapshot {
  * フロントエンドは `kind` で switch して該当部分だけ書き換える。
  */
 export type LiveStatePatch =
+    | { kind: "reset" }
     | { kind: "session"; fields: Partial<SessionInfoVm> }
     | { kind: "flag"; flag: TrackFlag }
     | { kind: "class_upsert"; value: CarClassVm }
@@ -155,4 +179,5 @@ export type LiveStatePatch =
     | { kind: "standing_remove"; teamId: string }
     | { kind: "fastest_lap"; value: FastestLapVm | null }
     | { kind: "track_count"; value: TrackCountVm }
+    | { kind: "driver_lap"; teamId: string; value: LapDataVm }
     | { kind: "message"; value: RaceControlMessageVm };

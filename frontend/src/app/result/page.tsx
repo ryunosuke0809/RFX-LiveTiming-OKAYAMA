@@ -10,11 +10,43 @@ import {
   mockSchedule,
   getTeamByStanding,
   getClassByStanding,
+  getDriverName,
   getMockPersonalData,
 } from "@/data/mock";
 import { formatTime } from "@/lib/format";
 import { TIME_COLORS } from "@/lib/colors";
+import { deriveCategoryLabel } from "@/lib/sessionNaming";
+import { useLiveTiming } from "@/hooks/useLiveTiming";
+import {
+  colWidthStyle,
+  getStickyLeftOffsets,
+  stickyCellClass,
+  stickyTdStyle,
+  type TableColumn,
+} from "@/lib/timingTableLayout";
 import type { Standing, DriverPersonalData } from "@/types/smis";
+
+const CLASSIFICATION_COLUMNS: TableColumn[] = [
+  { key: "p", minW: 36, pct: "3.5%", align: "text-center" },
+  { key: "pic", minW: 36, pct: "3.5%", align: "text-center" },
+  { key: "no", minW: 44, pct: "4%", align: "text-center" },
+  { key: "class", minW: 52, pct: "5%", align: "text-center" },
+  { key: "name", minW: 100, pct: "12%", align: "text-left pl-2" },
+  { key: "team", minW: 120, pct: "14%", align: "text-left pl-2" },
+  { key: "best", minW: 88, pct: "9%", align: "text-right pr-3" },
+  { key: "lap", minW: 40, pct: "4%", align: "text-center" },
+  { key: "gap", minW: 72, pct: "7%", align: "text-right pr-3" },
+  { key: "last", minW: 80, pct: "8%", align: "text-right pr-3" },
+  { key: "s1", minW: 68, pct: "6.5%", align: "text-right pr-3" },
+  { key: "s2", minW: 68, pct: "6.5%", align: "text-right pr-3" },
+  { key: "s3", minW: 68, pct: "6%", align: "text-right pr-3" },
+  { key: "pits", minW: 40, pct: "4%", align: "text-center" },
+  { key: "laps", minW: 40, pct: "4%", align: "text-center" },
+];
+
+const CLASSIFICATION_STICKY_KEYS = ["p", "pic", "no", "class"];
+const CLASSIFICATION_FIRST_STICKY = "p";
+const CLASSIFICATION_LAST_STICKY = "class";
 
 // --- CSV helpers ---
 
@@ -37,26 +69,46 @@ function sortStandingsByBestTime(standings: Standing[]): Standing[] {
   });
 }
 
-function generateClassificationCsv(standings: Standing[]): string {
-  const header = "Position,Class Position,No.,Class,Team,Best Time,Best Lap,Last Lap Time,Laps,S1,S2,S3,Pits,Status";
+interface CsvMeta {
+  competition: string;
+  category: string;
+  session: string;
+}
+
+function csvSafe(v: string): string {
+  return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
+}
+
+function generateClassificationCsv(standings: Standing[], meta: CsvMeta): string {
+  const metaLines = [
+    `# Competition: ${meta.competition}`,
+    `# Category: ${meta.category}`,
+    `# Session: ${meta.session}`,
+    "",
+  ];
+  const header = "Position,Class Position,No.,Class,Name,Team,Best Time,Best Lap,Last Lap Time,Laps,S1,S2,S3,Pits,Status";
   const rows = standings.map((s, idx) => {
     const team = getTeamByStanding(s);
     const cls = getClassByStanding(s);
     return [
-      idx + 1, s.classPosition, team?.no ?? "", cls?.nameE ?? "", team?.nameE ?? "",
+      idx + 1, s.classPosition, team?.no ?? "", csvSafe(cls?.nameE ?? ""), csvSafe(getDriverName(s, team)), csvSafe(team?.nameE ?? ""),
       formatTime(s.bestTime), s.bestTimeLap, formatTime(s.lastLapTime), s.lap,
       formatTime(s.sectors[0]?.time), formatTime(s.sectors[1]?.time), formatTime(s.sectors[2]?.time),
       s.pits, s.status.replace("_", " ").toUpperCase(),
     ].join(",");
   });
-  return [header, ...rows].join("\n");
+  return [...metaLines, header, ...rows].join("\n");
 }
 
-function generateIndividualCsv(standing: Standing, data: DriverPersonalData): string {
+function generateIndividualCsv(standing: Standing, data: DriverPersonalData, meta: CsvMeta): string {
   const team = getTeamByStanding(standing);
   const cls = getClassByStanding(standing);
   const info = [
+    `# Competition: ${meta.competition}`,
+    `# Category: ${meta.category}`,
+    `# Session: ${meta.session}`,
     `# No.${team?.no} ${team?.nameE} (${cls?.nameE})`,
+    `# Driver: ${getDriverName(standing, team)}`,
     `# Best Lap: ${formatTime(data.bestLapTime)} (Lap ${data.bestLap})`,
     `# Best S1: ${formatTime(data.bestS1)}  Best S2: ${formatTime(data.bestS2)}  Best S3: ${formatTime(data.bestS3)}`,
     "",
@@ -66,6 +118,10 @@ function generateIndividualCsv(standing: Standing, data: DriverPersonalData): st
     [l.lap, formatTime(l.lapTime), formatTime(l.s1), formatTime(l.s2), formatTime(l.s3), l.position > 0 ? l.position : "", l.isPit ? "YES" : ""].join(",")
   );
   return [...info, header, ...rows].join("\n");
+}
+
+function fileSafe(v: string): string {
+  return (v || "").trim().replace(/[\\/:*?"<>|]/g, "").replace(/\s+/g, "_") || "NA";
 }
 
 function makeTimestamp() {
@@ -115,12 +171,32 @@ export default function ResultPage() {
   const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
   const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
+  // ライブ接続 (/ws)。データ受信時は mock の代わりにライブ順位を使う。
+  const live = useLiveTiming();
+  const isLive = live.hasData;
+  const baseStandings = isLive ? live.standings : mockStandings;
+  const classes = isLive ? live.classes : mockClasses;
+  const sessionMeta = isLive && live.sessionInfo ? live.sessionInfo : mockSessionInfo;
+  const competitionName = sessionMeta.competition.nameE || sessionMeta.competition.nameJ;
+  // カテゴリー名は Competition 名から短縮ラベル（FIA-F4 / SFL 等）を導出する。
+  // 導出できない場合は MOLA の Category 名にフォールバック。
+  const categoryName =
+    deriveCategoryLabel(sessionMeta.competition.nameJ, sessionMeta.competition.nameE) ||
+    sessionMeta.category.nameE ||
+    sessionMeta.category.nameJ;
+  const sessionName = sessionMeta.session.nameE || sessionMeta.session.nameJ;
+  const csvMeta: CsvMeta = {
+    competition: competitionName,
+    category: categoryName,
+    session: sessionName,
+  };
+
   const sortedStandings = useMemo(() => {
     const base = classFilter
-      ? mockStandings.filter((s) => getClassByStanding(s)?.nameE === classFilter)
-      : mockStandings;
+      ? baseStandings.filter((s) => getClassByStanding(s)?.nameE === classFilter)
+      : baseStandings;
     return sortStandingsByBestTime(base);
-  }, [classFilter]);
+  }, [classFilter, baseStandings]);
 
   const selectedDateEvents = useMemo(() => {
     if (!selectedDate) return [];
@@ -128,14 +204,20 @@ export default function ResultPage() {
   }, [selectedDate]);
 
   const handleDownloadClassification = () => {
-    const session = mockSessionInfo.session.nameE.replace(/\s+/g, "_");
-    downloadCsv(`Classification_${session}_${makeTimestamp()}.csv`, generateClassificationCsv(sortedStandings));
+    const cat = fileSafe(categoryName);
+    const ses = fileSafe(sessionName);
+    downloadCsv(`Classification_${cat}_${ses}_${makeTimestamp()}.csv`, generateClassificationCsv(sortedStandings, csvMeta));
   };
+
+  const getPersonal = (s: Standing) =>
+    isLive ? live.getPersonalData(s.teamId) : getMockPersonalData(s);
 
   const handleDownloadIndividual = (s: Standing) => {
     const team = getTeamByStanding(s);
-    const data = getMockPersonalData(s);
-    downloadCsv(`Laps_No${team?.no}_${makeTimestamp()}.csv`, generateIndividualCsv(s, data));
+    const data = getPersonal(s);
+    const cat = fileSafe(categoryName);
+    const ses = fileSafe(sessionName);
+    downloadCsv(`Laps_${cat}_${ses}_No${team?.no}_${makeTimestamp()}.csv`, generateIndividualCsv(s, data, csvMeta));
   };
 
   const prevMonth = () => {
@@ -158,7 +240,7 @@ export default function ResultPage() {
       <SideMenu
         isOpen={menuOpen}
         onClose={() => setMenuOpen(!menuOpen)}
-        classes={mockClasses}
+        classes={classes}
         activeClassFilter={classFilter}
         onClassFilterChange={setClassFilter}
       />
@@ -171,7 +253,7 @@ export default function ResultPage() {
         <div className="min-w-0 flex-1">
           <h1 className="text-base sm:text-lg font-bold text-white tracking-wide truncate">Results</h1>
           <p className="text-[10px] sm:text-xs text-zinc-500 mt-0.5 truncate">
-            {mockSessionInfo.competition.nameE}
+            {competitionName}
           </p>
         </div>
         <div className="flex items-center gap-1 bg-zinc-800 rounded-lg p-0.5 flex-shrink-0 self-start sm:self-auto">
@@ -196,10 +278,10 @@ export default function ResultPage() {
           子側 (IndividualView) がスクロール領域を管理する。
           Classification / Calendar は縦に長いコンテンツを外側スクロールで読む。 */}
       <div
-        className={`flex-1 transition-all duration-300 ${
+        className={`flex-1 transition-all duration-300 min-w-0 ${
           activeTab === "individual"
             ? "overflow-hidden flex flex-col min-h-0"
-            : "overflow-auto"
+            : "overflow-y-auto overflow-x-hidden"
         }`}
         style={{ paddingLeft: menuOpen ? "220px" : "40px" }}
       >
@@ -217,6 +299,7 @@ export default function ResultPage() {
             target={individualTarget}
             onSelectTarget={setIndividualTarget}
             onDownload={handleDownloadIndividual}
+            getPersonal={getPersonal}
           />
         )}
         {activeTab === "calendar" && (
@@ -241,7 +324,7 @@ export default function ResultPage() {
           standing={selectedStanding}
           team={getTeamByStanding(selectedStanding)}
           carClass={getClassByStanding(selectedStanding)}
-          personalData={getMockPersonalData(selectedStanding)}
+          personalData={getPersonal(selectedStanding)}
           onClose={() => setSelectedStanding(null)}
         />
       )}
@@ -259,9 +342,16 @@ function ClassificationView({
   onDownload: () => void;
   onRowClick: (s: Standing) => void;
 }) {
+  const stickyOffsets = getStickyLeftOffsets(CLASSIFICATION_COLUMNS, CLASSIFICATION_STICKY_KEYS);
+  const headerLabels: Record<string, string> = {
+    p: "P", pic: "PIC", no: "No.", class: "Class", name: "Name", team: "Team",
+    best: "Best Time", lap: "Lap", gap: "Gap", last: "Last Lap",
+    s1: "S1", s2: "S2", s3: "S3", pits: "Pits", laps: "Laps",
+  };
+
   return (
-    <div className="p-3 sm:p-4">
-      <div className="flex items-center justify-between mb-3 sm:mb-4 flex-wrap gap-2">
+    <div className="p-3 sm:p-4 flex flex-col min-w-0">
+      <div className="flex-shrink-0 flex items-center justify-between mb-3 sm:mb-4 flex-wrap gap-2">
         <div className="flex items-center gap-2 sm:gap-3 flex-wrap min-w-0">
           <div className="flex items-center gap-2 flex-shrink-0">
             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -281,21 +371,44 @@ function ClassificationView({
       </div>
 
       {classFilter && (
-        <div className="mb-3">
+        <div className="flex-shrink-0 mb-3">
           <span className="text-xs text-zinc-500">Filtered by: </span>
           <span className="inline-block px-2 py-0.5 rounded text-xs font-bold bg-zinc-700 text-white">{classFilter}</span>
         </div>
       )}
 
-      <div className="overflow-x-auto -mx-3 sm:mx-0 px-3 sm:px-0">
-        <table className="w-full border-collapse min-w-[760px]" style={{ fontSize: "var(--timing-fs)" }}>
+      <div className="timing-table-scroll-x min-w-0">
+        <table
+          className="timing-table w-full"
+          style={{
+            fontSize: "var(--timing-fs)",
+            tableLayout: "fixed",
+            minWidth: `${CLASSIFICATION_COLUMNS.reduce((sum, c) => sum + c.minW, 0)}px`,
+          }}
+        >
+          <colgroup>
+            {CLASSIFICATION_COLUMNS.map((col) => (
+              <col key={col.key} style={colWidthStyle(col, stickyOffsets)} />
+            ))}
+          </colgroup>
           <thead>
             <tr className="border-b-2 border-red-700 bg-zinc-800">
-              {["P","PIC","No.","Class","Team","Best Time","Lap","Gap","Last Lap","S1","S2","S3","Pits","Laps"].map((h) => (
-                <th key={h} className={`py-2 px-2 text-xs font-semibold text-white uppercase tracking-wider ${h === "Team" ? "text-left px-3" : h === "Best Time" || h === "Gap" || h === "Last Lap" || h === "S1" || h === "S2" || h === "S3" ? "text-right px-3" : "text-center"}`}>
-                  {h}
-                </th>
-              ))}
+              {CLASSIFICATION_COLUMNS.map((col) => {
+                const isSticky = stickyOffsets.has(col.key);
+                return (
+                  <th
+                    key={col.key}
+                    className={`py-2 px-2 text-xs font-semibold text-white uppercase tracking-wider ${col.align} ${
+                      isSticky
+                        ? stickyCellClass(col.key, stickyOffsets, CLASSIFICATION_FIRST_STICKY, CLASSIFICATION_LAST_STICKY)
+                        : ""
+                    }`}
+                    style={isSticky ? { left: `${stickyOffsets.get(col.key)}px` } : undefined}
+                  >
+                    {headerLabels[col.key]}
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody>
@@ -305,19 +418,30 @@ function ClassificationView({
               if (!team) return null;
               const leaderBest = standings[0]?.bestTime;
               const gap = idx === 0 || !s.bestTime || !leaderBest ? "" : `+${formatTime(s.bestTime - leaderBest)}`;
+              const isEven = idx % 2 === 0;
+              const sticky = (colKey: string, className: string) =>
+                `${stickyCellClass(colKey, stickyOffsets, CLASSIFICATION_FIRST_STICKY, CLASSIFICATION_LAST_STICKY, isEven)} ${className}`.trim();
+              const stickyStyle = (colKey: string) => stickyTdStyle(colKey, stickyOffsets);
               return (
                 <tr
                   key={s.teamId}
                   onClick={() => onRowClick(s)}
-                  className={`border-b border-zinc-800/70 hover:bg-zinc-800/50 transition-colors cursor-pointer ${idx % 2 === 0 ? "bg-zinc-900/40" : "bg-zinc-900/20"}`}
+                  className={`group border-b border-zinc-800/70 hover:bg-zinc-800/50 transition-colors cursor-pointer ${isEven ? "bg-zinc-900/40" : "bg-zinc-900/20"}`}
                 >
-                  <td className="py-1.5 px-2 text-center font-bold text-white font-mono">{idx + 1}</td>
-                  <td className="py-1.5 px-2 text-center text-zinc-400 font-mono">{s.classPosition}</td>
-                  <td className="py-1.5 px-2 text-center">
+                  <td className={sticky("p", "py-1.5 px-2 text-center font-bold text-white font-mono")} style={stickyStyle("p")}>
+                    {idx + 1}
+                  </td>
+                  <td className={sticky("pic", "py-1.5 px-2 text-center text-zinc-400 font-mono")} style={stickyStyle("pic")}>
+                    {s.classPosition}
+                  </td>
+                  <td className={sticky("no", "py-1.5 px-2 text-center")} style={stickyStyle("no")}>
                     <span className="inline-block w-8 h-6 rounded text-white text-xs font-bold leading-6 text-center" style={{ backgroundColor: cls?.color || "#71717a" }}>{team.no}</span>
                   </td>
-                  <td className="py-1.5 px-2 text-center text-xs text-zinc-400">{cls?.nameE}</td>
-                  <td className="py-1.5 px-3 text-left text-zinc-200 truncate max-w-[200px]">{team.nameE}</td>
+                  <td className={sticky("class", "py-1.5 px-2 text-center text-xs text-zinc-400")} style={stickyStyle("class")}>
+                    {cls?.nameE}
+                  </td>
+                  <td className="py-1.5 pl-2 pr-1 text-left text-zinc-200 truncate">{getDriverName(s, team)}</td>
+                  <td className="py-1.5 pl-2 pr-1 text-left text-zinc-300 truncate max-w-[200px]">{team.nameE}</td>
                   <td className="py-1.5 px-3 text-right font-mono font-bold text-fuchsia-400">{formatTime(s.bestTime)}</td>
                   <td className="py-1.5 px-2 text-center text-zinc-500 font-mono text-xs">{s.bestTimeLap > 0 ? `L${s.bestTimeLap}` : ""}</td>
                   <td className="py-1.5 px-3 text-right font-mono text-zinc-400">{gap}</td>
@@ -351,13 +475,15 @@ function IndividualView({
   target,
   onSelectTarget,
   onDownload,
+  getPersonal,
 }: {
   standings: Standing[];
   target: Standing | null;
   onSelectTarget: (s: Standing | null) => void;
   onDownload: (s: Standing) => void;
+  getPersonal: (s: Standing) => DriverPersonalData;
 }) {
-  const personalData = target ? getMockPersonalData(target) : null;
+  const personalData = target ? getPersonal(target) : null;
   const team = target ? getTeamByStanding(target) : null;
   const cls = target ? getClassByStanding(target) : null;
 
@@ -368,7 +494,7 @@ function IndividualView({
       {/* PC: 左サイドの縦リスト */}
       <div className="hidden md:flex w-72 flex-shrink-0 flex-col border border-zinc-700 rounded-xl bg-zinc-900/80 overflow-hidden">
         <div className="px-4 py-2.5 border-b border-zinc-700 bg-zinc-800/50">
-          <span className="text-xs text-zinc-400 uppercase tracking-wider font-semibold">Select Driver</span>
+          <span className="text-xs text-zinc-400 uppercase tracking-wider font-semibold">Select Name</span>
         </div>
         <div className="flex-1 overflow-y-auto">
           {standings.map((s) => {
@@ -392,6 +518,9 @@ function IndividualView({
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className={`text-xs truncate ${isActive ? "text-white font-bold" : "text-zinc-300"}`}>
+                    {getDriverName(s, t)}
+                  </div>
+                  <div className="text-[10px] text-zinc-500 truncate">
                     {t.nameE}
                   </div>
                   <div className="text-[10px] text-zinc-500 font-mono">
@@ -407,8 +536,8 @@ function IndividualView({
       {/* スマホ: 水平スクロールの chips リスト */}
       <div className="md:hidden flex-shrink-0 border border-zinc-700 rounded-xl bg-zinc-900/80 overflow-hidden">
         <div className="px-3 py-1.5 border-b border-zinc-700 bg-zinc-800/50 flex items-center justify-between">
-          <span className="text-[10px] text-zinc-400 uppercase tracking-wider font-semibold">Select Driver</span>
-          <span className="text-[10px] text-zinc-500">{standings.length} drivers</span>
+          <span className="text-[10px] text-zinc-400 uppercase tracking-wider font-semibold">Select Name</span>
+          <span className="text-[10px] text-zinc-500">{standings.length} entries</span>
         </div>
         <div className="flex gap-1.5 px-2 py-2 overflow-x-auto">
           {standings.map((s) => {
@@ -434,6 +563,9 @@ function IndividualView({
                 </span>
                 <div className="flex flex-col items-start min-w-0">
                   <span className={`text-[11px] leading-tight truncate max-w-[120px] ${isActive ? "font-bold" : ""}`}>
+                    {getDriverName(s, t)}
+                  </span>
+                  <span className="text-[9px] text-zinc-500 leading-tight truncate max-w-[120px]">
                     {t.nameE}
                   </span>
                   <span className="text-[9px] text-zinc-500 font-mono leading-tight">
@@ -454,7 +586,7 @@ function IndividualView({
               <svg className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-3 text-zinc-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
               </svg>
-              <p className="text-xs sm:text-sm">Select a driver to view individual results</p>
+              <p className="text-xs sm:text-sm">Select a name to view individual results</p>
             </div>
           </div>
         ) : (
@@ -469,15 +601,23 @@ function IndividualView({
                   {team.no}
                 </span>
                 <div className="min-w-0">
-                  <div className="text-white font-bold text-sm truncate">{team.nameE}</div>
+                  <div className="text-white font-bold text-sm truncate">{getDriverName(target, team)}</div>
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] sm:text-xs text-zinc-400">
-                    <span className="truncate max-w-[180px]">{team.drivers[1]?.nameE || "---"}</span>
+                    <span className="truncate max-w-[180px]">{team.nameE}</span>
                     <span className="text-zinc-600">|</span>
                     <span>{cls?.nameE}</span>
-                    <span className="text-zinc-600">|</span>
-                    <span className="truncate max-w-[140px]">{team.machine}</span>
-                    <span className="text-zinc-600">|</span>
-                    <span>{team.tire}</span>
+                    {team.machine && (
+                      <>
+                        <span className="text-zinc-600">|</span>
+                        <span className="truncate max-w-[140px]">{team.machine}</span>
+                      </>
+                    )}
+                    {team.tire && (
+                      <>
+                        <span className="text-zinc-600">|</span>
+                        <span>{team.tire}</span>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>

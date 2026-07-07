@@ -80,6 +80,7 @@ export interface Standing {
   sectorNo: number; // 1-4
   sectorTime: number | null; // 1/10000秒
   order: number;
+  refSectors?: Array<number | null>; // 各区間の直近計測タイム [S1,S2,S3]（Tracking移動時間の参照用）
 
   // フロントエンド用の算出フィールド
   gap: string;

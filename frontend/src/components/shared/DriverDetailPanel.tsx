@@ -1,6 +1,7 @@
 "use client";
 
 import type { Standing, Team, CarClass, DriverPersonalData } from "@/types/smis";
+import { getDriverName } from "@/data/mock";
 import { formatTime } from "@/lib/format";
 import { TIME_COLORS } from "@/lib/colors";
 
@@ -21,10 +22,7 @@ export default function DriverDetailPanel({
 }: DriverDetailPanelProps) {
   if (!team) return null;
 
-  const driverName =
-    team.drivers.find((d) => d.no === standing.driverNo)?.nameE ||
-    team.drivers[1]?.nameE ||
-    "---";
+  const driverName = getDriverName(standing, team);
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-8 pb-8">

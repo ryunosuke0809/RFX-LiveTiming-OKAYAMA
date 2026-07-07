@@ -1,0 +1,63 @@
+---
+description: RFX LiveTiming OKAYAMA の UI デザイントークン・色・タイポ（frontend 限定）
+globs: frontend/**/*.{tsx,css}
+alwaysApply: false
+---
+
+# LiveTiming OKAYAMA — デザイン規約
+
+このルールは **RFX-LiveTiming-OKAYAMA** の frontend のみに適用する。他プロジェクトのデザインを流用しない。
+
+## テーマ
+
+- **ダーク UI**: 背景 `#0c0c0f`（`layout.tsx` / `--background`）、本文 `text-zinc-200`
+- **パネル**: `bg-zinc-900` + `border-zinc-700`（ヘッダー・フッター・サイドメニュー）
+- **区切り**: `border-zinc-800` / `border-zinc-800/50`、テーブルヘッダー下は `border-red-700`（2px）
+- **アクセント**: 残り時間・現在時刻は `font-mono` + `text-white` / `text-emerald-400`（`TimingHeader`）
+
+## フォント
+
+- **UI 本文**: Titillium Web（`font-sans` / `--font-titillium`）、`body` は `font-weight: 600`
+- **タイム・順位・Gap**: `font-mono`（Roboto Mono）+ `tabular-nums`（数値列）
+- **ラベル**: `uppercase tracking-wider` または `tracking-widest` + `text-zinc-500`（小見出し）
+
+## レスポンシブ文字サイズ
+
+固定 `text-sm` 等でタイミング表を組まない。必ず CSS 変数を使う:
+
+```tsx
+style={{ fontSize: "var(--timing-fs)" }}       // 表本体
+style={{ fontSize: "var(--timing-fs-sm)" }}    // ヘッダー・ラベル
+style={{ fontSize: "var(--timing-fs-lg)" }}    // 強調
+style={{ fontSize: "var(--timing-fs-xl)" }}    // 残り時間・時計
+```
+
+定義は `frontend/src/app/globals.css`。ブレークポイントを変えずに済む。
+
+## 色の意味（必ず既存定数を使う）
+
+| 用途 | 参照 |
+|------|------|
+| ラップタイム種別（OB/PB/Current） | `TIME_COLORS` in `@/lib/colors` |
+| 車両ステータス背景 | `STATUS_COLORS` |
+| クラス表示 | `getClassColor()` / `ClassBadge` |
+| トラックフラグ | `FLAG_COLORS` |
+| FL 表示 | `text-fuchsia-400`（StatusBar と統一） |
+
+新規に `text-purple-400` 等の「似た色」を増やさない。必要なら `colors.ts` に追加してから使う。
+
+## アニメーション
+
+`globals.css` のクラスのみ使用（`box-shadow: inset` で行背景と競合しない設計）:
+
+- 順位 UP/DOWN: `pos-up` / `pos-down`（Race モード時）
+- FL 通過: `fl-flash`
+- セクター: `sector-flash` + `sector-flash-ob|pb|cur`
+
+## トラッキング地図のセクター色
+
+`OkayamaCircuitSvg.tsx` と一致: **S1=赤 `#ef4444` / S2=黄 `#eab308` / S3=緑 `#22c55e`**。境界線は `#f59e0b` 点線。
+
+## 詳細
+
+コンポーネント構成・新規画面の手順は `.cursor/skills/livetiming-ui/` を参照。

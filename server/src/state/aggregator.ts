@@ -5,12 +5,14 @@ import {
     formatGap,
     parseFlagFromMessage,
 } from "./derive.js";
-import type { LiveSessionState } from "./session-state.js";
+import type { LiveSessionState, TeamLapAccum } from "./session-state.js";
 import type {
     CarClassVm,
     CarStatus,
+    LapDataVm,
     LiveStatePatch,
     RaceControlMessageVm,
+    SectorTimeVm,
     StandingVm,
     TeamSummaryVm,
     TrackFlag,
@@ -29,6 +31,7 @@ export class SessionStateAggregator {
 
     apply(envelope: IngestEnvelope): LiveStatePatch[] {
         this.state.circuitId = envelope.circuitId;
+        if (envelope.ts) this.state.lastDataTs = envelope.ts;
         const p = envelope.payload as Record<string, unknown>;
 
         switch (envelope.kind) {
@@ -78,14 +81,37 @@ export class SessionStateAggregator {
             categoryNameJ: str(p, "nameJ") ?? "",
             categoryNameE: str(p, "nameE") ?? "",
         };
-        return this.mergeSessionInfo(fields);
+        const patches = this.mergeSessionInfo(fields);
+
+        // MOLA は SessionId が固定のため、Competition/Category 名で切替を検知する。
+        // Category はマスターダンプの Class/Team より前に来るので、ここでリセットすれば
+        // 直後に再送されるマスターで新セッションのエントリーが正しく構築される。
+        const s = this.state.session;
+        const signature = s
+            ? `${s.competitionNameJ}|${s.categoryNameJ}|${s.roundNameJ}`
+            : "";
+        const isSwitch =
+            this.state.sessionSignature !== null &&
+            signature !== this.state.sessionSignature;
+        this.state.sessionSignature = signature;
+        if (isSwitch) {
+            this.state.resetForSessionSwitch();
+            return [{ kind: "reset" }, ...patches];
+        }
+        return patches;
     }
 
     private applyRound(p: Record<string, unknown>): LiveStatePatch[] {
+        const nameJ = str(p, "nameJ") ?? "";
+        const nameE = str(p, "nameE") ?? "";
+        // MOLA の Round.Type は当該データでは常に "L" で信頼できないため、
+        // ラウンド名から race / time を推定する (決勝・Race・Final → race、他は time)。
+        this.state.sessionMode = deriveSessionMode(nameJ, nameE, str(p, "type"));
         const fields = {
             roundId: str(p, "id") ?? "",
-            roundNameJ: str(p, "nameJ") ?? "",
-            roundNameE: str(p, "nameE") ?? "",
+            roundNameJ: nameJ,
+            roundNameE: nameE,
+            isRace: this.state.sessionMode === "race",
         };
         return this.mergeSessionInfo(fields);
     }
@@ -145,14 +171,16 @@ export class SessionStateAggregator {
     }
 
     private applyStart(p: Record<string, unknown>): LiveStatePatch[] {
-        const startedAt = str(p, "startedAt") ?? str(p, "time") ?? null;
-        if (startedAt) {
-            const ms = Date.parse(startedAt);
+        // SMIS Start.DateTime は "yyyy/MM/dd HH:mm.ss" (秒の前が '.', 末尾空白あり, JST)。
+        const raw = str(p, "dateTime") ?? str(p, "startedAt") ?? str(p, "time") ?? null;
+        const iso = parseSmisStartDateTime(raw);
+        if (iso) {
+            const ms = Date.parse(iso);
             if (!Number.isNaN(ms)) {
                 this.state.sessionStartedAtMs = ms;
             }
         }
-        return this.mergeSessionInfo({ sessionStartedAt: startedAt ?? null });
+        return this.mergeSessionInfo({ sessionStartedAt: iso ?? raw ?? null });
     }
 
     // ============================================================
@@ -196,10 +224,71 @@ export class SessionStateAggregator {
         return patches;
     }
 
+    /**
+     * SMIS Standings。
+     *
+     * MOLA は `<Standings>` に全車の `<Standing>` を内包して送る (envelope の payload は
+     * `{ sessionId, items: [...] }`)。旧スモークテスト用に、items が無い単一 standing 形式も許容する。
+     */
     private applyStandings(p: Record<string, unknown>): LiveStatePatch[] {
-        const teamId = str(p, "teamId");
-        if (!teamId) return [];
+        const items = Array.isArray(p["items"])
+            ? (p["items"] as Array<Record<string, unknown>>)
+            : [p];
 
+        const extraPatches: LiveStatePatch[] = [];
+        let anyChanged = false;
+
+        for (const item of items) {
+            const teamId = str(item, "teamId");
+            if (!teamId) continue;
+            extraPatches.push(...this.upsertStanding(teamId, item));
+            anyChanged = true;
+        }
+
+        if (!anyChanged) return [];
+
+        // gap / interval を全車に対して再計算 (順位は SMIS が決めた position が真)
+        const sorted = this.state.standingsArray();
+        const patches: LiveStatePatch[] = [];
+        const top = sorted[0];
+        if (top) {
+            if (this.state.sessionMode === "time") {
+                // ベストタイムモード (予選/専有): トップのベストタイムとの差
+                let prev = top;
+                for (const cur of sorted) {
+                    cur.gap = formatTimeGap(cur.bestTime, top.bestTime);
+                    cur.interval = formatTimeGap(cur.bestTime, prev.bestTime);
+                    prev = cur;
+                }
+            } else {
+                // 周回レースモード: 周回差 / 同一周回のラップ差
+                let prev = top;
+                for (const cur of sorted) {
+                    cur.gap = formatGap(cur.lap, cur.lastPassingTime, top.lap, top.lastPassingTime);
+                    cur.interval = formatGap(cur.lap, cur.lastPassingTime, prev.lap, prev.lastPassingTime);
+                    prev = cur;
+                }
+            }
+        }
+
+        // グループ更新では全車を送り直す (順位・gap がまとめて変わるため)
+        for (const s of sorted) {
+            patches.push({ kind: "standing_upsert", value: { ...s } });
+        }
+        patches.push({ kind: "track_count", value: this.state.trackCount() });
+        patches.push(...extraPatches);
+
+        return patches;
+    }
+
+    /**
+     * 1 台分の standing を state に反映する。gap/interval は呼び出し側でまとめて再計算する。
+     * fastest_lap / driver_lap の追加 patch を配列で返す。
+     */
+    private upsertStanding(
+        teamId: string,
+        p: Record<string, unknown>,
+    ): LiveStatePatch[] {
         const newPosition = int(p, "position") ?? 0;
         const newClassPos = int(p, "classPosition") ?? 0;
         const newLap = int(p, "lap") ?? 0;
@@ -215,12 +304,11 @@ export class SessionStateAggregator {
 
         const prevPosition = this.state.previousPosition.get(teamId);
         const positionChange =
-            prevPosition !== undefined && prevPosition !== 0
+            prevPosition !== undefined && prevPosition !== 0 && newPosition !== 0
                 ? prevPosition - newPosition
                 : 0;
-        this.state.previousPosition.set(teamId, newPosition);
+        if (newPosition !== 0) this.state.previousPosition.set(teamId, newPosition);
 
-        // BestTime に対する TimeType を計算するため overallBest を先に更新
         const personalBefore = this.state.teamPersonalBest.get(teamId) ?? null;
         let overallBefore = this.state.overallBest;
         if (newBest !== null && newBest > 0) {
@@ -239,10 +327,105 @@ export class SessionStateAggregator {
         const existing = this.state.standings.get(teamId);
         const status: CarStatus = existing?.status ?? "on_track";
 
+        // セクタータイム (S1/S2/S3) を「進行中の周」で集計する。
+        // SMIS: S1→SectorNo=1, S2→SectorNo=2, S3→SectorNo=3 (S3 は Lap が +1 済で届く)。
+        // ピット時は SectorNo=0 (S3 は来ない) → S3 はブランクのまま = 「S3・ラップ無し」。
+        // 1 周の完了は LastLapTime の変化で検知する (通常の FL 通過も、ピットアウトの FL も拾える)。
+        const extraPatches: LiveStatePatch[] = [];
+        const accum = this.getLapAccum(teamId);
+        const secKey = `${newSectorNo}:${newSectorTime ?? ""}`;
+
+        if (
+            newSectorNo >= 1 &&
+            newSectorNo <= 3 &&
+            newSectorTime !== null &&
+            newSectorTime > 0 &&
+            secKey !== accum.lastSecKey
+        ) {
+            accum.lastSecKey = secKey;
+            const idx = newSectorNo - 1;
+
+            // ベストセクター判定 (色分け用)。
+            const teamBest = this.state.teamBestSector.get(teamId) ?? [null, null, null];
+            const overallBest = this.state.overallBestSector;
+            const prevTeamBest = teamBest[idx] ?? null;
+            const prevOverallBest = overallBest[idx] ?? null;
+            if (prevTeamBest === null || newSectorTime < prevTeamBest) {
+                teamBest[idx] = newSectorTime;
+                this.state.teamBestSector.set(teamId, teamBest);
+            }
+            if (prevOverallBest === null || newSectorTime < prevOverallBest) {
+                overallBest[idx] = newSectorTime;
+            }
+            const secType = classifyTimeType(newSectorTime, prevOverallBest, prevTeamBest);
+            const sectorVm: SectorTimeVm = { time: newSectorTime, type: secType };
+
+            // 各区間の「最後に計測したタイム」を保持 (周をまたいで参照用)。
+            accum.refTimes[idx] = newSectorTime;
+
+            if (newSectorNo === 1) {
+                // 新しい周の始まり: 前周の S2/S3 をクリアして混在を防ぐ。
+                accum.s1 = sectorVm;
+                accum.s2 = null;
+                accum.s3 = null;
+                accum.s1Lap = newLap;
+            } else if (newSectorNo === 2) {
+                accum.s2 = sectorVm;
+            } else if (newSectorNo === 3) {
+                accum.s3 = sectorVm;
+            }
+        }
+
+        // 1 周完了検知: LastLapTime が更新されたら、その時点の accum を 1 周として記録する。
+        // 初回観測時は「基準値」だけ設定して記録しない (途中接続で前周の LastLapTime を
+        // 誤って 1 周分カウントしてしまう off-by-one を防ぐ)。
+        if (accum.lastLapTime === -1) {
+            accum.lastLapTime = newLast ?? 0;
+        } else if (newLast !== null && newLast > 0 && newLast !== accum.lastLapTime) {
+            accum.lastLapTime = newLast;
+            const isPitLap = accum.s3 === null; // S3 が無ければピット周 (S2 通過後にピットイン)
+            // 完了周番号は MOLA が FL 通過で付けた値 = 1 始まり (タイムモードの 1 周目 = Lap 1)。
+            const lapNo = newLap;
+            const s1t = accum.s1?.time ?? null;
+            const s2t = accum.s2?.time ?? null;
+            let s3t = accum.s3?.time ?? null;
+            // ピット周は S3 が来ないため、個別データには「S2 通過～ピットアウト FL」の時間
+            // (= LapTime - S1 - S2) を S3 として入れる。
+            if (isPitLap && s1t !== null && s2t !== null && newLast > s1t + s2t) {
+                s3t = newLast - s1t - s2t;
+            }
+            const lapData: LapDataVm = {
+                lap: lapNo,
+                lapTime: newLast,
+                s1: s1t,
+                s2: s2t,
+                s3: s3t,
+                s1Type: accum.s1?.type ?? "none",
+                s2Type: accum.s2?.type ?? "none",
+                s3Type: isPitLap ? "current" : (accum.s3?.type ?? "none"),
+                lapTimeType: classifyTimeType(newLast, this.state.overallBest, personalBefore),
+                isPit: isPitLap,
+                position: newPosition,
+            };
+            const laps = this.state.teamLaps.get(teamId) ?? [];
+            if (!laps.some((l) => l.lap === lapNo)) {
+                laps.push(lapData);
+                this.state.teamLaps.set(teamId, laps);
+                extraPatches.push({ kind: "driver_lap", teamId, value: lapData });
+            }
+        }
+
+        // 表示は「進行中の周」の値。ピット等で未計測の区間はブランク。
+        const sectors: SectorTimeVm[] = [
+            accum.s1 ?? { time: null, type: "none" },
+            accum.s2 ?? { time: null, type: "none" },
+            accum.s3 ?? { time: null, type: "none" },
+        ];
+
         const standing: StandingVm = {
             position: newPosition,
             classPosition: newClassPos,
-            classId: team?.classId ?? "",
+            classId: team?.classId ?? existing?.classId ?? "",
             teamId,
             teamNo: team?.no ?? 0,
             teamNameJ: team?.nameJ ?? "",
@@ -258,10 +441,11 @@ export class SessionStateAggregator {
             sectorNo: newSectorNo,
             sectorTime: newSectorTime,
             order: int(p, "order") ?? existing?.order ?? 0,
-            gap: "—", // 後段で書き換える
-            interval: "—",
+            refSectors: [...accum.refTimes],
+            gap: existing?.gap ?? "—",
+            interval: existing?.interval ?? "—",
             status,
-            sectors: existing?.sectors ?? [],
+            sectors,
             bestTimeType,
             lastLapTimeType,
             pits: this.state.pitCount.get(teamId) ?? existing?.pits ?? 0,
@@ -271,30 +455,6 @@ export class SessionStateAggregator {
 
         this.state.standings.set(teamId, standing);
 
-        // gap / interval を全車に対して再計算 (順位は SMIS が決めた position が真)
-        const sorted = this.state.standingsArray();
-        const top = sorted[0];
-        const patches: LiveStatePatch[] = [];
-
-        if (top) {
-            let prev = top;
-            for (const cur of sorted) {
-                cur.gap = formatGap(cur.lap, cur.lastPassingTime, top.lap, top.lastPassingTime);
-                cur.interval = formatGap(cur.lap, cur.lastPassingTime, prev.lap, prev.lastPassingTime);
-                prev = cur;
-            }
-        }
-
-        // 変化した standing だけ patch として送る (今回更新されたチームと先頭は必ず送る)
-        const updated = this.state.standings.get(teamId);
-        if (updated) {
-            patches.push({ kind: "standing_upsert", value: { ...updated } });
-        }
-        if (top && top.teamId !== teamId) {
-            patches.push({ kind: "standing_upsert", value: { ...top } });
-        }
-
-        // FastestLap の更新
         if (newBest !== null && newBest > 0 && newBest === this.state.overallBest) {
             this.state.fastestLap = {
                 teamId,
@@ -304,10 +464,25 @@ export class SessionStateAggregator {
                 lapTime: newBest,
                 lap: newLap,
             };
-            patches.push({ kind: "fastest_lap", value: this.state.fastestLap });
+            extraPatches.push({ kind: "fastest_lap", value: this.state.fastestLap });
         }
+        return extraPatches;
+    }
 
-        return patches;
+    /** teamId のラップ蓄積状態を取得 (無ければ初期化)。 */
+    private getLapAccum(teamId: string): TeamLapAccum {
+        let a = this.state.teamLapAccum.get(teamId);
+        if (!a) {
+            a = {
+                s1: null, s2: null, s3: null,
+                refTimes: [null, null, null],
+                s1Lap: 0,
+                lastSecKey: "",
+                lastLapTime: -1,
+            };
+            this.state.teamLapAccum.set(teamId, a);
+        }
+        return a;
     }
 
     private applyMessage(p: Record<string, unknown>): LiveStatePatch[] {
@@ -368,7 +543,26 @@ function emptySessionInfo(): NonNullable<LiveSessionState["session"]> {
         flag: "green",
         sessionStartedAt: null,
         sessionRemainingSec: null,
+        isRace: false,
     };
+}
+
+/**
+ * ラウンド名からセッション種別を推定する。
+ * 決勝 / Race / Final / レース / Heat 等 → "race"、それ以外 (予選・専有・フリー等) → "time"。
+ */
+function deriveSessionMode(
+    nameJ: string,
+    nameE: string,
+    type: string | null,
+): "race" | "time" {
+    const text = `${nameJ} ${nameE}`.toLowerCase();
+    if (/決勝|レース|race|final|heat|ヒート|grand prix|gp/.test(text)) return "race";
+    // 予選・専有走行・フリー走行・練習・calibration などは time
+    if (/予選|専有|フリー|練習|practice|qualif|warm|calib/.test(text)) return "time";
+    // 名前で判断できない場合は SMIS Type にフォールバック (L=Lap=race, それ以外 time)
+    if (type === "2" || type === "L") return "race";
+    return "time";
 }
 
 function str(obj: Record<string, unknown>, key: string): string | null {
@@ -386,4 +580,27 @@ function int(obj: Record<string, unknown>, key: string): number | null {
         if (Number.isFinite(n)) return n;
     }
     return null;
+}
+
+/**
+ * SMIS Start.DateTime ("yyyy/MM/dd HH:mm.ss", JST, 末尾空白あり) を
+ * ISO8601 (+09:00) に変換する。パース不能なら null。
+ */
+function parseSmisStartDateTime(raw: string | null): string | null {
+    if (!raw) return null;
+    const m = raw.trim().match(/^(\d{4})\/(\d{2})\/(\d{2})\s+(\d{2}):(\d{2})\.(\d{2})$/);
+    if (!m) return null;
+    const [, y, mo, d, hh, mm, ss] = m;
+    return `${y}-${mo}-${d}T${hh}:${mm}:${ss}+09:00`;
+}
+
+/**
+ * ベストタイムモードの gap/interval。基準タイムとの差を "+s.sss" で返す。
+ * 自分がトップ / どちらか未計測なら "—"。
+ */
+function formatTimeGap(selfBest: number | null, refBest: number | null): string {
+    if (selfBest === null || selfBest <= 0 || refBest === null || refBest <= 0) return "—";
+    const diff = selfBest - refBest;
+    if (diff <= 0) return "—";
+    return `+${(diff / 10000).toFixed(3)}`;
 }

@@ -1,0 +1,63 @@
+---
+description: RFX LiveTiming OKAYAMA の frontend コンポーネント構成・実装パターン
+globs: frontend/src/**/*.{tsx,ts}
+alwaysApply: false
+---
+
+# LiveTiming OKAYAMA — コンポーネント規約
+
+## スタック
+
+- Next.js 16 App Router（`frontend/`）、React 19、Tailwind CSS v4（`@import "tailwindcss"`）
+- パスエイリアス `@/` → `frontend/src/`
+- Next.js の挙動は `frontend/AGENTS.md` を優先
+
+## ディレクトリ
+
+```
+frontend/src/
+  app/              # ページ（page.tsx, layout.tsx, globals.css）
+  components/
+    timing/         # タイミング表・ヘッダー・StatusBar
+    tracking/       # OkayamaCircuitSvg
+    layout/         # SideMenu, SplashScreen
+    shared/         # DriverDetailPanel 等
+    dev/            # 開発用ツール
+  lib/              # colors, format, okayamaTrack*
+  types/smis.ts     # SMIS 型
+  data/mock.ts      # 開発用モック
+```
+
+## 実装パターン
+
+- インタラクティブ UI は先頭に `"use client"`
+- デフォルト export の関数コンポーネント（`export default function Xxx`）
+- SMIS データ型は `@/types/smis`、表示フォーマットは `@/lib/format`（`formatTime` は 1/10000 秒単位）
+- 色は `@/lib/colors`、岡山コース幾何は `okayamaTrackAsset.ts` + `okayamaTrackGeometry.ts`
+
+## レイアウト（全画面）
+
+```tsx
+<div className="h-full flex flex-col">
+  <SideMenu isOpen={...} style width 220px / 40px />
+  <motion area style={{ paddingLeft: menuOpen ? "220px" : "40px" }} />
+</motion>
+```
+
+`layout.tsx` の `body` は `h-full overflow-hidden`。ページも `h-full flex flex-col`。
+
+## タイミング表
+
+- `TimingTable` + `TimingRow`：列定義は `getColumns(isRaceMode)`、可変列は `ColumnToggle`
+- 行背景: 偶数 `bg-zinc-900/60` / 奇数 `bg-zinc-900/30`、`hover:bg-zinc-700/40`
+- セルは `py-px` でコンパクト、長文は `truncate`
+
+## モーダル
+
+`DriverDetailPanel` パターン: `fixed inset-0 z-50` + `bg-black/60 backdrop-blur-sm` + `bg-zinc-900 border-zinc-700 rounded-xl`
+
+## 新規 UI を足すとき
+
+1. 既存コンポーネントをコピー・拡張する（新規デザインシステムを作らない）
+2. `.cursor/skills/livetiming-ui/reference.md` のチェックリストを確認
+3. モックは `data/mock.ts`、本番接続前はページ内で mock を import

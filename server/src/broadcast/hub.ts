@@ -71,11 +71,12 @@ export class BroadcastHub {
     }
 
     /** Aggregator が計算した patch をフロントエンドへ送る。 */
-    broadcastPatches(circuitId: string | null, patches: LiveStatePatch[]): void {
+    broadcastPatches(circuitId: string | null, patches: LiveStatePatch[], dataTs: string | null = null): void {
         if (patches.length === 0) return;
         this.broadcastMessage({
             type: "patch",
             serverTs: new Date().toISOString(),
+            dataTs,
             circuitId,
             patches,
         });

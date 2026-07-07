@@ -53,18 +53,26 @@ export class TimingRepository {
                 );
             } else if (envelope.kind === "Standings") {
                 const p = envelope.payload as Record<string, unknown>;
-                this.insertStandingStmt!.run(
-                    envelope.circuitId,
-                    pickInt(p, "position", "Position"),
-                    pickInt(p, "classPosition", "ClassPosition"),
-                    pickStr(p, "teamId", "TeamId"),
-                    pickInt(p, "lap", "Lap"),
-                    pickInt(p, "bestTime", "BestTime"),
-                    pickInt(p, "lastLapTime", "LastLapTime"),
-                    pickInt(p, "sectorNo", "SectorNo"),
-                    pickInt(p, "sectorTime", "SectorTime"),
-                    envelope.ts,
-                );
+                // MOLA は全車を items[] にまとめて送る。旧単一形式もフォールバックで許容。
+                const rawItems = p["items"] ?? p["Items"];
+                const items = Array.isArray(rawItems)
+                    ? (rawItems as Array<Record<string, unknown>>)
+                    : [p];
+                for (const item of items) {
+                    if (pickStr(item, "teamId", "TeamId") === null) continue;
+                    this.insertStandingStmt!.run(
+                        envelope.circuitId,
+                        pickInt(item, "position", "Position"),
+                        pickInt(item, "classPosition", "ClassPosition"),
+                        pickStr(item, "teamId", "TeamId"),
+                        pickInt(item, "lap", "Lap"),
+                        pickInt(item, "bestTime", "BestTime"),
+                        pickInt(item, "lastLapTime", "LastLapTime"),
+                        pickInt(item, "sectorNo", "SectorNo"),
+                        pickInt(item, "sectorTime", "SectorTime"),
+                        envelope.ts,
+                    );
+                }
             }
         } catch (err) {
             this.logger.error("repository.insertEnvelope failed", {

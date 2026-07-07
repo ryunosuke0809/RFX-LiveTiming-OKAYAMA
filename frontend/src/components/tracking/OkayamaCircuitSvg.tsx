@@ -8,7 +8,7 @@
  * 同じくスムージング済みの `lapD` に沿って動く。ズームと回転は viewBox 中心を基準に <g> で適用。
  */
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Standing } from "@/types/smis";
 import { getTeamByStanding, getClassByStanding } from "@/data/mock";
 import {
@@ -31,6 +31,37 @@ const SECTOR_COLORS = {
   s3: "#22c55e",
 };
 
+// 岡山のセクター境界 (Loop 長 / 全長 3703m): S1末=962m(0.26) / S2末=2520m(0.68) / 一周=1.0。
+const BOUND_CL = 0.0;
+const BOUND_S1 = 0.2598;
+const BOUND_S2 = 0.6805;
+const BOUND_LAP = 1.0;
+/** 区間ごとの既定移動時間(ms)。区間タイム未取得時のフォールバック。 */
+const DEFAULT_SEG_MS = [22000, 42000, 33000];
+
+/**
+ * sectorNo から「今いる区間の始点/終点/移動に使う区間index」を返す。
+ * SectorNo は直近で通過した計測点: 1=S1通過(→S2走行), 2=S2通過(→S3走行), 3/0=CL通過(→S1走行)。
+ */
+function segmentFor(sectorNo: number): { start: number; target: number; durIdx: number } {
+  switch (sectorNo) {
+    case 1:
+      return { start: BOUND_S1, target: BOUND_S2, durIdx: 1 }; // S2 を走行
+    case 2:
+      return { start: BOUND_S2, target: BOUND_LAP, durIdx: 2 }; // S3 を走行
+    default: // 3 or 0
+      return { start: BOUND_CL, target: BOUND_S1, durIdx: 0 }; // S1 を走行
+  }
+}
+
+interface CarAnim {
+  start: number;
+  target: number;
+  startT: number;
+  durMs: number;
+  leg: number;
+}
+
 const TRACK_STROKE_WIDE = 38;
 const TRACK_STROKE_LINE = 9;
 
@@ -40,6 +71,12 @@ const ZOOM_STEP = 1.2;
 const ZOOM_DEFAULT = 0.83;
 const ROTATE_STEP = 15;
 const PAN_DRAG_THRESHOLD = 4;
+
+/** 車番アイコンのサイズ倍率。ユーザーがサークル/ラベルを拡大縮小できる。 */
+const MARKER_SCALE_MIN = 0.6;
+const MARKER_SCALE_MAX = 2.2;
+const MARKER_SCALE_STEP = 0.2;
+const MARKER_SCALE_DEFAULT = 1;
 
 /** セクター境界を路面に対し直交で横断するオレンジ点線 */
 const BOUNDARY_LINE_COLOR = "#f59e0b";
@@ -110,6 +147,22 @@ export default function OkayamaCircuitSvg({
   const [zoom, setZoom] = useState(ZOOM_DEFAULT);
   const [rotation, setRotation] = useState(0);
   const [pan, setPan] = useState<Vec2>({ x: 0, y: 0 });
+  const [markerScale, setMarkerScale] = useState(MARKER_SCALE_DEFAULT);
+
+  // 車両アニメーション: teamId ごとに「現区間の始点→終点を区間タイムかけて移動」する状態を保持し、
+  // requestAnimationFrame で毎フレーム再描画する。
+  const animRef = useRef<Map<string, CarAnim>>(new Map());
+  const [, setAnimFrame] = useState(0);
+  useEffect(() => {
+    if (!showCarMarkers) return;
+    let raf = 0;
+    const loop = () => {
+      setAnimFrame((f) => (f + 1) % 1_000_000);
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [showCarMarkers]);
 
   const svgRef = useRef<SVGSVGElement | null>(null);
   const dragRef = useRef<{
@@ -143,12 +196,17 @@ export default function OkayamaCircuitSvg({
 
   const onZoomIn = () => setZoom((z) => Math.min(ZOOM_MAX, z * ZOOM_STEP));
   const onZoomOut = () => setZoom((z) => Math.max(ZOOM_MIN, z / ZOOM_STEP));
+  const onMarkerBigger = () =>
+    setMarkerScale((m) => Math.min(MARKER_SCALE_MAX, +(m + MARKER_SCALE_STEP).toFixed(2)));
+  const onMarkerSmaller = () =>
+    setMarkerScale((m) => Math.max(MARKER_SCALE_MIN, +(m - MARKER_SCALE_STEP).toFixed(2)));
   const onRotateLeft = () => setRotation((r) => r - ROTATE_STEP);
   const onRotateRight = () => setRotation((r) => r + ROTATE_STEP);
   const onReset = () => {
     setZoom(ZOOM_DEFAULT);
     setRotation(0);
     setPan({ x: 0, y: 0 });
+    setMarkerScale(MARKER_SCALE_DEFAULT);
   };
 
   const screenToSvg = useCallback((clientX: number, clientY: number): Vec2 => {
@@ -516,9 +574,8 @@ export default function OkayamaCircuitSvg({
 
           {/* FL/S1/S2 の小ラベルは廃止（FL は上の独自デザイン、S1/S2 は横断ラインのみ） */}
 
-          {/* マシンマーカー（ラップ上に等間隔配置） */}
+          {/* マシンマーカー（sectorNo からコース位置を推定して配置） */}
           {showCarMarkers && (() => {
-            const total = standings.length;
             const highlighted = highlightedTeamIds ?? new Set<string>();
             const hasHighlights = highlighted.size > 0;
 
@@ -528,24 +585,60 @@ export default function OkayamaCircuitSvg({
               return aH - bH;
             });
 
+            const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+
             return sorted.map((s) => {
               const team = getTeamByStanding(s);
               const cls = getClassByStanding(s);
               if (!team) return null;
 
-              const origIdx = standings.findIndex((st) => st.teamId === s.teamId);
-              const t = total > 1 ? origIdx / total : 0;
+              // IN PIT の車両はコース上から消す（トラッキングページの PitIn リストに表示する）。
+              if (s.status === "in_pit") {
+                animRef.current.delete(s.teamId);
+                return null;
+              }
+
+              // 区間通過に応じてアニメーションのレグ(始点→終点)を更新する。
+              // 移動時間は「直近の該当区間タイム」(sectors[durIdx]) を採用。
+              let t: number;
+              {
+                const seg = segmentFor(s.sectorNo);
+                const legKey = s.lap * 4 + s.sectorNo; // (周,区間)が変わったら新レグ
+                const prev = animRef.current.get(s.teamId);
+                if (!prev || prev.leg !== legKey) {
+                  // 移動時間は「その区間で最後に計測したタイム」を採用 (前回最新通過タイム)。
+                  const secTime = s.refSectors?.[seg.durIdx] ?? null;
+                  const durMs = secTime && secTime > 0 ? secTime / 10 : DEFAULT_SEG_MS[seg.durIdx];
+                  animRef.current.set(s.teamId, {
+                    start: seg.start,
+                    target: seg.target,
+                    startT: now,
+                    durMs,
+                    leg: legKey,
+                  });
+                }
+                const a = animRef.current.get(s.teamId)!;
+                const p = Math.max(0, Math.min(1, (now - a.startT) / a.durMs));
+                t = a.start + (a.target - a.start) * p;
+                if (t >= 1) t -= 1;
+              }
               const { x, y } =
                 samples.length >= 2 ? pointOnLapSamples(samples, t) : { x: 800, y: 400 };
 
               const isHighlighted = highlighted.has(s.teamId);
               const fillColor = cls?.color || "#71717a";
               const dimmed = hasHighlights && !isHighlighted;
-              const r = isHighlighted ? 16 : 12;
+              const r = (isHighlighted ? 16 : 12) * markerScale;
+              const labelFont = (isHighlighted ? 11 : 9) * markerScale;
+
+              // 位置は親 <g> の回転で地図と一緒に動くが、番号ラベルは常に正立させたい。
+              // マーカー中心 (x,y) を軸に親の回転を打ち消す逆回転をかける。
+              const counterRotate = rotation % 360 !== 0 ? `rotate(${-rotation} ${x} ${y})` : undefined;
 
               return (
                 <g
                   key={s.teamId}
+                  transform={counterRotate}
                   filter={isHighlighted ? "url(#glow-strong)" : undefined}
                   style={{ cursor: onMarkerClick ? "pointer" : undefined }}
                   onClick={
@@ -578,7 +671,7 @@ export default function OkayamaCircuitSvg({
                     textAnchor="middle"
                     dominantBaseline="central"
                     fill="white"
-                    fontSize={isHighlighted ? 11 : 9}
+                    fontSize={labelFont}
                     fontWeight="bold"
                     fontFamily="sans-serif"
                     opacity={dimmed ? 0.4 : 1}
@@ -661,10 +754,37 @@ export default function OkayamaCircuitSvg({
           </button>
         </div>
 
+        {/* 車番アイコン（サークル/ラベル）のサイズ調整 */}
+        <div className="flex flex-col bg-zinc-900/80 backdrop-blur-sm border border-zinc-700 rounded-md overflow-hidden shadow-lg">
+          <button
+            type="button"
+            onClick={onMarkerBigger}
+            disabled={markerScale >= MARKER_SCALE_MAX - 1e-3}
+            className="w-9 h-9 flex items-center justify-center text-zinc-200 hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            aria-label="Enlarge car icons"
+            title="車番アイコンを拡大"
+          >
+            <span className="inline-block w-3.5 h-3.5 rounded-full bg-zinc-200" />
+          </button>
+          <div className="text-center text-[10px] text-zinc-500 font-mono py-0.5 border-y border-zinc-700/60">
+            {(markerScale * 100).toFixed(0)}%
+          </div>
+          <button
+            type="button"
+            onClick={onMarkerSmaller}
+            disabled={markerScale <= MARKER_SCALE_MIN + 1e-3}
+            className="w-9 h-9 flex items-center justify-center text-zinc-200 hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            aria-label="Shrink car icons"
+            title="車番アイコンを縮小"
+          >
+            <span className="inline-block w-2 h-2 rounded-full bg-zinc-200" />
+          </button>
+        </div>
+
         <button
           type="button"
           onClick={onReset}
-          disabled={zoom === ZOOM_DEFAULT && rotation === 0 && pan.x === 0 && pan.y === 0}
+          disabled={zoom === ZOOM_DEFAULT && rotation === 0 && pan.x === 0 && pan.y === 0 && markerScale === MARKER_SCALE_DEFAULT}
           className="w-9 h-7 flex items-center justify-center text-[10px] font-semibold rounded-md bg-zinc-900/80 backdrop-blur-sm border border-zinc-700 text-zinc-300 hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed shadow-lg transition-colors"
           aria-label="Reset view"
           title="リセット"

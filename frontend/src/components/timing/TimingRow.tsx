@@ -1,11 +1,13 @@
 "use client";
 
 import type { Standing, Team, CarClass } from "@/types/smis";
-import type { CarColMode, GapColMode, LapColMode, PitColMode } from "./TimingTable";
+import type { CarColMode, GapColMode, LapColMode, PitColMode, BestColMode } from "./TimingTable";
 import { TIME_COLORS } from "@/lib/colors";
 import { formatTime, formatPitTime } from "@/lib/format";
 import ClassBadge from "./ClassBadge";
 import PitTimer from "./PitTimer";
+import { getDriverName } from "@/data/mock";
+import { stickyCellClass, stickyTdStyle } from "@/lib/timingTableLayout";
 
 interface TimingRowProps {
   standing: Standing;
@@ -16,8 +18,12 @@ interface TimingRowProps {
   gapCol: GapColMode;
   lapCol: LapColMode;
   pitCol: PitColMode;
+  bestCol: BestColMode;
   isRaceMode: boolean;
   sectorFlash?: 0 | 1 | 2 | 3; // 0=FL(行全体), 1=S1, 2=S2, 3=S3
+  stickyOffsets: Map<string, number>;
+  firstStickyKey: string;
+  lastStickyKey: string;
   onClick?: () => void;
 }
 
@@ -28,19 +34,21 @@ function getSectorFlashClass(type: string): string {
 }
 
 const STATUS_INDICATOR: Record<string, { label: string; color: string }> = {
-  in_pit: { label: "P", color: "text-cyan-400" },
+  in_pit: { label: "P", color: "text-red-500" },
 };
 
-export default function TimingRow({ standing, team, carClass, isEven, carCol, gapCol, lapCol, pitCol, isRaceMode, sectorFlash, onClick }: TimingRowProps) {
+export default function TimingRow({ standing, team, carClass, isEven, carCol, gapCol, lapCol, pitCol, bestCol, isRaceMode, sectorFlash, stickyOffsets, firstStickyKey, lastStickyKey, onClick }: TimingRowProps) {
+  const sticky = (colKey: string, className: string) =>
+    `${stickyCellClass(colKey, stickyOffsets, firstStickyKey, lastStickyKey, isEven)} ${className}`.trim();
+  const stickyStyle = (colKey: string) => stickyTdStyle(colKey, stickyOffsets);
   const rowBg = isEven ? "bg-zinc-900/60" : "bg-zinc-900/30";
   const statusInfo = STATUS_INDICATOR[standing.status];
 
-  const driverName =
-    team?.drivers.find((d) => d.no === standing.driverNo)?.nameE ||
-    team?.drivers[1]?.nameE ||
-    "---";
+  const driverName = getDriverName(standing, team);
 
-  const carCellValue = carCol === "team" ? (team?.nameE || "---") : (team?.machine || "---");
+  // Car モードはマシン名。MOLA はマシン名を送らないため、無ければチーム名にフォールバック。
+  const teamName = team?.nameE || team?.nameJ || "---";
+  const carCellValue = carCol === "team" ? teamName : (team?.machine || teamName);
   const gapCellValue = gapCol === "int" ? standing.interval : standing.gap;
 
   let lapCellValue: string;
@@ -90,27 +98,33 @@ export default function TimingRow({ standing, team, carClass, isEven, carCol, ga
 
   return (
     <tr
-      className={`${rowBg} ${posFlashClass} ${flFlashClass} hover:bg-zinc-700/40 transition-colors border-b border-zinc-800/30 ${onClick ? "cursor-pointer" : ""}`}
+      className={`group ${rowBg} ${posFlashClass} ${flFlashClass} hover:bg-zinc-700/40 transition-colors border-b border-zinc-800/30 ${onClick ? "cursor-pointer" : ""}`}
       onClick={onClick}
     >
       {/* STATUS */}
-      <td className="py-px text-center font-bold" style={{ fontSize: "0.85em" }}>
+      <td className={sticky("status", "py-px text-center font-bold")} style={{ fontSize: "0.85em", ...stickyStyle("status") }}>
         {statusInfo && (
           <span className={statusInfo.color}>{statusInfo.label}</span>
         )}
       </td>
       {/* P */}
-      <td className="py-px text-center font-bold text-white font-mono">
+      <td className={sticky("pos", "py-px text-center font-bold text-white font-mono")} style={stickyStyle("pos")}>
         {standing.position}
       </td>
       {isRaceMode && (
-        <td className="py-px text-center" style={{ fontSize: "0.75em" }}>
+        <td className={sticky("chg", "py-px text-center")} style={{ fontSize: "0.75em", ...stickyStyle("chg") }}>
           {renderPosChange()}
         </td>
       )}
-      <td className="py-px text-center text-zinc-400 font-mono">{standing.classPosition}</td>
-      <td className="py-px text-center font-bold text-white font-mono">{team?.no}</td>
-      <td className="py-px text-center"><ClassBadge className={carClass?.nameE || "---"} /></td>
+      <td className={sticky("pic", "py-px text-center text-zinc-400 font-mono")} style={stickyStyle("pic")}>
+        {standing.classPosition}
+      </td>
+      <td className={sticky("nr", "py-px text-center font-bold text-white font-mono")} style={stickyStyle("nr")}>
+        {team?.no}
+      </td>
+      <td className={sticky("class", "py-px text-center")} style={stickyStyle("class")}>
+        <ClassBadge className={carClass?.nameE || "---"} />
+      </td>
       <td className="py-px pl-2 pr-1 text-zinc-200 truncate overflow-hidden whitespace-nowrap">{driverName}</td>
       <td className="py-px pl-2 pr-1 text-zinc-400 truncate overflow-hidden whitespace-nowrap">{carCellValue}</td>
       <td className={`py-px text-center font-mono ${lapCellColor}`}
@@ -118,8 +132,10 @@ export default function TimingRow({ standing, team, carClass, isEven, carCol, ga
         {lapCellValue}
       </td>
       <td className="py-px px-2 sm:pr-3 text-right font-mono text-zinc-300">{gapCellValue}</td>
-      <td className={`py-px px-2 sm:pr-3 text-right font-mono ${TIME_COLORS[standing.bestTimeType]}`}>
-        {formatTime(standing.bestTime)}
+      <td className={`py-px px-2 sm:pr-3 text-right font-mono ${bestCol === "bestlap" ? "text-zinc-300" : TIME_COLORS[standing.bestTimeType]}`}>
+        {bestCol === "bestlap"
+          ? (standing.bestTimeLap > 0 ? `L${standing.bestTimeLap}` : "—")
+          : formatTime(standing.bestTime)}
       </td>
       <td className={`py-px px-2 sm:pr-3 text-right font-mono ${TIME_COLORS[standing.sectors[0]?.type || "none"]} ${s1Flash}`}>
         {formatTime(standing.sectors[0]?.time)}
@@ -127,8 +143,10 @@ export default function TimingRow({ standing, team, carClass, isEven, carCol, ga
       <td className={`py-px px-2 sm:pr-3 text-right font-mono ${TIME_COLORS[standing.sectors[1]?.type || "none"]} ${s2Flash}`}>
         {formatTime(standing.sectors[1]?.time)}
       </td>
-      <td className={`py-px px-2 sm:pr-3 text-right font-mono ${TIME_COLORS[standing.sectors[2]?.type || "none"]} ${s3Flash}`}>
-        {formatTime(standing.sectors[2]?.time)}
+      <td className={`py-px px-2 sm:pr-3 text-right font-mono ${standing.status === "in_pit" && !standing.sectors[2]?.time ? "text-red-500 font-bold" : TIME_COLORS[standing.sectors[2]?.type || "none"]} ${s3Flash}`}>
+        {standing.status === "in_pit" && !standing.sectors[2]?.time
+          ? "In Pit"
+          : formatTime(standing.sectors[2]?.time)}
       </td>
       <td className="py-px px-2 sm:pr-3 text-right">{renderPitCell()}</td>
     </tr>

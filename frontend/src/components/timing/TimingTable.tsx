@@ -5,6 +5,13 @@ import type { Standing } from "@/types/smis";
 import TimingRow from "./TimingRow";
 import ColumnToggle from "./ColumnToggle";
 import { getTeamByStanding, getClassByStanding } from "@/data/mock";
+import {
+  colWidthStyle,
+  getStickyColumnKeys,
+  getStickyLeftOffsets,
+  stickyCellClass,
+  type TableColumn,
+} from "@/lib/timingTableLayout";
 
 export interface SectorFlash {
   teamId: string;
@@ -25,6 +32,7 @@ export type CarColMode = "car" | "team";
 export type GapColMode = "gap" | "int";
 export type LapColMode = "laps" | "time" | "last";
 export type PitColMode = "count" | "time";
+export type BestColMode = "best" | "bestlap";
 
 const CAR_OPTIONS = [
   { value: "car", label: "Car" },
@@ -47,7 +55,12 @@ const PIT_OPTIONS = [
   { value: "time", label: "PIT Time" },
 ];
 
-function getColumns(isRaceMode: boolean) {
+const BEST_OPTIONS = [
+  { value: "best", label: "Best" },
+  { value: "bestlap", label: "BestLap" },
+];
+
+function getColumns(isRaceMode: boolean): TableColumn[] {
   const cols = [
     { key: "status", minW: 20, pct: "1.8%", align: "text-center" },
     { key: "pos", minW: 28, pct: isRaceMode ? "2.2%" : "2.5%", align: "text-center" },
@@ -74,7 +87,7 @@ function getColumns(isRaceMode: boolean) {
 
 const FIXED_LABELS: Record<string, string> = {
   status: "", pos: "P", chg: "", pic: "PIC", nr: "No.", class: "Class",
-  driver: "Driver", best: "Best",
+  driver: "Name", best: "Best",
   s1: "S1", s2: "S2", s3: "S3",
 };
 
@@ -83,8 +96,13 @@ export default function TimingTable({ standings, classFilter, flashKey = 0, isRa
   const [gapCol, setGapCol] = useState<GapColMode>("gap");
   const [lapCol, setLapCol] = useState<LapColMode>("laps");
   const [pitCol, setPitCol] = useState<PitColMode>("count");
+  const [bestCol, setBestCol] = useState<BestColMode>("best");
 
   const columns = getColumns(isRaceMode);
+  const stickyKeys = getStickyColumnKeys(isRaceMode);
+  const stickyOffsets = getStickyLeftOffsets(columns, stickyKeys);
+  const firstStickyKey = stickyKeys[0];
+  const lastStickyKey = stickyKeys[stickyKeys.length - 1];
 
   const filtered = classFilter
     ? standings.filter((s) => {
@@ -106,33 +124,46 @@ export default function TimingTable({ standings, classFilter, flashKey = 0, isRa
     if (col.key === "pit") {
       return <ColumnToggle options={PIT_OPTIONS} current={pitCol} onChange={(v) => setPitCol(v as PitColMode)} />;
     }
+    if (col.key === "best") {
+      return <ColumnToggle options={BEST_OPTIONS} current={bestCol} onChange={(v) => setBestCol(v as BestColMode)} />;
+    }
     return FIXED_LABELS[col.key] ?? col.key;
   };
 
   const totalMinW = columns.reduce((sum, c) => sum + c.minW, 0);
 
   return (
-    <div className="flex-1 overflow-auto">
+    <div className="flex-1 timing-table-scroll">
       <table
-        className="border-collapse"
+        className="timing-table"
         style={{ tableLayout: "fixed", fontSize: "var(--timing-fs)", minWidth: `${totalMinW}px`, width: "100%" }}
       >
         <colgroup>
           {columns.map((col) => (
-            <col key={col.key} style={{ width: col.pct, minWidth: `${col.minW}px` }} />
+            <col key={col.key} style={colWidthStyle(col, stickyOffsets)} />
           ))}
         </colgroup>
         <thead className="sticky top-0 z-10">
           <tr className="bg-zinc-800 border-b-2 border-red-700">
-            {columns.map((col) => (
-              <th
-                key={col.key}
-                className={`py-1 font-semibold text-white uppercase tracking-wider ${col.align}`}
-                style={{ fontSize: "var(--timing-fs-sm)" }}
-              >
-                {renderHeader(col)}
-              </th>
-            ))}
+            {columns.map((col) => {
+              const isSticky = stickyOffsets.has(col.key);
+              return (
+                <th
+                  key={col.key}
+                  className={`py-1 font-semibold text-white uppercase tracking-wider ${col.align} ${
+                    isSticky
+                      ? stickyCellClass(col.key, stickyOffsets, firstStickyKey, lastStickyKey)
+                      : ""
+                  }`}
+                  style={{
+                    fontSize: "var(--timing-fs-sm)",
+                    ...(isSticky ? { left: `${stickyOffsets.get(col.key)}px` } : {}),
+                  }}
+                >
+                  {renderHeader(col)}
+                </th>
+              );
+            })}
           </tr>
         </thead>
         <tbody>
@@ -156,8 +187,12 @@ export default function TimingTable({ standings, classFilter, flashKey = 0, isRa
                 gapCol={gapCol}
                 lapCol={lapCol}
                 pitCol={pitCol}
+                bestCol={bestCol}
                 isRaceMode={isRaceMode}
                 sectorFlash={sf?.sector}
+                stickyOffsets={stickyOffsets}
+                firstStickyKey={firstStickyKey}
+                lastStickyKey={lastStickyKey}
                 onClick={onRowClick ? () => onRowClick(standing) : undefined}
               />
             );

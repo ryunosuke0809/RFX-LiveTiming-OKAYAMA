@@ -75,6 +75,6 @@ import type { LiveStatePatch, LiveStateSnapshot } from "../state/types.js";
 export type BroadcastMessage =
     | { type: "hello"; serverTime: string; circuitId: string | null }
     | { type: "state"; state: LiveStateSnapshot }
-    | { type: "patch"; serverTs: string; circuitId: string | null; patches: LiveStatePatch[] }
+    | { type: "patch"; serverTs: string; dataTs: string | null; circuitId: string | null; patches: LiveStatePatch[] }
     | { type: "smis"; envelope: IngestEnvelope }
     | { type: "snapshot"; envelopes: IngestEnvelope[] };

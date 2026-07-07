@@ -1,14 +1,32 @@
 import type {
     CarClassVm,
     FastestLapVm,
+    LapDataVm,
     LiveStateSnapshot,
     RaceControlMessageVm,
+    SectorTimeVm,
     SessionInfoVm,
     StandingVm,
     TeamSummaryVm,
     TrackCountVm,
     TrackFlag,
 } from "./types.js";
+
+/** 現在ラップのセクター蓄積 (周またぎ混在を防ぐための一時状態)。 */
+export interface TeamLapAccum {
+    /** 進行中の周のセクター (表示用、未計測は null)。 */
+    s1: SectorTimeVm | null;
+    s2: SectorTimeVm | null;
+    s3: SectorTimeVm | null;
+    /** 各区間で最後に計測されたタイム [S1,S2,S3] (周をまたいで保持、参照用)。 */
+    refTimes: Array<number | null>;
+    /** S1 を記録したときの周回数 (完了周番号として使う)。 */
+    s1Lap: number;
+    /** 直近に処理したセクターキー "secNo:secTime"。重複処理を防ぐ。 */
+    lastSecKey: string;
+    /** 直近に見た LastLapTime。周完了 (=値の変化) 検知に使う。 */
+    lastLapTime: number;
+}
 
 /**
  * クラウドサーバーが保持する「いまレースで起きていること」の単一状態。
@@ -23,6 +41,18 @@ export class LiveSessionState {
     flag: TrackFlag = "green";
     sessionStartedAtMs: number | null = null;
 
+    /** 直近に受信したデータのタイムスタンプ (ISO)。経過時間はこれ基準で出す (再生でも正しい)。 */
+    lastDataTs: string | null = null;
+
+    /**
+     * 現在のセッションを識別する署名 (competitionNameJ|categoryNameJ|roundNameJ)。
+     * MOLA は SessionId を常に "1:1:1:1:1" で送るため、切替検知にはこの署名を使う。
+     */
+    sessionSignature: string | null = null;
+
+    /** セッション種別。race = 周回レース (順位・ラップ差)、time = ベストタイム (予選/専有走行)。 */
+    sessionMode: "race" | "time" = "time";
+
     readonly classes = new Map<string, CarClassVm>();
     readonly teams = new Map<string, TeamSummaryVm>();
     readonly standings = new Map<string, StandingVm>(); // teamId → standing
@@ -30,6 +60,16 @@ export class LiveSessionState {
     readonly pitCount = new Map<string, number>(); // teamId → pit count
     readonly lastPassingClockMs = new Map<string, number>(); // teamId → 最終受信時刻 (Date.now())
     readonly previousPosition = new Map<string, number>(); // teamId → 直前の position
+
+    /** teamId → [S1,S2,S3] のベストセクター (1/10000s)。色分け判定用。 */
+    readonly teamBestSector = new Map<string, Array<number | null>>();
+    /** [S1,S2,S3] の全体ベストセクター (1/10000s)。 */
+    overallBestSector: Array<number | null> = [null, null, null];
+
+    /** teamId → 現在ラップのセクター蓄積状態 (周またぎ混在を防ぐ)。 */
+    readonly teamLapAccum = new Map<string, TeamLapAccum>();
+    /** teamId → 完了周のラップ履歴。 */
+    readonly teamLaps = new Map<string, LapDataVm[]>();
 
     overallBest: number | null = null;
     fastestLap: FastestLapVm | null = null;
@@ -51,11 +91,26 @@ export class LiveSessionState {
         this.pitCount.clear();
         this.lastPassingClockMs.clear();
         this.previousPosition.clear();
+        this.teamBestSector.clear();
+        this.overallBestSector = [null, null, null];
+        this.teamLapAccum.clear();
+        this.teamLaps.clear();
         this.overallBest = null;
         this.fastestLap = null;
         this.flag = "green";
         this.sessionStartedAtMs = null;
         this.recentMessages.length = 0;
+    }
+
+    /**
+     * セッション切替時 (Category 名が変わった時) の全リセット。
+     * マスター (Class / Team) も破棄する。直後にマスターダンプが再送されるため、
+     * 前セッションのエントリーが残らないようにする。
+     */
+    resetForSessionSwitch(): void {
+        this.resetForNewSession();
+        this.classes.clear();
+        this.teams.clear();
     }
 
     pushRecentMessage(msg: RaceControlMessageVm): void {
@@ -65,10 +120,13 @@ export class LiveSessionState {
         }
     }
 
-    /** すべての standings を position 昇順で配列化。 */
+    /** すべての standings を position 昇順で配列化。position 0 (未出走/無効) は末尾へ。 */
     standingsArray(): StandingVm[] {
+        const rank = (pos: number) => (pos > 0 ? pos : Number.MAX_SAFE_INTEGER);
         return Array.from(this.standings.values()).sort((a, b) => {
-            if (a.position !== b.position) return a.position - b.position;
+            const ra = rank(a.position);
+            const rb = rank(b.position);
+            if (ra !== rb) return ra - rb;
             return a.order - b.order;
         });
     }
@@ -105,6 +163,7 @@ export class LiveSessionState {
     snapshot(serverTs: string): LiveStateSnapshot {
         return {
             serverTs,
+            dataTs: this.lastDataTs,
             circuitId: this.circuitId,
             session: this.session ? { ...this.session, flag: this.flag } : null,
             standings: this.standingsArray(),
@@ -113,6 +172,7 @@ export class LiveSessionState {
             classes: Array.from(this.classes.values()),
             teams: Array.from(this.teams.values()),
             recentMessages: this.recentMessages.slice(),
+            driverLaps: Object.fromEntries(this.teamLaps),
         };
     }
 }
