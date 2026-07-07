@@ -6,6 +6,35 @@ import OkayamaCircuitSvg from "@/components/tracking/OkayamaCircuitSvg";
 import { mockClasses, mockSessionInfo, mockStandings, getTeamByStanding, getClassByStanding } from "@/data/mock";
 import { formatTime } from "@/lib/format";
 import { useLiveTiming } from "@/hooks/useLiveTiming";
+import type { Standing } from "@/types/smis";
+
+/** コース状況パネル用の CARNO のみのバッジ（丸み帯びた四角）。 */
+function CarNoBadge({
+  standing,
+  active,
+  onClick,
+}: {
+  standing: Standing;
+  active: boolean;
+  onClick: () => void;
+}) {
+  const team = getTeamByStanding(standing);
+  const cls = getClassByStanding(standing);
+  if (!team) return null;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={team.nameE}
+      className={`w-7 h-7 rounded-lg flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0 transition-all ${
+        active ? "ring-2 ring-white ring-offset-1 ring-offset-zinc-900" : "hover:brightness-110"
+      }`}
+      style={{ backgroundColor: cls?.color || "#71717a" }}
+    >
+      {team.no}
+    </button>
+  );
+}
 
 export default function TrackingPage() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -27,6 +56,7 @@ export default function TrackingPage() {
 
   // IN PIT の車両はコースマップから消え、こちらの PitIn リストに表示する。
   const pitStandings = filteredStandings.filter((s) => s.status === "in_pit");
+  const onTrackStandings = filteredStandings.filter((s) => s.status !== "in_pit");
 
   const toggleHighlight = useCallback((teamId: string) => {
     setHighlighted((prev) => {
@@ -103,45 +133,51 @@ export default function TrackingPage() {
             onMarkerClick={toggleHighlight}
           />
 
-          {/* PitIn リスト: IN PIT 中の車両はマップから消え、ここに一覧表示する。 */}
-          {pitStandings.length > 0 && (
-            <div className="absolute bottom-2 right-2 z-10 w-44 max-w-[70vw] bg-zinc-900/85 backdrop-blur-md border border-zinc-700 rounded-lg overflow-hidden shadow-2xl">
-              <div className="px-2.5 py-1.5 border-b border-zinc-700 bg-red-900/30 flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-red-500" />
-                <span className="text-[11px] text-red-300 uppercase tracking-wider font-bold">
-                  Pit In — {pitStandings.length}
-                </span>
-              </div>
-              <div className="max-h-48 overflow-y-auto">
-                {pitStandings.map((s) => {
-                  const team = getTeamByStanding(s);
-                  const cls = getClassByStanding(s);
-                  if (!team) return null;
-                  const isActive = highlighted.has(s.teamId);
-                  return (
-                    <button
-                      key={s.teamId}
-                      onClick={() => toggleHighlight(s.teamId)}
-                      className={`flex items-center gap-2 px-2.5 py-1 border-b border-zinc-800/50 transition-colors text-left w-full ${
-                        isActive ? "bg-amber-600/10" : "hover:bg-zinc-800/60"
-                      }`}
-                    >
-                      <span
-                        className="w-5 h-5 rounded flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0"
-                        style={{ backgroundColor: cls?.color || "#71717a" }}
-                      >
-                        {team.no}
-                      </span>
-                      <span className="text-[11px] text-zinc-300 truncate flex-1">
-                        {team.nameE}
-                      </span>
-                      <span className="text-[9px] text-red-400 font-bold uppercase flex-shrink-0">Pit</span>
-                    </button>
-                  );
-                })}
-              </div>
+          {/* コース状況パネル: On Track / Pit In を CARNO のみのバッジで一覧表示。
+              IN PIT 中の車両はマップから消え、Pit In エリアに入る。 */}
+          <div className="absolute bottom-2 right-2 z-10 w-52 max-w-[74vw] bg-zinc-900/85 backdrop-blur-md border border-zinc-700 rounded-lg overflow-hidden shadow-2xl">
+            <div className="px-2.5 py-1.5 border-b border-zinc-700 bg-green-900/25 flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-green-500" />
+              <span className="text-[11px] text-green-300 uppercase tracking-wider font-bold">
+                On Track — {onTrackStandings.length}
+              </span>
             </div>
-          )}
+            <div className="max-h-32 overflow-y-auto p-1.5 flex flex-wrap gap-1">
+              {onTrackStandings.length === 0 ? (
+                <span className="text-[10px] text-zinc-600 px-1 py-0.5">—</span>
+              ) : (
+                onTrackStandings.map((s) => (
+                  <CarNoBadge
+                    key={s.teamId}
+                    standing={s}
+                    active={highlighted.has(s.teamId)}
+                    onClick={() => toggleHighlight(s.teamId)}
+                  />
+                ))
+              )}
+            </div>
+
+            <div className="px-2.5 py-1.5 border-y border-zinc-700 bg-red-900/30 flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-red-500" />
+              <span className="text-[11px] text-red-300 uppercase tracking-wider font-bold">
+                Pit In — {pitStandings.length}
+              </span>
+            </div>
+            <div className="max-h-24 overflow-y-auto p-1.5 flex flex-wrap gap-1">
+              {pitStandings.length === 0 ? (
+                <span className="text-[10px] text-zinc-600 px-1 py-0.5">—</span>
+              ) : (
+                pitStandings.map((s) => (
+                  <CarNoBadge
+                    key={s.teamId}
+                    standing={s}
+                    active={highlighted.has(s.teamId)}
+                    onClick={() => toggleHighlight(s.teamId)}
+                  />
+                ))
+              )}
+            </div>
+          </div>
         </div>
 
         {/* 右サイドパネル: 車両一覧（オーバーレイ）

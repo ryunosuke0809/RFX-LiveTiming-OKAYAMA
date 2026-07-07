@@ -656,10 +656,13 @@ export default function OkayamaCircuitSvg({
                       <animate attributeName="opacity" values="0.5;0.1;0.5" dur="2s" repeatCount="indefinite" />
                     </circle>
                   )}
-                  <circle
-                    cx={x}
-                    cy={y}
-                    r={r}
+                  <rect
+                    x={x - r}
+                    y={y - r}
+                    width={r * 2}
+                    height={r * 2}
+                    rx={r * 0.42}
+                    ry={r * 0.42}
                     fill={fillColor}
                     opacity={dimmed ? 0.3 : 0.95}
                     stroke={isHighlighted ? "#fff" : "#000"}

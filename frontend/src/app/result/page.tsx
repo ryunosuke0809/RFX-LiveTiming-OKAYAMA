@@ -15,7 +15,6 @@ import {
 } from "@/data/mock";
 import { formatTime } from "@/lib/format";
 import { TIME_COLORS } from "@/lib/colors";
-import { deriveCategoryLabel } from "@/lib/sessionNaming";
 import { useLiveTiming } from "@/hooks/useLiveTiming";
 import {
   colWidthStyle,
@@ -178,12 +177,8 @@ export default function ResultPage() {
   const classes = isLive ? live.classes : mockClasses;
   const sessionMeta = isLive && live.sessionInfo ? live.sessionInfo : mockSessionInfo;
   const competitionName = sessionMeta.competition.nameE || sessionMeta.competition.nameJ;
-  // カテゴリー名は Competition 名から短縮ラベル（FIA-F4 / SFL 等）を導出する。
-  // 導出できない場合は MOLA の Category 名にフォールバック。
-  const categoryName =
-    deriveCategoryLabel(sessionMeta.competition.nameJ, sessionMeta.competition.nameE) ||
-    sessionMeta.category.nameE ||
-    sessionMeta.category.nameJ;
+  // カテゴリー名は Competition 名（例:「2026 … FIA-F4 JAPANESE CHAMPIONSHIP」）をそのまま使う。
+  const categoryName = competitionName;
   const sessionName = sessionMeta.session.nameE || sessionMeta.session.nameJ;
   const csvMeta: CsvMeta = {
     competition: competitionName,
