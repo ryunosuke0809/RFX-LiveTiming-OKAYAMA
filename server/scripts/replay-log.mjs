@@ -10,20 +10,23 @@
 // 実データでローカル検証できる。
 //
 // 使い方:
+//   node scripts/replay-log.mjs --dates                 # 収録日一覧を表示して終了
+//   node scripts/replay-log.mjs --date 20260614 --list  # 指定日のセッション区切りを一覧
+//   node scripts/replay-log.mjs --date 20260614 --segment 3 --speed 10 # 指定日の3番目を10倍速
 //   node scripts/replay-log.mjs --file ../exports/archive/20260612/MOLA_INPUT_20260612.log
-//   node scripts/replay-log.mjs --list                 # セッション区切りを一覧表示
-//   node scripts/replay-log.mjs --segment 3 --speed 10 # 3番目のセッションを10倍速
-//   node scripts/replay-log.mjs --speed inf            # 一気に流す (待機なし)
+//   node scripts/replay-log.mjs --speed inf             # 一気に流す (待機なし)
 //
 // 主なオプション:
-//   --file <path>     再生する .log ファイル (既定: 20260612)
+//   --date <YYYYMMDD> 収録日で再生ファイルを指定 (exports/archive/<日付>/MOLA_INPUT_<日付>.log)
+//   --file <path>     再生する .log ファイルを直接指定 (--date より優先, 既定: 20260612)
 //   --url <ws>        ingest URL (既定: ws://127.0.0.1:4000/ingest)
 //   --token <t>       Bearer トークン (既定: 環境変数 RECEIVER_INGEST_TOKEN)
 //   --circuit <id>    circuitId (既定: okayama)
 //   --speed <n|inf>   再生倍速 (既定: 1 = 実時間, inf = 待機なし)
 //   --segment <n>     Competition 区切りの n 番目のみ再生 (1始まり)
 //   --maxgap <ms>     メッセージ間の最大待機ms (長い空白を圧縮, 既定: 5000)
-//   --list            セグメント一覧を表示して終了
+//   --list            (指定ファイルの) セグメント一覧を表示して終了
+//   --dates           収録されている日付一覧を表示して終了
 
 import "dotenv/config";
 import fs from "node:fs";
@@ -53,11 +56,32 @@ function parseArgs(argv) {
 
 const args = parseArgs(process.argv);
 
-const DEFAULT_LOG = path.resolve(
-    __dirname,
-    "../../exports/archive/20260612/MOLA_INPUT_20260612.log",
-);
-const FILE = args.file ? path.resolve(process.cwd(), args.file) : DEFAULT_LOG;
+const ARCHIVE_DIR = path.resolve(__dirname, "../../exports/archive");
+
+/** exports/archive 配下の収録日 (MOLA_INPUT_<日付>.log を持つディレクトリ) を返す。 */
+function listArchiveDates() {
+    if (!fs.existsSync(ARCHIVE_DIR)) return [];
+    return fs
+        .readdirSync(ARCHIVE_DIR, { withFileTypes: true })
+        .filter((d) => d.isDirectory())
+        .map((d) => d.name)
+        .filter((name) =>
+            fs.existsSync(path.join(ARCHIVE_DIR, name, `MOLA_INPUT_${name}.log`)),
+        )
+        .sort();
+}
+
+/** --date <YYYYMMDD> → 該当ログの絶対パス。 */
+function logPathForDate(date) {
+    return path.join(ARCHIVE_DIR, String(date), `MOLA_INPUT_${date}.log`);
+}
+
+const DEFAULT_LOG = logPathForDate("20260612");
+const FILE = args.file
+    ? path.resolve(process.cwd(), args.file)
+    : args.date
+      ? logPathForDate(args.date)
+      : DEFAULT_LOG;
 const URL = args.url ?? "ws://127.0.0.1:4000/ingest";
 const TOKEN = args.token ?? process.env.RECEIVER_INGEST_TOKEN ?? "";
 const CIRCUIT = args.circuit ?? "okayama";
@@ -306,8 +330,21 @@ function summarize(segments) {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function main() {
+    if (args.dates) {
+        const dates = listArchiveDates();
+        console.log(`\n収録日一覧 (${dates.length}件):`);
+        for (const d of dates) console.log(`  --date ${d}`);
+        console.log("\n例: node scripts/replay-log.mjs --date <日付> --list\n");
+        process.exit(0);
+    }
+
     if (!fs.existsSync(FILE)) {
         console.error(`ログが見つかりません: ${FILE}`);
+        const dates = listArchiveDates();
+        if (dates.length > 0) {
+            console.error(`利用可能な日付: ${dates.join(", ")}`);
+            console.error("例: node scripts/replay-log.mjs --date <日付> --list");
+        }
         process.exit(1);
     }
 
