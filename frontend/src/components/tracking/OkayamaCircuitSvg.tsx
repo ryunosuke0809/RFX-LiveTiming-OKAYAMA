@@ -675,11 +675,17 @@ export default function OkayamaCircuitSvg({
                 continue;
               }
 
-              // エントリーのみのプレースホルダー (Standings 未受信) はコース上に位置を
-              // 推定できないため描画しない。プレースホルダーは lastPassingTime===null で、
-              // 実データを受けた車は数値 (1 周目でまだ通過が無くても 0) になる。
-              // ここで <=0 を弾くと 1 周目の走行車まで消えてしまうので null のみ除外する。
-              if (s.lastPassingTime == null) {
+              // 実際の通過(Passing)がまだ無い車両は走行させない:
+              //   - エントリーのみのプレースホルダー
+              //   - グリッド/ピットスタートでまだ S1 等を通過していない車両
+              //   - ピットアウトしていない車両
+              // 通過があれば lastPassingTime>0、または区間通過(sectorNo>0)/周回(lap>0)で判定。
+              // (これらだけでは 1 周目の走行車を消さない。)
+              const hasPassed =
+                (s.lastPassingTime != null && s.lastPassingTime > 0) ||
+                s.sectorNo > 0 ||
+                s.lap > 0;
+              if (!hasPassed) {
                 animRef.current.delete(s.teamId);
                 continue;
               }
