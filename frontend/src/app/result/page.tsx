@@ -679,11 +679,16 @@ function IndividualView({
                       key={lap.lap}
                       className={`border-b border-zinc-800/50 hover:bg-zinc-800/40 transition-colors ${
                         lap.lap % 2 === 0 ? "bg-zinc-900/40" : ""
-                      } ${lap.isPit ? "bg-blue-900/10" : ""}`}
+                      } ${lap.isPit ? "bg-blue-900/10" : ""} ${
+                        lap.inProgress ? "bg-amber-500/10 ring-1 ring-inset ring-amber-500/30" : ""
+                      }`}
                     >
-                      <td className="py-1 sm:py-1.5 px-2 sm:px-3 text-center font-mono text-zinc-400">{lap.lap}</td>
-                      <td className={`py-1 sm:py-1.5 px-2 sm:px-3 text-right font-mono font-bold ${TIME_COLORS[lap.lapTimeType]}`}>
-                        {formatTime(lap.lapTime)}
+                      <td className="py-1 sm:py-1.5 px-2 sm:px-3 text-center font-mono text-zinc-400">
+                        {lap.lap}
+                        {lap.inProgress && <span className="ml-1 text-[9px] text-amber-400 font-bold align-middle">●</span>}
+                      </td>
+                      <td className={`py-1 sm:py-1.5 px-2 sm:px-3 text-right font-mono font-bold ${lap.inProgress ? "text-amber-400" : TIME_COLORS[lap.lapTimeType]}`}>
+                        {lap.inProgress ? "LIVE" : formatTime(lap.lapTime)}
                       </td>
                       <td className={`py-1 sm:py-1.5 px-2 sm:px-3 text-right font-mono ${TIME_COLORS[lap.s1Type]}`}>
                         {formatTime(lap.s1)}
@@ -691,14 +696,14 @@ function IndividualView({
                       <td className={`py-1 sm:py-1.5 px-2 sm:px-3 text-right font-mono ${TIME_COLORS[lap.s2Type]}`}>
                         {formatTime(lap.s2)}
                       </td>
-                      <td className={`py-1 sm:py-1.5 px-2 sm:px-3 text-right font-mono ${TIME_COLORS[lap.s3Type]}`}>
-                        {formatTime(lap.s3)}
+                      <td className={`py-1 sm:py-1.5 px-2 sm:px-3 text-right font-mono ${lap.inProgress && lap.isPit && lap.s3 == null ? "text-red-500 font-bold" : TIME_COLORS[lap.s3Type]}`}>
+                        {lap.inProgress && lap.isPit && lap.s3 == null ? "In Pit" : formatTime(lap.s3)}
                       </td>
                       <td className="py-1 sm:py-1.5 px-2 sm:px-3 text-center font-mono text-zinc-500">
                         {lap.position > 0 ? lap.position : ""}
                       </td>
                       <td className="py-1 sm:py-1.5 px-2 sm:px-3 text-center">
-                        {lap.isPit && <span className="text-cyan-400 font-bold text-[10px]">P</span>}
+                        {lap.isPit && <span className={`font-bold text-[10px] ${lap.inProgress ? "text-red-500" : "text-cyan-400"}`}>P</span>}
                       </td>
                     </tr>
                   ))}

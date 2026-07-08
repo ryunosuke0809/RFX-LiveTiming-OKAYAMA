@@ -163,6 +163,8 @@ export interface LapData {
   lapTimeType: TimeType;
   isPit: boolean;
   position: number;
+  /** 集計中の現在ラップ（未完了）。セクタータイムや In Pit をリアルタイム表示するための行。 */
+  inProgress?: boolean;
 }
 
 export interface DriverPersonalData {

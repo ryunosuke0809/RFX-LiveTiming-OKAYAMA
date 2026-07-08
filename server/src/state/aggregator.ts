@@ -128,12 +128,18 @@ export class SessionStateAggregator {
     }
 
     private applyClass(p: Record<string, unknown>): LiveStatePatch[] {
+        const id = str(p, "id") ?? "";
+        // MOLA は CarClass に色を持たないため、クラス ID から安定した配色を割り当てる。
+        // 既存色 (前回割当) があればそれを維持する。
+        const provided = str(p, "color");
+        const existing = this.state.classes.get(id);
+        const color = provided || existing?.color || pickClassColor(id);
         const value: CarClassVm = {
-            id: str(p, "id") ?? "",
+            id,
             nameJ: str(p, "nameJ") ?? "",
             nameE: str(p, "nameE") ?? "",
             record: str(p, "record") ?? "",
-            color: str(p, "color") ?? "#888",
+            color,
         };
         this.state.classes.set(value.id, value);
         return [{ kind: "class_upsert", value }];
@@ -563,6 +569,27 @@ function deriveSessionMode(
     // 名前で判断できない場合は SMIS Type にフォールバック (L=Lap=race, それ以外 time)
     if (type === "2" || type === "L") return "race";
     return "time";
+}
+
+/** クラス ID から安定した配色を選ぶ。MOLA が色を持たないため使用。
+ * 白文字を載せても読める、彩度高め・中〜暗トーンのパレット。 */
+const CLASS_PALETTE = [
+    "#dc2626", // red
+    "#2563eb", // blue
+    "#16a34a", // green
+    "#d97706", // amber
+    "#9333ea", // purple
+    "#0891b2", // cyan
+    "#db2777", // pink
+    "#4f46e5", // indigo
+    "#ca8a04", // dark yellow
+    "#0d9488", // teal
+];
+
+function pickClassColor(id: string): string {
+    let h = 0;
+    for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+    return CLASS_PALETTE[h % CLASS_PALETTE.length] ?? "#2563eb";
 }
 
 function str(obj: Record<string, unknown>, key: string): string | null {

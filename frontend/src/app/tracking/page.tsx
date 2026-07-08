@@ -29,7 +29,10 @@ function CarNoBadge({
       className={`w-7 h-7 rounded-lg flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0 transition-all ${
         active ? "ring-2 ring-white ring-offset-1 ring-offset-zinc-900" : "hover:brightness-110"
       }`}
-      style={{ backgroundColor: cls?.color || "#71717a" }}
+      style={{
+        backgroundColor: cls?.color || "#71717a",
+        textShadow: "0 0 2px rgba(0,0,0,0.9), 0 1px 1px rgba(0,0,0,0.9)",
+      }}
     >
       {team.no}
     </button>

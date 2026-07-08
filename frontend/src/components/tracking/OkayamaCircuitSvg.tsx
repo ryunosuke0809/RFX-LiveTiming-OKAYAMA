@@ -678,6 +678,10 @@ export default function OkayamaCircuitSvg({
                     fontWeight="bold"
                     fontFamily="sans-serif"
                     opacity={dimmed ? 0.4 : 1}
+                    stroke="#000"
+                    strokeWidth={labelFont * 0.22}
+                    strokeLinejoin="round"
+                    style={{ paintOrder: "stroke" }}
                   >
                     {team.no}
                   </text>

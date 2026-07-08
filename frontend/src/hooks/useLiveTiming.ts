@@ -368,6 +368,7 @@ export function useLiveTiming(url?: string): LiveTimingData {
     const standings: Standing[] = Array.from(s.standings.values())
       .map(vmToStanding)
       .sort((a, b) => rank(a.position) - rank(b.position) || a.order - b.order);
+    const standingMap = new Map(standings.map((st) => [st.teamId, st]));
 
     const fastestLap: FastestLap | null = s.fastestLap
       ? {
@@ -419,7 +420,8 @@ export function useLiveTiming(url?: string): LiveTimingData {
       leaderLap,
       getTeamById: (id) => teamMap.get(id),
       getClassById: (id) => classMap.get(id),
-      getPersonalData: (id) => buildPersonalData(id, driverLapsMap.get(id) ?? []),
+      getPersonalData: (id) =>
+        buildPersonalData(id, driverLapsMap.get(id) ?? [], standingMap.get(id)),
     };
   }, [version, connected]);
 
@@ -428,16 +430,51 @@ export function useLiveTiming(url?: string): LiveTimingData {
 
 const rank = (pos: number) => (pos > 0 ? pos : Number.MAX_SAFE_INTEGER);
 
-/** ライブの周回履歴 (LapData[]) から DriverPersonalData を構築する。 */
-function buildPersonalData(teamId: string, laps: LapData[]): DriverPersonalData {
-  const sorted = [...laps].sort((a, b) => a.lap - b.lap);
+/** ライブの周回履歴 (LapData[]) から DriverPersonalData を構築する。
+ * 現在の standing が渡された場合は、集計中の「現在ラップ」を末尾に追加し、
+ * セクタータイムや In Pit をリアルタイムに反映する。 */
+function buildPersonalData(
+  teamId: string,
+  laps: LapData[],
+  standing?: Standing,
+): DriverPersonalData {
+  const completed = [...laps].sort((a, b) => a.lap - b.lap);
+  const sorted = [...completed];
+
+  // 進行中ラップ: 完了周回 (standing.lap) の次の周を集計中として表示。
+  if (standing && standing.status !== "retired" && standing.status !== "finished") {
+    const sec = standing.sectors ?? [];
+    const s1 = sec[0]?.time ?? null;
+    const s2 = sec[1]?.time ?? null;
+    const s3 = sec[2]?.time ?? null;
+    const inPit = standing.status === "in_pit";
+    // 何かしら表示すべき情報 (セクター計測 or ピット中) がある時だけ現在ラップ行を出す。
+    if (s1 !== null || s2 !== null || s3 !== null || inPit) {
+      sorted.push({
+        lap: standing.lap + 1,
+        lapTime: null,
+        s1,
+        s2,
+        s3,
+        s1Type: sec[0]?.type ?? "none",
+        s2Type: sec[1]?.type ?? "none",
+        s3Type: sec[2]?.type ?? "none",
+        lapTimeType: "none",
+        isPit: inPit,
+        position: standing.position,
+        inProgress: true,
+      });
+    }
+  }
+
+  // 集計値 (Best/Avg/Pits) は完了周回のみで算出。進行中ラップは表示行だけに含める。
   const min = (vals: Array<number | null>): number | null => {
     const nums = vals.filter((v): v is number => v !== null && v > 0);
     return nums.length ? Math.min(...nums) : null;
   };
-  const lapTimes = sorted.map((l) => l.lapTime);
+  const lapTimes = completed.map((l) => l.lapTime);
   const bestLapTime = min(lapTimes);
-  const bestLap = bestLapTime !== null ? (sorted.find((l) => l.lapTime === bestLapTime)?.lap ?? 0) : 0;
+  const bestLap = bestLapTime !== null ? (completed.find((l) => l.lapTime === bestLapTime)?.lap ?? 0) : 0;
   const validLapTimes = lapTimes.filter((v): v is number => v !== null && v > 0);
   const avgLapTime =
     validLapTimes.length > 0
@@ -448,10 +485,10 @@ function buildPersonalData(teamId: string, laps: LapData[]): DriverPersonalData 
     laps: sorted,
     bestLapTime,
     bestLap,
-    bestS1: min(sorted.map((l) => l.s1)),
-    bestS2: min(sorted.map((l) => l.s2)),
-    bestS3: min(sorted.map((l) => l.s3)),
-    totalPits: sorted.filter((l) => l.isPit).length,
+    bestS1: min(completed.map((l) => l.s1)),
+    bestS2: min(completed.map((l) => l.s2)),
+    bestS3: min(completed.map((l) => l.s3)),
+    totalPits: completed.filter((l) => l.isPit).length,
     avgLapTime,
   };
 }
