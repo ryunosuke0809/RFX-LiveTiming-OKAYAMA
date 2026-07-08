@@ -3,6 +3,7 @@ import {
     classifyTimeType,
     deriveStatusFromLoop,
     formatGap,
+    formatSecondsDiff,
     parseFlagFromMessage,
 } from "./derive.js";
 import type { LiveSessionState, TeamLapAccum } from "./session-state.js";
@@ -686,5 +687,5 @@ function formatTimeGap(selfBest: number | null, refBest: number | null): string 
     if (selfBest === null || selfBest <= 0 || refBest === null || refBest <= 0) return "—";
     const diff = selfBest - refBest;
     if (diff <= 0) return "—";
-    return `+${(diff / 10000).toFixed(3)}`;
+    return formatSecondsDiff(diff);
 }

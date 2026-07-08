@@ -59,13 +59,14 @@ function downloadCsv(filename: string, content: string) {
   URL.revokeObjectURL(url);
 }
 
-function sortStandingsByBestTime(standings: Standing[]): Standing[] {
-  return [...standings].sort((a, b) => {
-    if (a.bestTime == null && b.bestTime == null) return 0;
-    if (a.bestTime == null) return 1;
-    if (b.bestTime == null) return -1;
-    return a.bestTime - b.bestTime;
-  });
+/**
+ * リザルトの並び順。MOLA が付けた position を正とする (ライブタイミング表と同じ)。
+ * 決勝は周回数＋走行順、予選/専有はベストタイム順が position に反映されている。
+ * position 0 (未出走・コース車など) や 0 周の車両は末尾へ送る。
+ */
+function sortStandingsForResult(standings: Standing[]): Standing[] {
+  const rank = (p: number) => (p > 0 ? p : Number.MAX_SAFE_INTEGER);
+  return [...standings].sort((a, b) => rank(a.position) - rank(b.position) || a.order - b.order);
 }
 
 interface CsvMeta {
@@ -190,7 +191,7 @@ export default function ResultPage() {
     const base = classFilter
       ? baseStandings.filter((s) => getClassByStanding(s)?.nameE === classFilter)
       : baseStandings;
-    return sortStandingsByBestTime(base);
+    return sortStandingsForResult(base);
   }, [classFilter, baseStandings]);
 
   const selectedDateEvents = useMemo(() => {
@@ -411,8 +412,8 @@ function ClassificationView({
               const team = getTeamByStanding(s);
               const cls = getClassByStanding(s);
               if (!team) return null;
-              const leaderBest = standings[0]?.bestTime;
-              const gap = idx === 0 || !s.bestTime || !leaderBest ? "" : `+${formatTime(s.bestTime - leaderBest)}`;
+              // Gap はサーバー計算値 (決勝=周回/タイム差、予選=ベストタイム差、60秒以上は分表記)。
+              const gap = idx === 0 || !s.gap || s.gap === "—" ? "" : s.gap;
               const isEven = idx % 2 === 0;
               const sticky = (colKey: string, className: string) =>
                 `${stickyCellClass(colKey, stickyOffsets, CLASSIFICATION_FIRST_STICKY, CLASSIFICATION_LAST_STICKY, isEven)} ${className}`.trim();

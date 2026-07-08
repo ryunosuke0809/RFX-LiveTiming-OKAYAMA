@@ -25,11 +25,25 @@ export function formatLapTime(time10000: number | null): string {
 }
 
 /**
+ * 1/10000 秒単位のタイム差を "+秒" 表記にする。
+ * 60 秒以上は "+M:SS.mmm" の分表記にする (例: 612370 → "+1:01.237")。
+ */
+export function formatSecondsDiff(diff10000: number): string {
+    const seconds = diff10000 / 10000;
+    if (seconds >= 60) {
+        const m = Math.floor(seconds / 60);
+        const rem = seconds - m * 60;
+        return `+${m}:${rem.toFixed(3).padStart(6, "0")}`;
+    }
+    return `+${seconds.toFixed(3)}`;
+}
+
+/**
  * トップとの gap を文字列化。
  *
  * - 自分がトップ → "—"
  * - 周回違い      → "+2L" (lap 差)
- * - 同一周回      → "+1.234" (lastPassingTime 差を秒で)
+ * - 同一周回      → "+1.234" / 60 秒以上は "+1:01.237" (lastPassingTime 差)
  */
 export function formatGap(
     selfLap: number,
@@ -40,7 +54,7 @@ export function formatGap(
     if (selfLap === topLap && selfLastPassing !== null && topLastPassing !== null) {
         const diff10000 = selfLastPassing - topLastPassing;
         if (diff10000 <= 0) return "—";
-        return `+${(diff10000 / 10000).toFixed(3)}`;
+        return formatSecondsDiff(diff10000);
     }
     const lapDiff = topLap - selfLap;
     if (lapDiff <= 0) return "—";
