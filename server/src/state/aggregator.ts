@@ -26,6 +26,9 @@ import type {
  * - DTO のフィールド名は `JsonNamingPolicy.CamelCase` で .NET から送られている前提
  *   (例: `Time` → `time`, `TeamId` → `teamId`)。
  */
+/** 最終 Passing からこの時間(ms, データ時刻)経過で「停止」と判定。岡山1周 ~90-100s。 */
+const STOP_MS = 90_000;
+
 export class SessionStateAggregator {
     constructor(private readonly state: LiveSessionState) {}
 
@@ -34,32 +37,82 @@ export class SessionStateAggregator {
         if (envelope.ts) this.state.lastDataTs = envelope.ts;
         const p = envelope.payload as Record<string, unknown>;
 
+        let patches: LiveStatePatch[];
         switch (envelope.kind) {
             case "Competition":
-                return this.applyCompetition(p);
+                patches = this.applyCompetition(p);
+                break;
             case "Category":
-                return this.applyCategory(p);
+                patches = this.applyCategory(p);
+                break;
             case "Round":
-                return this.applyRound(p);
+                patches = this.applyRound(p);
+                break;
             case "Session":
-                return this.applySession(p);
+                patches = this.applySession(p);
+                break;
             case "Class":
-                return this.applyClass(p);
+                patches = this.applyClass(p);
+                break;
             case "Team":
-                return this.applyTeam(p);
+                patches = this.applyTeam(p);
+                break;
             case "Select":
-                return this.applySelect(p);
+                patches = this.applySelect(p);
+                break;
             case "Start":
-                return this.applyStart(p);
+                patches = this.applyStart(p);
+                break;
             case "Passing":
-                return this.applyPassing(p);
+                patches = this.applyPassing(p);
+                break;
             case "Standings":
-                return this.applyStandings(p);
+                patches = this.applyStandings(p);
+                break;
             case "Message":
-                return this.applyMessage(p);
+                patches = this.applyMessage(p);
+                break;
             default:
-                return [];
+                patches = [];
         }
+
+        // 一定時間 Passing が来ない車両は「停止 (stopped)」と判定する。
+        // Passing/Standings のたびにデータ時刻が進むので、そのタイミングで再評価する。
+        if (envelope.kind === "Passing" || envelope.kind === "Standings") {
+            const stalled = this.checkStalled();
+            if (stalled.length > 0) patches = patches.concat(stalled);
+        }
+        return patches;
+    }
+
+    /** データ時刻(ms)。lastDataTs から算出。未確定時は null。 */
+    private currentDataMs(): number | null {
+        if (!this.state.lastDataTs) return null;
+        const t = Date.parse(this.state.lastDataTs);
+        return Number.isNaN(t) ? null : t;
+    }
+
+    /**
+     * 最終 Passing から STOP_MS 以上データ時刻が進んだ車両を stopped にする。
+     * 復帰 (再度 Passing) 時は applyPassing 側で on_track に戻る。
+     */
+    private checkStalled(): LiveStatePatch[] {
+        const nowMs = this.currentDataMs();
+        if (nowMs === null) return [];
+        const patches: LiveStatePatch[] = [];
+        let anyChanged = false;
+        for (const [teamId, st] of this.state.standings) {
+            if (st.status !== "on_track" && st.status !== "pit_out") continue;
+            const last = this.state.lastPassingDataMs.get(teamId);
+            if (last === undefined) continue;
+            if (nowMs - last >= STOP_MS) {
+                st.status = "stopped";
+                patches.push({ kind: "standing_upsert", value: { ...st } });
+                anyChanged = true;
+            }
+        }
+        if (anyChanged) patches.push({ kind: "track_count", value: this.state.trackCount() });
+        return patches;
     }
 
     // ============================================================
@@ -199,6 +252,8 @@ export class SessionStateAggregator {
         if (!teamId || loopId === null) return [];
 
         const status = deriveStatusFromLoop(loopId);
+        const dataMs = this.currentDataMs();
+        if (dataMs !== null) this.state.lastPassingDataMs.set(teamId, dataMs);
 
         const existing = this.state.standings.get(teamId);
         if (!existing) {
@@ -573,18 +628,19 @@ function deriveSessionMode(
 }
 
 /** クラス ID から安定した配色を選ぶ。MOLA が色を持たないため使用。
- * 白文字を載せても読める、彩度高め・中〜暗トーンのパレット。 */
+ * Tracking のセクターライン (S1=赤 / S2=黄 / S3=緑) と被らないよう、
+ * 赤・黄・緑系を避けた青〜紫〜ピンク中心のパレット。白文字が載る前提で中〜暗トーン。 */
 const CLASS_PALETTE = [
-    "#dc2626", // red
     "#2563eb", // blue
-    "#16a34a", // green
-    "#d97706", // amber
     "#9333ea", // purple
-    "#0891b2", // cyan
-    "#db2777", // pink
+    "#06b6d4", // cyan
+    "#ec4899", // pink
     "#4f46e5", // indigo
-    "#ca8a04", // dark yellow
-    "#0d9488", // teal
+    "#c026d3", // fuchsia
+    "#0ea5e9", // sky
+    "#7c3aed", // violet
+    "#8b5cf6", // light violet
+    "#db2777", // dark pink
 ];
 
 function pickClassColor(id: string): string {

@@ -59,6 +59,8 @@ export class LiveSessionState {
     readonly teamPersonalBest = new Map<string, number>(); // teamId → bestTime (1/10000s)
     readonly pitCount = new Map<string, number>(); // teamId → pit count
     readonly lastPassingClockMs = new Map<string, number>(); // teamId → 最終受信時刻 (Date.now())
+    /** teamId → 最終 Passing の「データ時刻」(ms)。再生でも正しく stall 判定するため wall clock ではなくデータ時刻を使う。 */
+    readonly lastPassingDataMs = new Map<string, number>();
     readonly previousPosition = new Map<string, number>(); // teamId → 直前の position
 
     /** teamId → [S1,S2,S3] のベストセクター (1/10000s)。色分け判定用。 */
@@ -90,6 +92,7 @@ export class LiveSessionState {
         this.teamPersonalBest.clear();
         this.pitCount.clear();
         this.lastPassingClockMs.clear();
+        this.lastPassingDataMs.clear();
         this.previousPosition.clear();
         this.teamBestSector.clear();
         this.overallBestSector = [null, null, null];

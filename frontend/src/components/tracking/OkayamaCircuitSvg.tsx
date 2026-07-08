@@ -598,10 +598,17 @@ export default function OkayamaCircuitSvg({
                 return null;
               }
 
+              // 停止/リタイア車は「最後に通過した計測点」に固定表示する（アニメーションしない）。
+              // 例: S1 通過後に停止 → S2 区間の始点 (S1 計測点) に静止。
+              const stopped = s.status === "stopped" || s.status === "retired";
+
               // 区間通過に応じてアニメーションのレグ(始点→終点)を更新する。
               // 移動時間は「直近の該当区間タイム」(sectors[durIdx]) を採用。
               let t: number;
-              {
+              if (stopped) {
+                animRef.current.delete(s.teamId);
+                t = segmentFor(s.sectorNo).start;
+              } else {
                 const seg = segmentFor(s.sectorNo);
                 const legKey = s.lap * 4 + s.sectorNo; // (周,区間)が変わったら新レグ
                 const prev = animRef.current.get(s.teamId);
@@ -664,9 +671,10 @@ export default function OkayamaCircuitSvg({
                     rx={r * 0.42}
                     ry={r * 0.42}
                     fill={fillColor}
-                    opacity={dimmed ? 0.3 : 0.95}
-                    stroke={isHighlighted ? "#fff" : "#000"}
-                    strokeWidth={isHighlighted ? 2 : 1}
+                    opacity={dimmed ? 0.3 : stopped ? 0.7 : 0.95}
+                    stroke={stopped ? "#f87171" : isHighlighted ? "#fff" : "#000"}
+                    strokeWidth={stopped ? 2.5 : isHighlighted ? 2 : 1}
+                    strokeDasharray={stopped ? "3 2" : undefined}
                   />
                   <text
                     x={x}

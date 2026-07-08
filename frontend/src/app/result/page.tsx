@@ -114,7 +114,7 @@ function generateIndividualCsv(standing: Standing, data: DriverPersonalData, met
   ];
   const header = "Lap,Lap Time,S1,S2,S3,Position,Pit";
   const rows = data.laps.map((l) =>
-    [l.lap, formatTime(l.lapTime), formatTime(l.s1), formatTime(l.s2), formatTime(l.s3), l.position > 0 ? l.position : "", l.isPit ? "YES" : ""].join(",")
+    [l.lap, formatTime(l.lapTime), formatTime(l.s1), formatTime(l.s2), formatTime(l.s3), l.position > 0 ? l.position : "", l.isPit ? "P" : ""].join(",")
   );
   return [...info, header, ...rows].join("\n");
 }
