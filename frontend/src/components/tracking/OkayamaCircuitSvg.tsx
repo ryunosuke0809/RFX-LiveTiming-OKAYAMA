@@ -64,8 +64,18 @@ interface CarAnim {
   target: number;
   startT: number;
   durMs: number;
+  /** この区間の「実秒ベース」推定時間(ms)。再生レート推定(実測/推定)に使う。 */
+  estMs: number;
   leg: number;
 }
+
+/** 再生レート(実測壁時計 / 実秒推定) の許容範囲と平滑化係数。
+ *  ライブ=1x なら ≈1、10倍速再生なら ≈0.1 に自動追従する。 */
+const RATE_MIN = 0.02;
+const RATE_MAX = 1.5;
+const RATE_EMA = 0.35;
+/** レート適用後の区間移動時間の下限(ms)。inf 再生でも視認できる程度は動かす。 */
+const MIN_DUR_MS = 250;
 
 const TRACK_STROKE_WIDE = 38;
 const TRACK_STROKE_LINE = 9;
@@ -232,6 +242,9 @@ export default function OkayamaCircuitSvg({
   // 車両アニメーション: teamId ごとに「現区間の始点→終点を区間タイムかけて移動」する状態を保持し、
   // requestAnimationFrame で毎フレーム再描画する。
   const animRef = useRef<Map<string, CarAnim>>(new Map());
+  // データ配信レート(=実測の区間所要壁時計 / 実秒推定)の平滑化値。
+  // ライブなら ≈1、加速再生なら小さくなり、マーカー移動がデータ更新に追従する。
+  const rateRef = useRef<number>(1);
   const [, setAnimFrame] = useState(0);
   useEffect(() => {
     if (!showCarMarkers) return;
@@ -701,14 +714,28 @@ export default function OkayamaCircuitSvg({
                 const legKey = s.lap * 4 + s.sectorNo; // (周,区間)が変わったら新レグ
                 const prev = animRef.current.get(s.teamId);
                 if (!prev || prev.leg !== legKey) {
-                  // 移動時間は「1周前のその区間タイム」(refSectors[durIdx])。未計測時のみ既定値。
+                  // 新しい通過を検知した瞬間。直前レグの「実測壁時計 / 実秒推定」から
+                  // 配信レートを推定し、平滑化しておく (加速再生でもマーカーが追従する)。
+                  if (prev && prev.estMs > 0) {
+                    const observed = (now - prev.startT) / prev.estMs;
+                    if (observed > 0 && Number.isFinite(observed)) {
+                      const clamped = Math.min(RATE_MAX, Math.max(RATE_MIN, observed));
+                      rateRef.current =
+                        rateRef.current * (1 - RATE_EMA) + clamped * RATE_EMA;
+                    }
+                  }
+                  // 実秒ベースの推定移動時間は「1周前のその区間タイム」。未計測時のみ既定値。
                   const secTime = s.refSectors?.[seg.durIdx] ?? null;
-                  const durMs = secTime && secTime > 0 ? secTime / 10 : DEFAULT_SEG_MS[seg.durIdx];
+                  const estMs =
+                    secTime && secTime > 0 ? secTime / 10 : DEFAULT_SEG_MS[seg.durIdx];
+                  // 実際の移動時間は推定値に配信レートを掛けたもの。
+                  const durMs = Math.max(MIN_DUR_MS, estMs * rateRef.current);
                   animRef.current.set(s.teamId, {
                     start: seg.start,
                     target: seg.target,
                     startT: now,
                     durMs,
+                    estMs,
                     leg: legKey,
                   });
                 }
