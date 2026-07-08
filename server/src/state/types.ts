@@ -163,6 +163,8 @@ export interface LiveStateSnapshot {
     recentMessages: RaceControlMessageVm[];
     /** teamId → 完了周のラップ履歴 (個別ドライバー表示用)。 */
     driverLaps: Record<string, LapDataVm[]>;
+    /** セッション全体のベストセクター [S1,S2,S3] (理論ベスト表示用)。 */
+    bestSectors: Array<number | null>;
 }
 
 /**
@@ -178,6 +180,7 @@ export type LiveStatePatch =
     | { kind: "standing_upsert"; value: StandingVm }
     | { kind: "standing_remove"; teamId: string }
     | { kind: "fastest_lap"; value: FastestLapVm | null }
+    | { kind: "best_sectors"; value: Array<number | null> }
     | { kind: "track_count"; value: TrackCountVm }
     | { kind: "driver_lap"; teamId: string; value: LapDataVm }
     | { kind: "message"; value: RaceControlMessageVm };

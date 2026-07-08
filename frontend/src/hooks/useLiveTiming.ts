@@ -86,6 +86,7 @@ interface StateSnapshot {
   classes: CarClassVm[];
   teams: TeamSummaryVm[];
   driverLaps: Record<string, LapData[]>;
+  bestSectors?: Array<number | null>;
 }
 
 type LiveStatePatch =
@@ -97,6 +98,7 @@ type LiveStatePatch =
   | { kind: "standing_upsert"; value: StandingVm }
   | { kind: "standing_remove"; teamId: string }
   | { kind: "fastest_lap"; value: FastestLapVm | null }
+  | { kind: "best_sectors"; value: Array<number | null> }
   | { kind: "track_count"; value: TrackCount }
   | { kind: "driver_lap"; teamId: string; value: LapData }
   | { kind: "message"; value: unknown };
@@ -149,6 +151,7 @@ interface InternalState {
   flag: TrackFlag;
   dataTsMs: number | null;
   driverLaps: Map<string, LapData[]>;
+  bestSectors: Array<number | null>;
 }
 
 function emptyInternal(): InternalState {
@@ -162,6 +165,7 @@ function emptyInternal(): InternalState {
     flag: "green",
     dataTsMs: null,
     driverLaps: new Map(),
+    bestSectors: [null, null, null],
   };
 }
 
@@ -213,6 +217,7 @@ export function useLiveTiming(url?: string): LiveTimingData {
           s.teams.clear();
           s.driverLaps.clear();
           s.fastestLap = null;
+          s.bestSectors = [null, null, null];
           s.trackCount = { onTrack: 0, inPit: 0, stopped: 0, retired: 0 };
           s.flag = "green";
           break;
@@ -237,6 +242,9 @@ export function useLiveTiming(url?: string): LiveTimingData {
           break;
         case "fastest_lap":
           s.fastestLap = patch.value;
+          break;
+        case "best_sectors":
+          s.bestSectors = patch.value;
           break;
         case "track_count":
           s.trackCount = patch.value;
@@ -284,6 +292,7 @@ export function useLiveTiming(url?: string): LiveTimingData {
           s.classes = new Map(msg.state.classes.map((x) => [x.id, x]));
           s.teams = new Map(msg.state.teams.map((x) => [x.id, x]));
           s.driverLaps = new Map(Object.entries(msg.state.driverLaps ?? {}));
+          s.bestSectors = msg.state.bestSectors ?? [null, null, null];
           s.dataTsMs = msg.state.dataTs ? Date.parse(msg.state.dataTs) || null : s.dataTsMs;
           scheduleFlush();
         } else if (msg.type === "patch") {
@@ -370,13 +379,15 @@ export function useLiveTiming(url?: string): LiveTimingData {
       .sort((a, b) => rank(a.position) - rank(b.position) || a.order - b.order);
     const standingMap = new Map(standings.map((st) => [st.teamId, st]));
 
+    // 全体ベストセクター [S1,S2,S3]。null は 0 として渡し、表示側で "--:--" になる。
+    const bestSectorArr = (s.bestSectors ?? [null, null, null]).map((v) => v ?? 0);
     const fastestLap: FastestLap | null = s.fastestLap
       ? {
           teamNo: s.fastestLap.teamNo,
           driverName: s.fastestLap.driverNameJ,
           lapTime: s.fastestLap.lapTime,
           lap: s.fastestLap.lap,
-          sectors: [],
+          sectors: bestSectorArr,
         }
       : null;
 

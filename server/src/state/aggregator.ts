@@ -362,6 +362,7 @@ export class SessionStateAggregator {
             }
             if (prevOverallBest === null || newSectorTime < prevOverallBest) {
                 overallBest[idx] = newSectorTime;
+                extraPatches.push({ kind: "best_sectors", value: [...overallBest] });
             }
             const secType = classifyTimeType(newSectorTime, prevOverallBest, prevTeamBest);
             const sectorVm: SectorTimeVm = { time: newSectorTime, type: secType };

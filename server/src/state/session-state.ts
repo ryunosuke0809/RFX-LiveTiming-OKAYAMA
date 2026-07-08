@@ -173,6 +173,7 @@ export class LiveSessionState {
             teams: Array.from(this.teams.values()),
             recentMessages: this.recentMessages.slice(),
             driverLaps: Object.fromEntries(this.teamLaps),
+            bestSectors: [...this.overallBestSector],
         };
     }
 }
