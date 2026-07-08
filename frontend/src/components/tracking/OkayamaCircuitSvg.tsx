@@ -31,10 +31,8 @@ const SECTOR_COLORS = {
   s3: "#22c55e",
 };
 
-// 岡山のセクター境界 (Loop 長 / 全長 3703m): S1末=962m(0.26) / S2末=2520m(0.68) / 一周=1.0。
+/** FL(スタート/フィニッシュ) と 一周終端の samples インデックス比率。S1/S2 境界は geom.bounds から取る。 */
 const BOUND_CL = 0.0;
-const BOUND_S1 = 0.2598;
-const BOUND_S2 = 0.6805;
 const BOUND_LAP = 1.0;
 /** 区間ごとの既定移動時間(ms)。区間タイム未取得時のフォールバック。 */
 const DEFAULT_SEG_MS = [22000, 42000, 33000];
@@ -42,15 +40,22 @@ const DEFAULT_SEG_MS = [22000, 42000, 33000];
 /**
  * sectorNo から「今いる区間の始点/終点/移動に使う区間index」を返す。
  * SectorNo は直近で通過した計測点: 1=S1通過(→S2走行), 2=S2通過(→S3走行), 3/0=CL通過(→S1走行)。
+ *
+ * 境界は色分けセクターパスと同じジオメトリ (`bounds` = samples インデックス比率) を使う。
+ * 実距離比の固定値だと pointOnLapSamples の補間 (インデックス基準) と位置がずれ、
+ * S2 通過済の車が黄色い S2 ゾーンの途中に描画される不具合になる。
  */
-function segmentFor(sectorNo: number): { start: number; target: number; durIdx: number } {
+function segmentFor(
+  sectorNo: number,
+  bounds: { s1: number; s2: number },
+): { start: number; target: number; durIdx: number } {
   switch (sectorNo) {
     case 1:
-      return { start: BOUND_S1, target: BOUND_S2, durIdx: 1 }; // S2 を走行
+      return { start: bounds.s1, target: bounds.s2, durIdx: 1 }; // S2 を走行
     case 2:
-      return { start: BOUND_S2, target: BOUND_LAP, durIdx: 2 }; // S3 を走行
+      return { start: bounds.s2, target: BOUND_LAP, durIdx: 2 }; // S3 を走行
     default: // 3 or 0
-      return { start: BOUND_CL, target: BOUND_S1, durIdx: 0 }; // S1 を走行
+      return { start: BOUND_CL, target: bounds.s1, durIdx: 0 }; // S1 を走行
   }
 }
 
@@ -578,7 +583,8 @@ export default function OkayamaCircuitSvg({
           {/* FL/S1/S2 の小ラベルは廃止（FL は上の独自デザイン、S1/S2 は横断ラインのみ） */}
 
           {/* マシンマーカー（sectorNo からコース位置を推定して配置） */}
-          {showCarMarkers && (() => {
+          {showCarMarkers && geom && (() => {
+            const bounds = geom.bounds;
             const highlighted = highlightedTeamIds ?? new Set<string>();
             const hasHighlights = highlighted.size > 0;
 
@@ -601,8 +607,10 @@ export default function OkayamaCircuitSvg({
                 return null;
               }
 
-              // 停止/リタイア車は「最後に通過した計測点」に固定表示する（アニメーションしない）。
-              // 例: S1 通過後に停止 → S2 区間の始点 (S1 計測点) に静止。
+              // 停止/リタイア車は「走行中だった区間の終点=次の計測点」に固定表示する。
+              // 例: S1 通過後に停止 → S2 を走行中に止まった → S2 計測点で静止。
+              //     S2 通過後に停止 → S3 を走行中に止まった → FL で静止。
+              // (通常のアニメーションも区間タイム経過後は終点で静止するので位置は連続する。)
               const stopped = s.status === "stopped" || s.status === "retired";
 
               // 区間通過に応じてアニメーションのレグ(始点→終点)を更新する。
@@ -610,9 +618,9 @@ export default function OkayamaCircuitSvg({
               let t: number;
               if (stopped) {
                 animRef.current.delete(s.teamId);
-                t = segmentFor(s.sectorNo).start;
+                t = segmentFor(s.sectorNo, bounds).target;
               } else {
-                const seg = segmentFor(s.sectorNo);
+                const seg = segmentFor(s.sectorNo, bounds);
                 const legKey = s.lap * 4 + s.sectorNo; // (周,区間)が変わったら新レグ
                 const prev = animRef.current.get(s.teamId);
                 if (!prev || prev.leg !== legKey) {

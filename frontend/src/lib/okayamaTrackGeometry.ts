@@ -29,6 +29,13 @@ export type OkayamaLapGeometry = {
   /** ラップ全体に占める各セクターの長さ累積（ワールド座標基準） */
   cutS1: number;
   cutS2: number;
+  /**
+   * セクター境界の「samples 配列インデックス比率」(0..1)。
+   * pointOnLapSamples はインデックス比率で位置を返すため、マーカー配置には
+   * 実距離ではなくこの比率を使わないと色分けパスと位置がずれる。
+   *   s1 = S1→S2 境界 (S1 計測点), s2 = S2→S3 境界 (S2 計測点)。FL/CL=0, 一周=1。
+   */
+  bounds: { s1: number; s2: number };
   /** 一周をサンプリングしたワールド座標列（マーカー位置補間用） */
   samples: Vec2[];
   sectorLabelCenters: { s1: Vec2; s2: Vec2; s3: Vec2 };
@@ -208,6 +215,15 @@ export function buildOkayamaLapGeometry(
     const cutS1 = cumulative[sectorEndIdx[0]!]!;
     const cutS2 = cumulative[sectorEndIdx[1]!]!;
 
+    // マーカー配置用の境界: pointOnLapSamples が使うのと同じ「インデックス比率」で持つ。
+    // 各セクターはサンプル点数が異なる (S1 は強めスムージングで点数が多い) ため、
+    // 実距離比 (cutS1/totalLen) ではなくインデックス比でないと色分けパスとずれる。
+    const denom = Math.max(1, merged.length - 1);
+    const bounds = {
+      s1: sectorEndIdx[0]! / denom,
+      s2: sectorEndIdx[1]! / denom,
+    };
+
     const fl = lapPath.getPointAtLength(0);
     const s1End = lapPath.getPointAtLength(Math.min(cutS1, totalLen));
     const s2End = lapPath.getPointAtLength(Math.min(cutS2, totalLen));
@@ -239,6 +255,7 @@ export function buildOkayamaLapGeometry(
       totalLen,
       cutS1,
       cutS2,
+      bounds,
       samples: merged,
       sectorLabelCenters,
       timing: {
