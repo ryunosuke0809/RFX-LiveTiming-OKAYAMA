@@ -217,7 +217,62 @@ export class SessionStateAggregator {
             drivers,
         };
         this.state.teams.set(value.id, value);
-        return [{ kind: "team_upsert", value }];
+        const patches: LiveStatePatch[] = [{ kind: "team_upsert", value }];
+
+        // エントリー(Team マスター)受信時点でプレースホルダー standing を作る。
+        // これで S1 通過前(セッション選択直後)からタイミング表に全エントリーが並ぶ。
+        // 実際の Standings/Passing が来たら upsertStanding が上書きする。
+        const placeholder = this.ensurePlaceholderStanding(value);
+        if (placeholder) {
+            patches.push(placeholder);
+            patches.push({ kind: "track_count", value: this.state.trackCount() });
+        }
+        return patches;
+    }
+
+    /**
+     * まだ standing の無いチームに、タイム未計測のプレースホルダーを作る。
+     * 走行データが無いので Tracking のコース上には出さない (lastPassingTime=null で判定)。
+     */
+    private ensurePlaceholderStanding(team: TeamSummaryVm): LiveStatePatch | null {
+        if (this.state.standings.has(team.id)) return null;
+        const driver = team.drivers[0];
+        const standing: StandingVm = {
+            position: 0,
+            classPosition: 0,
+            classId: team.classId,
+            teamId: team.id,
+            teamNo: team.no,
+            teamNameJ: team.nameJ,
+            teamNameE: team.nameE,
+            driverNo: driver?.no ?? 0,
+            driverNameJ: driver?.nameJ ?? "",
+            driverNameE: driver?.nameE ?? "",
+            lap: 0,
+            bestTime: null,
+            bestTimeLap: 0,
+            lastLapTime: null,
+            lastPassingTime: null,
+            sectorNo: 0,
+            sectorTime: null,
+            order: team.no, // 走行前は車番順で並べる
+            refSectors: [null, null, null],
+            gap: "—",
+            interval: "—",
+            status: "on_track",
+            sectors: [
+                { time: null, type: "none" },
+                { time: null, type: "none" },
+                { time: null, type: "none" },
+            ],
+            bestTimeType: "none",
+            lastLapTimeType: "none",
+            pits: 0,
+            pitTime: null,
+            positionChange: 0,
+        };
+        this.state.standings.set(team.id, standing);
+        return { kind: "standing_upsert", value: { ...standing } };
     }
 
     private applySelect(p: Record<string, unknown>): LiveStatePatch[] {

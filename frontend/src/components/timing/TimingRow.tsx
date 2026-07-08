@@ -109,7 +109,7 @@ export default function TimingRow({ standing, team, carClass, isEven, carCol, ga
       </td>
       {/* P */}
       <td className={sticky("pos", "py-px text-center font-bold text-white font-mono")} style={stickyStyle("pos")}>
-        {standing.position}
+        {standing.position > 0 ? standing.position : "—"}
       </td>
       {isRaceMode && (
         <td className={sticky("chg", "py-px text-center")} style={{ fontSize: "0.75em", ...stickyStyle("chg") }}>
@@ -117,7 +117,7 @@ export default function TimingRow({ standing, team, carClass, isEven, carCol, ga
         </td>
       )}
       <td className={sticky("pic", "py-px text-center text-zinc-400 font-mono")} style={stickyStyle("pic")}>
-        {standing.classPosition}
+        {standing.classPosition > 0 ? standing.classPosition : "—"}
       </td>
       <td className={sticky("nr", "py-px text-center font-bold text-white font-mono")} style={stickyStyle("nr")}>
         {team?.no}

@@ -9,7 +9,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Standing } from "@/types/smis";
+import type { Standing, Team } from "@/types/smis";
 import { getTeamByStanding, getClassByStanding } from "@/data/mock";
 import {
   OKAYAMA_TRACK_CENTER,
@@ -82,6 +82,78 @@ const MARKER_SCALE_MIN = 0.6;
 const MARKER_SCALE_MAX = 2.2;
 const MARKER_SCALE_STEP = 0.2;
 const MARKER_SCALE_DEFAULT = 1.5;
+
+/** マーカー: 実位置ドット / リード線 / CARNO ラベルの基準寸法 (markerScale=1・ワールド座標)。 */
+const DOT_R = 4;
+const LABEL_H = 18;
+const LABEL_FONT = 11;
+const LABEL_CHAR_W = 7.5;
+const LABEL_PAD_X = 6;
+/** ラベルと実位置ドットを結ぶリード線の最大長 (markerScale 倍)。 */
+const LEADER_MAX = 46;
+
+/** デクラッタ対象のラベル1件。実位置(x,y)とラベル中心(lx,ly)を分離して持つ。 */
+interface LabelMark {
+  s: Standing;
+  team: Team;
+  noStr: string;
+  x: number;
+  y: number;
+  lx: number;
+  ly: number;
+  labelW: number;
+  labelH: number;
+  fill: string;
+  isHi: boolean;
+  dimmed: boolean;
+  stopped: boolean;
+}
+
+/**
+ * ラベル同士が重ならないよう AABB 反発でラベル位置(lx,ly)を調整する。
+ * 実位置(ドット)からの距離が LEADER_MAX を超えないよう毎反復で引き戻す。
+ * 集団でも CARNO が読めるようにするための簡易デクラッタ。
+ */
+function declutterLabels(marks: LabelMark[], markerScale: number): void {
+  const ITER = 10;
+  const gap = 3 * markerScale;
+  const maxLead = LEADER_MAX * markerScale;
+  for (let it = 0; it < ITER; it++) {
+    for (let i = 0; i < marks.length; i++) {
+      for (let j = i + 1; j < marks.length; j++) {
+        const a = marks[i]!;
+        const b = marks[j]!;
+        const dx = b.lx - a.lx;
+        const dy = b.ly - a.ly;
+        const minX = (a.labelW + b.labelW) / 2 + gap;
+        const minY = (a.labelH + b.labelH) / 2 + gap;
+        const ox = minX - Math.abs(dx);
+        const oy = minY - Math.abs(dy);
+        if (ox > 0 && oy > 0) {
+          // 重なりが小さい軸方向へ押し離す。
+          if (ox < oy) {
+            const push = (ox / 2) * (dx < 0 ? -1 : 1);
+            a.lx -= push;
+            b.lx += push;
+          } else {
+            const push = (oy / 2) * (dy < 0 ? -1 : 1);
+            a.ly -= push;
+            b.ly += push;
+          }
+        }
+      }
+    }
+    for (const m of marks) {
+      const dx = m.lx - m.x;
+      const dy = m.ly - m.y;
+      const d = Math.hypot(dx, dy);
+      if (d > maxLead) {
+        m.lx = m.x + (dx / d) * maxLead;
+        m.ly = m.y + (dy / d) * maxLead;
+      }
+    }
+  }
+}
 
 /** セクター境界を路面に対し直交で横断するオレンジ点線 */
 const BOUNDARY_LINE_COLOR = "#f59e0b";
@@ -582,39 +654,36 @@ export default function OkayamaCircuitSvg({
 
           {/* FL/S1/S2 の小ラベルは廃止（FL は上の独自デザイン、S1/S2 は横断ラインのみ） */}
 
-          {/* マシンマーカー（sectorNo からコース位置を推定して配置） */}
+          {/* マシンマーカー: 実位置ドット + リード線 + CARNO ラベル。
+              集団でもラベルが重ならないよう declutter してから描画する。 */}
           {showCarMarkers && geom && (() => {
             const bounds = geom.bounds;
             const highlighted = highlightedTeamIds ?? new Set<string>();
             const hasHighlights = highlighted.size > 0;
-
-            const sorted = [...standings].sort((a, b) => {
-              const aH = highlighted.has(a.teamId) ? 1 : 0;
-              const bH = highlighted.has(b.teamId) ? 1 : 0;
-              return aH - bH;
-            });
-
             const now = typeof performance !== "undefined" ? performance.now() : Date.now();
 
-            return sorted.map((s) => {
+            // 1) 各車の実位置(ドット)を計算してマーカー候補を作る。
+            const marks: LabelMark[] = [];
+            for (const s of standings) {
               const team = getTeamByStanding(s);
               const cls = getClassByStanding(s);
-              if (!team) return null;
+              if (!team) continue;
 
-              // IN PIT の車両はコース上から消す（トラッキングページの PitIn リストに表示する）。
+              // IN PIT はコースから消す（PitIn リストに表示）。
               if (s.status === "in_pit") {
                 animRef.current.delete(s.teamId);
-                return null;
+                continue;
+              }
+
+              // まだ 1 度も通過データが無い車両（エントリーのみのプレースホルダー）は
+              // コース上の位置を推定できないため描画しない。走り出せば位置が付く。
+              if (s.lastPassingTime == null || s.lastPassingTime <= 0) {
+                animRef.current.delete(s.teamId);
+                continue;
               }
 
               // 停止/リタイア車は「走行中だった区間の終点=次の計測点」に固定表示する。
-              // 例: S1 通過後に停止 → S2 を走行中に止まった → S2 計測点で静止。
-              //     S2 通過後に停止 → S3 を走行中に止まった → FL で静止。
-              // (通常のアニメーションも区間タイム経過後は終点で静止するので位置は連続する。)
               const stopped = s.status === "stopped" || s.status === "retired";
-
-              // 区間通過に応じてアニメーションのレグ(始点→終点)を更新する。
-              // 移動時間は「直近の該当区間タイム」(sectors[durIdx]) を採用。
               let t: number;
               if (stopped) {
                 animRef.current.delete(s.teamId);
@@ -624,7 +693,7 @@ export default function OkayamaCircuitSvg({
                 const legKey = s.lap * 4 + s.sectorNo; // (周,区間)が変わったら新レグ
                 const prev = animRef.current.get(s.teamId);
                 if (!prev || prev.leg !== legKey) {
-                  // 移動時間は「その区間で最後に計測したタイム」を採用 (前回最新通過タイム)。
+                  // 移動時間は「1周前のその区間タイム」(refSectors[durIdx])。未計測時のみ既定値。
                   const secTime = s.refSectors?.[seg.durIdx] ?? null;
                   const durMs = secTime && secTime > 0 ? secTime / 10 : DEFAULT_SEG_MS[seg.durIdx];
                   animRef.current.set(s.teamId, {
@@ -643,21 +712,42 @@ export default function OkayamaCircuitSvg({
               const { x, y } =
                 samples.length >= 2 ? pointOnLapSamples(samples, t) : { x: 800, y: 400 };
 
-              const isHighlighted = highlighted.has(s.teamId);
-              const fillColor = cls?.color || "#71717a";
-              const dimmed = hasHighlights && !isHighlighted;
-              const r = (isHighlighted ? 16 : 12) * markerScale;
-              const labelFont = (isHighlighted ? 11 : 9) * markerScale;
+              const isHi = highlighted.has(s.teamId);
+              const noStr = String(team.no);
+              const labelH = LABEL_H * markerScale;
+              const labelW = (LABEL_PAD_X * 2 + noStr.length * LABEL_CHAR_W) * markerScale;
+              marks.push({
+                s,
+                team,
+                noStr,
+                x,
+                y,
+                lx: x,
+                ly: y - labelH * 1.6, // 初期はドットの少し上にラベルを置く
+                labelW,
+                labelH,
+                fill: cls?.color || "#71717a",
+                isHi,
+                dimmed: hasHighlights && !isHi,
+                stopped,
+              });
+            }
 
-              // 位置は親 <g> の回転で地図と一緒に動くが、番号ラベルは常に正立させたい。
-              // マーカー中心 (x,y) を軸に親の回転を打ち消す逆回転をかける。
-              const counterRotate = rotation % 360 !== 0 ? `rotate(${-rotation} ${x} ${y})` : undefined;
+            // 2) ラベルの重なりを回避（集団でも CARNO が読めるように）。
+            declutterLabels(marks, markerScale);
 
+            // 3) 描画（ハイライトを前面に）。
+            const ordered = [...marks].sort((a, b) => (a.isHi ? 1 : 0) - (b.isHi ? 1 : 0));
+            return ordered.map((m) => {
+              const { s, team, noStr, x, y, lx, ly, labelW, labelH, fill, isHi, dimmed, stopped } = m;
+              const dotR = DOT_R * markerScale * (isHi ? 1.25 : 1);
+              const fontSize = LABEL_FONT * markerScale * (isHi ? 1.1 : 1);
+              // ラベルは常に正立（親の回転を打ち消す）。ドット/リード線は地図と一緒に回る。
+              const counter = rotation % 360 !== 0 ? `rotate(${-rotation} ${lx} ${ly})` : undefined;
               return (
                 <g
                   key={s.teamId}
-                  transform={counterRotate}
-                  filter={isHighlighted ? "url(#glow-strong)" : undefined}
+                  filter={isHi ? "url(#glow-strong)" : undefined}
                   style={{ cursor: onMarkerClick ? "pointer" : undefined }}
                   onClick={
                     onMarkerClick
@@ -668,60 +758,84 @@ export default function OkayamaCircuitSvg({
                       : undefined
                   }
                 >
-                  {isHighlighted && (
-                    <circle cx={x} cy={y} r={r + 5} fill="none" stroke={fillColor} strokeWidth="2" opacity="0.4">
-                      <animate attributeName="r" values={`${r + 2};${r + 10};${r + 2}`} dur="2s" repeatCount="indefinite" />
+                  {/* ハイライト時: 実位置ドットにパルスリング */}
+                  {isHi && (
+                    <circle cx={x} cy={y} r={dotR + 4} fill="none" stroke={fill} strokeWidth="2" opacity="0.4">
+                      <animate attributeName="r" values={`${dotR + 2};${dotR + 9};${dotR + 2}`} dur="2s" repeatCount="indefinite" />
                       <animate attributeName="opacity" values="0.5;0.1;0.5" dur="2s" repeatCount="indefinite" />
                     </circle>
                   )}
-                  <rect
-                    x={x - r}
-                    y={y - r}
-                    width={r * 2}
-                    height={r * 2}
-                    rx={r * 0.42}
-                    ry={r * 0.42}
-                    fill={fillColor}
-                    opacity={dimmed ? 0.3 : stopped ? 0.7 : 0.95}
-                    stroke={stopped ? "#f87171" : isHighlighted ? "#fff" : "#000"}
-                    strokeWidth={stopped ? 2.5 : isHighlighted ? 2 : 1}
-                    strokeDasharray={stopped ? "3 2" : undefined}
+                  {/* リード線: 実位置(ドット) → ラベル */}
+                  <line
+                    x1={x}
+                    y1={y}
+                    x2={lx}
+                    y2={ly}
+                    stroke={fill}
+                    strokeWidth={1.2 * markerScale}
+                    opacity={dimmed ? 0.2 : 0.65}
                   />
-                  <text
-                    x={x}
-                    y={y + 1}
-                    textAnchor="middle"
-                    dominantBaseline="central"
-                    fill="white"
-                    fontSize={labelFont}
-                    fontWeight="bold"
-                    fontFamily="sans-serif"
-                    opacity={dimmed ? 0.4 : 1}
-                    stroke="#000"
-                    strokeWidth={labelFont * 0.22}
-                    strokeLinejoin="round"
-                    style={{ paintOrder: "stroke" }}
-                  >
-                    {team.no}
-                  </text>
-                  {isHighlighted && (
-                    <g>
-                      <rect
-                        x={x + r + 4}
-                        y={y - 14}
-                        width={Math.max(team.nameE.length * 5.5, 80)}
-                        height="18"
-                        rx="3"
-                        fill="#18181b"
-                        stroke={fillColor}
-                        strokeWidth="1"
-                        opacity="0.9"
-                      />
-                      <text x={x + r + 8} y={y - 4} fill="#e4e4e7" fontSize="9" fontWeight="bold" fontFamily="sans-serif">
-                        {team.nameE}
-                      </text>
-                    </g>
-                  )}
+                  {/* 実位置ドット */}
+                  <circle
+                    cx={x}
+                    cy={y}
+                    r={dotR}
+                    fill={fill}
+                    stroke={stopped ? "#f87171" : "#000"}
+                    strokeWidth={1}
+                    opacity={dimmed ? 0.35 : 1}
+                  />
+                  {/* CARNO ラベル（丸み帯びた四角・正立） */}
+                  <g transform={counter}>
+                    <rect
+                      x={lx - labelW / 2}
+                      y={ly - labelH / 2}
+                      width={labelW}
+                      height={labelH}
+                      rx={labelH * 0.3}
+                      ry={labelH * 0.3}
+                      fill={fill}
+                      opacity={dimmed ? 0.3 : stopped ? 0.7 : 0.95}
+                      stroke={stopped ? "#f87171" : isHi ? "#fff" : "#000"}
+                      strokeWidth={stopped ? 2 : isHi ? 1.5 : 1}
+                      strokeDasharray={stopped ? "3 2" : undefined}
+                    />
+                    <text
+                      x={lx}
+                      y={ly}
+                      textAnchor="middle"
+                      dominantBaseline="central"
+                      fill="white"
+                      fontSize={fontSize}
+                      fontWeight="bold"
+                      fontFamily="sans-serif"
+                      opacity={dimmed ? 0.4 : 1}
+                      stroke="#000"
+                      strokeWidth={fontSize * 0.22}
+                      strokeLinejoin="round"
+                      style={{ paintOrder: "stroke" }}
+                    >
+                      {noStr}
+                    </text>
+                    {isHi && (
+                      <g>
+                        <rect
+                          x={lx + labelW / 2 + 4}
+                          y={ly - 9}
+                          width={Math.max(team.nameE.length * 5.5, 80)}
+                          height="18"
+                          rx="3"
+                          fill="#18181b"
+                          stroke={fill}
+                          strokeWidth="1"
+                          opacity="0.9"
+                        />
+                        <text x={lx + labelW / 2 + 8} y={ly + 1} fill="#e4e4e7" fontSize="9" fontWeight="bold" fontFamily="sans-serif" dominantBaseline="middle">
+                          {team.nameE}
+                        </text>
+                      </g>
+                    )}
+                  </g>
                 </g>
               );
             });
