@@ -76,7 +76,7 @@ const PAN_DRAG_THRESHOLD = 4;
 const MARKER_SCALE_MIN = 0.6;
 const MARKER_SCALE_MAX = 2.2;
 const MARKER_SCALE_STEP = 0.2;
-const MARKER_SCALE_DEFAULT = 1;
+const MARKER_SCALE_DEFAULT = 1.5;
 
 /** セクター境界を路面に対し直交で横断するオレンジ点線 */
 const BOUNDARY_LINE_COLOR = "#f59e0b";
@@ -138,11 +138,14 @@ export default function OkayamaCircuitSvg({
   onMarkerClick,
   className = "",
 }: OkayamaCircuitSvgProps) {
-  // ジオメトリは純粋関数（SSR 時は document が無く null）なので useMemo で導出する。
-  // （useEffect + setState はカスケード再レンダーを誘発するため避ける）
+  // ジオメトリは document 依存 (SVG パスのサンプリング) のためクライアント専用。
+  // SSR と初回クライアント描画はともに null にし、マウント後に構築することで
+  // ハイドレーション不一致 (サーバーが出さない <path> をクライアントが出す) を防ぐ。
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   const geom = useMemo<OkayamaLapGeometry | null>(
-    () => buildOkayamaLapGeometry(),
-    [],
+    () => (mounted ? buildOkayamaLapGeometry() : null),
+    [mounted],
   );
   const [zoom, setZoom] = useState(ZOOM_DEFAULT);
   const [rotation, setRotation] = useState(0);
