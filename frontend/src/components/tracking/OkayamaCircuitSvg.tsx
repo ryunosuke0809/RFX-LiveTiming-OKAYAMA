@@ -675,9 +675,11 @@ export default function OkayamaCircuitSvg({
                 continue;
               }
 
-              // まだ 1 度も通過データが無い車両（エントリーのみのプレースホルダー）は
-              // コース上の位置を推定できないため描画しない。走り出せば位置が付く。
-              if (s.lastPassingTime == null || s.lastPassingTime <= 0) {
+              // エントリーのみのプレースホルダー (Standings 未受信) はコース上に位置を
+              // 推定できないため描画しない。プレースホルダーは lastPassingTime===null で、
+              // 実データを受けた車は数値 (1 周目でまだ通過が無くても 0) になる。
+              // ここで <=0 を弾くと 1 周目の走行車まで消えてしまうので null のみ除外する。
+              if (s.lastPassingTime == null) {
                 animRef.current.delete(s.teamId);
                 continue;
               }
