@@ -45,6 +45,63 @@ sudo -u ubuntu bash /opt/mola-timing-okayama/repo/deploy/scripts/deploy.sh
 cd /opt/mola-timing-okayama/repo && git pull && bash deploy/scripts/deploy.sh
 ```
 
+## 再起動
+
+コード変更なしでプロセスだけ立て直すとき:
+
+```bash
+sudo systemctl restart mola-timing-server mola-timing-frontend
+sudo systemctl status mola-timing-server mola-timing-frontend
+```
+
+片方だけ:
+
+```bash
+sudo systemctl restart mola-timing-server     # WS / API
+sudo systemctl restart mola-timing-frontend   # Next.js
+sudo systemctl reload nginx                   # 設定再読込（接続は維持しやすい）
+```
+
+ログ確認:
+
+```bash
+journalctl -u mola-timing-server -f
+journalctl -u mola-timing-frontend -f
+```
+
+## アクセスログ（訪問者報告用）
+
+nginx が `/var/log/nginx/mola-timing-access.log` に記録（90日ローテ）。
+
+```bash
+# サマリ（本日まで全体 / 特定日）
+bash /opt/mola-timing-okayama/repo/deploy/scripts/access-report.sh
+bash /opt/mola-timing-okayama/repo/deploy/scripts/access-report.sh 2026-07-21
+
+# 素のユニーク IP 数
+awk '{print $1}' /var/log/nginx/mola-timing-access.log | sort -u | wc -l
+```
+
+報告の目安:
+
+| 指標 | 意味 |
+|------|------|
+| unique IPs (HTML) | ページを開いたおおよその人数 |
+| unique IPs (/ws) | LiveTiming を購読したおおよその人数 |
+| top paths | どの画面が多いか |
+
+※ IP 単位のため同一回線の複数人は1、携帯のIP変動は過大になることがある。
+
+設定反映（初回 or nginx 変更後）:
+
+```bash
+sudo install -m 644 /opt/mola-timing-okayama/repo/deploy/nginx/mola-timing-okayama.conf \
+  /etc/nginx/sites-available/mola-timing-okayama
+sudo install -m 644 /opt/mola-timing-okayama/repo/deploy/logrotate/mola-timing-nginx \
+  /etc/logrotate.d/mola-timing-nginx
+sudo nginx -t && sudo systemctl reload nginx
+```
+
 ## Receiver 設定
 
 - URL: `wss://mola-timing-okayama.com/ingest`

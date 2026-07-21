@@ -21,6 +21,17 @@ cd "$REPO/frontend"
 npm ci
 npm run build
 
+echo "==> sync nginx / logrotate (if present)"
+if [[ -f /etc/nginx/sites-available/mola-timing-okayama ]]; then
+  sudo install -m 644 "$REPO/deploy/nginx/mola-timing-okayama.conf" \
+    /etc/nginx/sites-available/mola-timing-okayama
+  sudo install -m 644 "$REPO/deploy/logrotate/mola-timing-nginx" \
+    /etc/logrotate.d/mola-timing-nginx
+  sudo nginx -t
+  sudo systemctl reload nginx
+fi
+sudo chmod +x "$REPO/deploy/scripts/access-report.sh" || true
+
 echo "==> restart services"
 if systemctl is-enabled mola-timing-server >/dev/null 2>&1; then
   sudo systemctl restart mola-timing-server

@@ -1,0 +1,14 @@
+/var/log/nginx/mola-timing-access.log
+/var/log/nginx/mola-timing-error.log {
+    daily
+    missingok
+    rotate 90
+    compress
+    delaycompress
+    notifempty
+    create 0640 www-data adm
+    sharedscripts
+    postrotate
+        [ -s /run/nginx.pid ] && kill -USR1 "$(cat /run/nginx.pid)"
+    endscript
+}
