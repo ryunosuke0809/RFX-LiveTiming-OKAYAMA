@@ -174,6 +174,44 @@ body {
   background-color: #0c0c0f;
 }
 
+/* 横スクロール可能ヒント（右端フェード + シェブロン） */
+.h-scroll-hint-fade {
+  background: linear-gradient(to right, transparent, rgba(12, 12, 15, 0.92) 45%);
+  animation: h-scroll-hint-pulse 1.6s ease-in-out infinite;
+}
+
+.h-scroll-hint-chevron {
+  animation: h-scroll-hint-nudge 1.2s ease-in-out infinite;
+  text-shadow: 0 0 8px rgba(245, 158, 11, 0.45);
+}
+
+@keyframes h-scroll-hint-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes h-scroll-hint-nudge {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(5px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .h-scroll-hint-fade,
+  .h-scroll-hint-chevron {
+    animation: none;
+  }
+}
+
 /* 横スクロール時に POS / PIC / No. / Class を左固定（不透明背景で下のセルを隠す） */
 .timing-sticky-col {
   position: sticky;

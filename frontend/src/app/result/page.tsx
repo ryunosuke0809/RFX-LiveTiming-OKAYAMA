@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import SideMenu from "@/components/layout/SideMenu";
 import DriverDetailPanel from "@/components/shared/DriverDetailPanel";
+import HorizontalScrollArea from "@/components/shared/HorizontalScrollArea";
 import {
   mockStandings,
   mockClasses,
@@ -667,7 +668,7 @@ function ClassificationView({
         </div>
       )}
 
-      <div className="timing-table-scroll-x min-w-0">
+      <HorizontalScrollArea className="min-w-0" contentClassName="timing-table-scroll-x">
         <table
           className="timing-table w-full"
           style={{
@@ -746,7 +747,7 @@ function ClassificationView({
             })}
           </tbody>
         </table>
-      </div>
+      </HorizontalScrollArea>
 
       {standings.length === 0 && (
         <div className="text-center py-16 text-zinc-600">
@@ -829,7 +830,7 @@ function IndividualView({
           <span className="text-[10px] text-zinc-400 uppercase tracking-wider font-semibold">Select Name</span>
           <span className="text-[10px] text-zinc-500">{standings.length} entries</span>
         </div>
-        <div className="flex gap-1.5 px-2 py-2 overflow-x-auto">
+        <HorizontalScrollArea contentClassName="flex gap-1.5 px-2 py-2">
           {standings.map((s) => {
             const t = getTeamByStanding(s);
             const c = getClassByStanding(s);
@@ -865,7 +866,7 @@ function IndividualView({
               </button>
             );
           })}
-        </div>
+        </HorizontalScrollArea>
       </div>
 
       {/* 右 (PC) / 下 (スマホ): 個別リザルト詳細 */}
@@ -925,7 +926,10 @@ function IndividualView({
                   - grid だと SideMenu 開時に各カードが 30〜80px まで狭まり値が切れるため。
                   - 横スクロールで指で送れば全項目見えるし、縦方向は ~46px しか使わない。
                 PC (md ≥): 従来の grid（lg で 5 列、md で 3 列）。 */}
-            <div className="md:hidden flex gap-1.5 overflow-x-auto pb-1.5 mb-2 flex-shrink-0 -mx-3 px-3">
+            <HorizontalScrollArea
+              className="md:hidden mb-2 flex-shrink-0 -mx-3"
+              contentClassName="flex gap-1.5 px-3 pb-1.5"
+            >
               <MetricChip label="Pos" value={`P${target.position}`} />
               <MetricChip label="PIC" value={String(target.classPosition)} />
               <MetricChip label="Best" value={formatTime(personalData.bestLapTime)} accent />
@@ -935,7 +939,7 @@ function IndividualView({
               <MetricChip label="S1" value={formatTime(personalData.bestS1)} accent />
               <MetricChip label="S2" value={formatTime(personalData.bestS2)} accent />
               <MetricChip label="S3" value={formatTime(personalData.bestS3)} accent />
-            </div>
+            </HorizontalScrollArea>
             <div className="hidden md:grid grid-cols-3 lg:grid-cols-5 gap-3 mb-4 flex-shrink-0">
               <SummaryCard label="Position" value={`P${target.position}`} sub={`PIC ${target.classPosition}`} />
               <SummaryCard label="Best Lap" value={formatTime(personalData.bestLapTime)} sub={personalData.bestLap > 0 ? `Lap ${personalData.bestLap}` : "---"} accent />
@@ -955,7 +959,10 @@ function IndividualView({
             </div>
 
             {/* ラップテーブル: flex-1 で残りの高さを全部使う。横スクロールも維持。 */}
-            <div className="flex-1 overflow-auto border border-zinc-700 rounded-xl min-h-[200px]">
+            <HorizontalScrollArea
+              className="flex-1 min-h-[200px] border border-zinc-700 rounded-xl overflow-hidden"
+              contentClassName="h-full max-h-full overflow-auto"
+            >
               <table className="w-full border-collapse text-[11px] sm:text-xs min-w-[440px]">
                 <thead className="sticky top-0 z-10">
                   <tr className="bg-zinc-800 border-b border-zinc-700">
@@ -1004,7 +1011,7 @@ function IndividualView({
                   ))}
                 </tbody>
               </table>
-            </div>
+            </HorizontalScrollArea>
           </>
         )}
       </div>
@@ -1096,8 +1103,11 @@ function CalendarView({
           ) : dateSessions.length > 0 ? (
             <div className="divide-y divide-zinc-800/50">
               {dateSessions.map((session) => (
-                <div key={session.index} className="flex items-center justify-between px-4 py-3 hover:bg-zinc-800/30 transition-colors gap-2">
-                  <div className="min-w-0">
+                <div
+                  key={session.index}
+                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-3 sm:px-4 py-3 hover:bg-zinc-800/30 transition-colors gap-2"
+                >
+                  <div className="min-w-0 flex-1">
                     <span className="text-sm text-zinc-200 block truncate">
                       {[session.roundName, session.sessionName].filter(Boolean).join(" · ") ||
                         session.categoryName ||
@@ -1112,18 +1122,18 @@ function CalendarView({
                       {session.carCount > 0 ? ` · ${session.carCount} cars` : ""}
                     </span>
                   </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
+                  <div className="flex items-center gap-2 flex-shrink-0 self-stretch sm:self-auto">
                     <button
                       type="button"
                       onClick={() => onOpenSession(session.index)}
-                      className="px-3 py-1.5 rounded-md text-xs font-bold bg-zinc-700 text-zinc-300 hover:bg-zinc-600 hover:text-white transition-colors"
+                      className="flex-1 sm:flex-none px-3 py-1.5 rounded-md text-xs font-bold bg-zinc-700 text-zinc-300 hover:bg-zinc-600 hover:text-white transition-colors"
                     >
                       View
                     </button>
                     <button
                       type="button"
                       onClick={() => onDownloadSessionCsv(session.index)}
-                      className="px-3 py-1.5 rounded-md text-xs font-bold bg-amber-600 text-white hover:bg-amber-500 transition-colors"
+                      className="flex-1 sm:flex-none px-3 py-1.5 rounded-md text-xs font-bold bg-amber-600 text-white hover:bg-amber-500 transition-colors"
                     >
                       CSV
                     </button>
@@ -1139,41 +1149,31 @@ function CalendarView({
 
       <div className="mt-6 sm:mt-8">
         <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-wider mb-3">Past Events</h3>
-        <div className="rounded-xl border border-zinc-700 bg-zinc-900/80 overflow-x-auto">
-          <table className="w-full min-w-[480px]">
-            <thead>
-              <tr className="border-b border-zinc-700 bg-zinc-800/50">
-                <th className="py-2.5 px-4 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider">Date</th>
-                <th className="py-2.5 px-4 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider">Status</th>
-                <th className="py-2.5 px-4 text-center text-xs font-semibold text-zinc-400 uppercase tracking-wider">Open</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pastRows.length === 0 ? (
-                <tr>
-                  <td colSpan={3} className="py-8 text-center text-sm text-zinc-600">
-                    No archived days yet. Data appears after Receiver uploads to the cloud.
-                  </td>
-                </tr>
-              ) : (
-                pastRows.map((date) => (
-                  <tr key={date} className="border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-colors">
-                    <td className="py-2.5 px-4 text-sm text-zinc-500 font-mono">{date}</td>
-                    <td className="py-2.5 px-4 text-sm text-amber-400">Recorded</td>
-                    <td className="py-2.5 px-4 text-center">
-                      <button
-                        type="button"
-                        onClick={() => onSelectDate(date)}
-                        className="px-3 py-1 rounded text-xs font-bold bg-amber-600 text-white hover:bg-amber-500 transition-colors"
-                      >
-                        Open
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+        <div className="rounded-xl border border-zinc-700 bg-zinc-900/80 overflow-hidden divide-y divide-zinc-800/50">
+          {pastRows.length === 0 ? (
+            <div className="px-4 py-8 text-center text-sm text-zinc-600">
+              No archived days yet. Data appears after Receiver uploads to the cloud.
+            </div>
+          ) : (
+            pastRows.map((date) => (
+              <div
+                key={date}
+                className="flex items-center justify-between gap-3 px-3 sm:px-4 py-3 hover:bg-zinc-800/30 transition-colors"
+              >
+                <div className="min-w-0">
+                  <div className="text-sm text-zinc-200 font-mono">{date}</div>
+                  <div className="text-xs text-amber-400 mt-0.5">Recorded</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onSelectDate(date)}
+                  className="flex-shrink-0 px-3 py-1.5 rounded-md text-xs font-bold bg-amber-600 text-white hover:bg-amber-500 transition-colors"
+                >
+                  Open
+                </button>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>
