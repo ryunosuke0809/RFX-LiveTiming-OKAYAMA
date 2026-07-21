@@ -100,7 +100,11 @@ export function rebuildSessionsFromMessages(
     return list.map((s, i) => ({ ...s, index: i }));
 }
 
-/** 同一論理セッションのキー。SessionId は MOLA で使いまわされるため使わない。 */
+/**
+ * 同一論理セッションのキー。
+ * SessionId は MOLA で使いまわされるため使わない。
+ * Competition は途中で差し替わることがあるため、カテゴリがあれば大会名はキーに含めない。
+ */
 function makeSessionKey(session: SessionInfoVm | null): string | null {
     if (!session) return null;
     const comp = session.competitionNameJ || session.competitionNameE || "";
@@ -109,7 +113,12 @@ function makeSessionKey(session: SessionInfoVm | null): string | null {
     const sess = session.sessionNameJ || session.sessionNameE || "";
     // 最低でもカテゴリかラウンド名が無いとキーにならない（空マスター除外）
     if (!comp && !cat && !round && !sess) return null;
-    return `${comp}|${cat}|${round}|${sess}|${session.isRace ? "R" : "T"}`;
+    // カテゴリがある場合は「カテゴリ+ラウンド+セッション種別」で同一視
+    // （Competition 再送で大会名だけ変わっても重複させない）
+    if (cat) {
+        return `${cat}|${round}|${sess}|${session.isRace ? "R" : "T"}`;
+    }
+    return `${comp}|${round}|${sess}|${session.isRace ? "R" : "T"}`;
 }
 
 function displayName(session: SessionInfoVm | null): string {
