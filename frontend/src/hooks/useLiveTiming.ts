@@ -173,7 +173,15 @@ function resolveDefaultUrl(): string {
   const fromEnv = process.env.NEXT_PUBLIC_LIVE_WS;
   if (fromEnv && fromEnv.length > 0) return fromEnv;
   if (typeof window !== "undefined") {
-    return `ws://${window.location.hostname}:4000/ws`;
+    const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const host = window.location.hostname;
+    const port = window.location.port;
+    // 本番（標準 80/443）: 同一オリジンの /ws（nginx 経由）
+    // 開発（:3000 等）: バックエンド直結 :4000
+    if (!port || port === "80" || port === "443") {
+      return `${proto}//${window.location.host}/ws`;
+    }
+    return `${proto}//${host}:4000/ws`;
   }
   return "ws://localhost:4000/ws";
 }

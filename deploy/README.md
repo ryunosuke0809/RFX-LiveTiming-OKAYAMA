@@ -1,0 +1,51 @@
+# 本番デプロイ（mola-timing-okayama.com）
+
+さくらの VPS 上で LiveTiming を HTTPS 公開するための配置・更新手順。
+
+## ディレクトリ構成
+
+```
+/opt/mola-timing-okayama/
+  repo/                 # Git リポジトリ（ここを pull / 再ビルドして更新）
+    frontend/
+    server/
+    deploy/
+  shared/
+    server.env          # 秘密情報（Git 管理外）
+    data/               # SQLite など永続データ
+  logs/                 # アプリログ（任意）
+```
+
+更新時は原則 `repo` だけ差し替え／`git pull` し、`shared` は触らない。
+
+## サービス
+
+| systemd ユニット | 役割 | 待受 |
+|------------------|------|------|
+| `mola-timing-server` | WebSocket / API | `127.0.0.1:4000` |
+| `mola-timing-frontend` | Next.js | `127.0.0.1:3000` |
+| `nginx` | HTTPS / リバプロ | `0.0.0.0:80,443` |
+
+外部公開は **443（と ACME 用 80）のみ**。`:4000` / `:3000` は外から閉じる。
+
+## 初回セットアップ
+
+```bash
+# リポジトリを配置したうえで（または本 README と同梱のスクリプト）
+sudo bash /opt/mola-timing-okayama/repo/deploy/scripts/bootstrap.sh
+sudo bash /opt/mola-timing-okayama/repo/deploy/scripts/deploy.sh
+sudo bash /opt/mola-timing-okayama/repo/deploy/scripts/issue-cert.sh
+```
+
+## 日常の更新
+
+```bash
+sudo -u ubuntu bash /opt/mola-timing-okayama/repo/deploy/scripts/deploy.sh
+# または ssh 後:
+cd /opt/mola-timing-okayama/repo && git pull && bash deploy/scripts/deploy.sh
+```
+
+## Receiver 設定
+
+- URL: `wss://mola-timing-okayama.com/ingest`
+- Token: `shared/server.env` の `RECEIVER_INGEST_TOKEN`
