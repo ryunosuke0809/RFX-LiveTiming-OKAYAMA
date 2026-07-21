@@ -511,15 +511,6 @@ export default function ResultPage() {
       >
         <div className="min-w-0 flex-1">
           <h1 className="text-base sm:text-lg font-bold text-white tracking-wide truncate">Results</h1>
-          <p className="text-xs sm:text-sm text-zinc-200 font-medium mt-0.5 truncate">
-            {sessionHeadline}
-          </p>
-          {sessionDetail ? (
-            <p className="text-[10px] sm:text-xs text-zinc-400 mt-0.5 truncate">{sessionDetail}</p>
-          ) : null}
-          {competitionName && competitionName !== sessionHeadline && competitionName !== sessionDetail ? (
-            <p className="text-[10px] sm:text-xs text-zinc-500 mt-0.5 truncate">{competitionName}</p>
-          ) : null}
         </div>
         <div className="flex items-center gap-1 bg-zinc-800 rounded-lg p-0.5 flex-shrink-0 self-start sm:self-auto">
           {tabs.map((t) => (
