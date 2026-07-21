@@ -5,11 +5,16 @@ set -euo pipefail
 APP_ROOT=/opt/mola-timing-okayama
 REPO="$APP_ROOT/repo"
 BRANCH="${BRANCH:-main}"
+SCRIPT="$REPO/deploy/scripts/deploy.sh"
 
-cd "$REPO"
-git fetch origin
-git checkout "$BRANCH"
-git pull --ff-only origin "$BRANCH"
+# pull でこのスクリプト自体が更新されることがあるため、pull 後に最新版へ差し替えて続行する
+if [[ "${DEPLOY_SKIP_PULL:-0}" != "1" ]]; then
+  cd "$REPO"
+  git fetch origin
+  git checkout "$BRANCH"
+  git pull --ff-only origin "$BRANCH"
+  exec env DEPLOY_SKIP_PULL=1 bash "$SCRIPT"
+fi
 
 echo "==> build server"
 cd "$REPO/server"
