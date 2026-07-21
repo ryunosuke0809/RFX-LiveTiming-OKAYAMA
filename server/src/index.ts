@@ -9,6 +9,7 @@ import { attachIngestServer } from "./ingest/ingest-server.js";
 import { createApiRouter } from "./api/router.js";
 import { LiveSessionState } from "./state/session-state.js";
 import { SessionStateAggregator } from "./state/aggregator.js";
+import { hydrateLiveStateFromDb } from "./state/hydrate.js";
 
 const config = loadConfig();
 const logger = new Logger(config.logLevel);
@@ -28,6 +29,9 @@ const hub = new BroadcastHub(config.recentMessageBuffer, logger);
 const liveState = new LiveSessionState();
 const aggregator = new SessionStateAggregator(liveState);
 hub.setSnapshotProvider(() => liveState.snapshot(new Date().toISOString()));
+
+// 再起動してもセッション途中のチーム名が出るよう、当日 DB から状態を復元
+hydrateLiveStateFromDb(repository, aggregator, liveState, logger);
 
 const app = express();
 app.disable("x-powered-by");
