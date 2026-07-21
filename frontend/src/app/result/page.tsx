@@ -141,10 +141,8 @@ function generateCalendarDays(year: number, month: number) {
 }
 
 const EVENT_DATES: Record<string, string[]> = {
-  "2026-04-19": ["Free Practice 1", "Free Practice 2", "Qualifying"],
-  "2026-04-20": ["Race"],
-  "2026-07-18": ["Free Practice 1", "Free Practice 2", "Qualifying"],
-  "2026-07-19": ["Race"],
+  // 本番では Receiver / サーバー側のセッション一覧から埋める（Phase 2c）。
+  // テスト用の Free Practice / Qualifying / Race 仮データは削除済み。
 };
 
 function getEventsForDate(year: number, month: number, day: number): string[] {
@@ -285,6 +283,8 @@ export default function ResultPage() {
           <ClassificationView
             standings={sortedStandings}
             classFilter={classFilter}
+            sessionLabel={sessionName}
+            courseLabel={sessionMeta.category.courseName || "OKAYAMA International Circuit"}
             onDownload={handleDownloadClassification}
             onRowClick={(s) => setSelectedStanding(s)}
           />
@@ -331,10 +331,12 @@ export default function ResultPage() {
 // ========== Classification (全体順位リザルト) ==========
 
 function ClassificationView({
-  standings, classFilter, onDownload, onRowClick,
+  standings, classFilter, sessionLabel, courseLabel, onDownload, onRowClick,
 }: {
   standings: Standing[];
   classFilter: string | null;
+  sessionLabel: string;
+  courseLabel: string;
   onDownload: () => void;
   onRowClick: (s: Standing) => void;
 }) {
@@ -353,9 +355,9 @@ function ClassificationView({
             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             <span className="text-xs text-emerald-400 font-semibold uppercase tracking-wider">Live</span>
           </div>
-          <span className="text-xs sm:text-sm text-zinc-300 font-medium truncate">{mockSessionInfo.session.nameE}</span>
+          <span className="text-xs sm:text-sm text-zinc-300 font-medium truncate">{sessionLabel || "—"}</span>
           <span className="text-xs text-zinc-600 hidden sm:inline">|</span>
-          <span className="text-xs text-zinc-500 truncate hidden sm:inline">{mockSessionInfo.category.courseName}</span>
+          <span className="text-xs text-zinc-500 truncate hidden sm:inline">{courseLabel}</span>
         </div>
         <button
           onClick={onDownload}
@@ -792,7 +794,7 @@ function CalendarView({
                 <div key={session} className="flex items-center justify-between px-4 py-3 hover:bg-zinc-800/30 transition-colors">
                   <div>
                     <span className="text-sm text-zinc-200">{session}</span>
-                    <span className="text-xs text-zinc-500 ml-2">{mockSessionInfo.competition.nameE}</span>
+                    <span className="text-xs text-zinc-500 ml-2">OKAYAMA</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <button
@@ -825,7 +827,14 @@ function CalendarView({
               </tr>
             </thead>
             <tbody>
-              {mockSchedule.map((entry, idx) => (
+              {mockSchedule.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="py-8 text-center text-sm text-zinc-600">
+                    No past events yet
+                  </td>
+                </tr>
+              ) : (
+                mockSchedule.map((entry, idx) => (
                 <tr key={idx} className={`border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-colors ${idx % 2 === 0 ? "bg-zinc-900/40" : ""}`}>
                   <td className="py-2.5 px-4 text-sm text-zinc-500 font-mono">{entry.localTime.split(" ")[0]}</td>
                   <td className="py-2.5 px-4 text-sm text-amber-400">{entry.event}</td>
@@ -841,7 +850,8 @@ function CalendarView({
                     )}
                   </td>
                 </tr>
-              ))}
+                ))
+              )}
             </tbody>
           </table>
         </div>
