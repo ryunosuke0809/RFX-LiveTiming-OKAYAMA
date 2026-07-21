@@ -372,25 +372,38 @@ export default function ResultPage() {
   const baseStandings = isArchive ? pastStandings : isLive ? live.standings : mockStandings;
   const classes = isArchive ? pastClasses : isLive ? live.classes : mockClasses;
   const sessionMeta = isLive && live.sessionInfo ? live.sessionInfo : mockSessionInfo;
+  const snapSession = isArchive ? pastResult!.snapshot.session : null;
   const competitionName = isArchive
     ? pastResult!.competitionName ||
-      pastResult!.snapshot.session?.competitionNameE ||
-      pastResult!.snapshot.session?.competitionNameJ ||
+      snapSession?.competitionNameE ||
+      snapSession?.competitionNameJ ||
       ""
     : sessionMeta.competition.nameE || sessionMeta.competition.nameJ;
   const categoryName = isArchive
-    ? pastResult!.categoryName || competitionName
-    : competitionName;
+    ? pastResult!.categoryName ||
+      snapSession?.categoryNameE ||
+      snapSession?.categoryNameJ ||
+      ""
+    : sessionMeta.category.nameE || sessionMeta.category.nameJ;
+  const roundName = isArchive
+    ? pastResult!.roundName || snapSession?.roundNameE || snapSession?.roundNameJ || ""
+    : sessionMeta.round.nameE || sessionMeta.round.nameJ;
   const sessionName = isArchive
     ? pastResult!.sessionName ||
-      pastResult!.snapshot.session?.sessionNameE ||
-      pastResult!.snapshot.session?.sessionNameJ ||
+      snapSession?.sessionNameE ||
+      snapSession?.sessionNameJ ||
       ""
     : sessionMeta.session.nameE || sessionMeta.session.nameJ;
+  // ヘッダー用: ラウンド/セッションを優先し、無ければカテゴリ名で何の結果か分かるようにする
+  const sessionHeadline = [roundName, sessionName].filter(Boolean).join(" · ") || categoryName || "Session";
+  const sessionDetail =
+    categoryName && categoryName !== sessionHeadline && categoryName !== competitionName
+      ? categoryName
+      : "";
   const csvMeta: CsvMeta = {
     competition: competitionName,
-    category: categoryName,
-    session: sessionName,
+    category: categoryName || competitionName,
+    session: sessionHeadline,
   };
 
   const sortedStandings = useMemo(() => {
@@ -405,8 +418,8 @@ export default function ResultPage() {
       window.location.href = archiveCsvUrl(pastResult.date, pastResult.index, "classification");
       return;
     }
-    const cat = fileSafe(categoryName);
-    const ses = fileSafe(sessionName);
+    const cat = fileSafe(categoryName || competitionName);
+    const ses = fileSafe(sessionHeadline);
     downloadCsv(
       `Classification_${cat}_${ses}_${makeTimestamp()}.csv`,
       generateClassificationCsv(sortedStandings, csvMeta),
@@ -425,8 +438,8 @@ export default function ResultPage() {
     }
     const team = getTeamByStanding(s);
     const data = getPersonal(s);
-    const cat = fileSafe(categoryName);
-    const ses = fileSafe(sessionName);
+    const cat = fileSafe(categoryName || competitionName);
+    const ses = fileSafe(sessionHeadline);
     downloadCsv(
       `Laps_${cat}_${ses}_No${team?.no}_${makeTimestamp()}.csv`,
       generateIndividualCsv(s, data, csvMeta),
@@ -498,9 +511,15 @@ export default function ResultPage() {
       >
         <div className="min-w-0 flex-1">
           <h1 className="text-base sm:text-lg font-bold text-white tracking-wide truncate">Results</h1>
-          <p className="text-[10px] sm:text-xs text-zinc-500 mt-0.5 truncate">
-            {competitionName}
+          <p className="text-xs sm:text-sm text-zinc-200 font-medium mt-0.5 truncate">
+            {sessionHeadline}
           </p>
+          {sessionDetail ? (
+            <p className="text-[10px] sm:text-xs text-zinc-400 mt-0.5 truncate">{sessionDetail}</p>
+          ) : null}
+          {competitionName && competitionName !== sessionHeadline && competitionName !== sessionDetail ? (
+            <p className="text-[10px] sm:text-xs text-zinc-500 mt-0.5 truncate">{competitionName}</p>
+          ) : null}
         </div>
         <div className="flex items-center gap-1 bg-zinc-800 rounded-lg p-0.5 flex-shrink-0 self-start sm:self-auto">
           {tabs.map((t) => (
@@ -536,10 +555,10 @@ export default function ResultPage() {
           <ClassificationView
             standings={sortedStandings}
             classFilter={classFilter}
-            sessionLabel={sessionName}
+            sessionLabel={sessionHeadline}
             courseLabel={
               isArchive
-                ? pastResult?.date || ""
+                ? [pastResult?.date, sessionDetail || categoryName].filter(Boolean).join(" · ")
                 : sessionMeta.category.courseName || "OKAYAMA International Circuit"
             }
             mode={isArchive ? "archive" : "live"}
@@ -1089,10 +1108,16 @@ function CalendarView({
                 <div key={session.index} className="flex items-center justify-between px-4 py-3 hover:bg-zinc-800/30 transition-colors gap-2">
                   <div className="min-w-0">
                     <span className="text-sm text-zinc-200 block truncate">
-                      {session.sessionName || session.roundName || `Session ${session.index + 1}`}
+                      {[session.roundName, session.sessionName].filter(Boolean).join(" · ") ||
+                        session.categoryName ||
+                        `Session ${session.index + 1}`}
                     </span>
                     <span className="text-xs text-zinc-500 truncate block">
-                      {[session.competitionName, session.categoryName].filter(Boolean).join(" / ") || "OKAYAMA"}
+                      {session.categoryName &&
+                      session.categoryName !== session.roundName &&
+                      session.categoryName !== session.sessionName
+                        ? session.categoryName
+                        : session.competitionName || "OKAYAMA"}
                       {session.carCount > 0 ? ` · ${session.carCount} cars` : ""}
                     </span>
                   </div>
