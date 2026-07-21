@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import SideMenu from "@/components/layout/SideMenu";
 import DriverDetailPanel from "@/components/shared/DriverDetailPanel";
 import {
@@ -437,6 +437,8 @@ export default function ResultPage() {
     setArchiveError(null);
     try {
       const result = await fetchArchiveResult(date, sessionIndex);
+      // エンティティを先に登録してから state 更新 (初回描画で車番・チーム名が空になるのを防ぐ)
+      registerArchiveEntities(result);
       setPastResult(result);
       setIndividualTarget(null);
       setSelectedStanding(null);
@@ -451,6 +453,14 @@ export default function ResultPage() {
     setIndividualTarget(null);
     setSelectedStanding(null);
   };
+
+  const mainScrollRef = useRef<HTMLDivElement | null>(null);
+
+  // タブ切替・アーカイブ表示時は先頭へ (カレンダーでスクロールした位置のまま空に見える問題を防ぐ)
+  useEffect(() => {
+    const el = mainScrollRef.current;
+    if (el) el.scrollTop = 0;
+  }, [activeTab, pastResult]);
 
   const prevMonth = () => {
     if (calMonth === 0) {
@@ -514,6 +524,7 @@ export default function ResultPage() {
           子側 (IndividualView) がスクロール領域を管理する。
           Classification / Calendar は縦に長いコンテンツを外側スクロールで読む。 */}
       <div
+        ref={mainScrollRef}
         className={`flex-1 transition-all duration-300 min-w-0 ${
           activeTab === "individual"
             ? "overflow-hidden flex flex-col min-h-0"
