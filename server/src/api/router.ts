@@ -116,8 +116,7 @@ export function createApiRouter(
             }
             let csv: string | null = null;
             let filename = "result.csv";
-            const dateYmd = session.date.replace(/-/g, "");
-            const round = safeName(session.roundName || session.sessionName || "Session").slice(0, 24);
+            const round = safeName(session.roundName || session.sessionName || "Session").slice(0, 40);
             if (kind === "laps") {
                 if (!teamId) {
                     res.status(400).json({ error: "teamId is required for kind=laps" });
@@ -126,10 +125,10 @@ export function createApiRouter(
                 csv = buildLapsCsv(session.snapshot, teamId);
                 const team = session.snapshot.teams.find((t) => t.id === teamId);
                 const no = team?.no != null ? `_No${team.no}` : "";
-                filename = `Laps_${dateYmd}_${round}_s${sessionIndex}${no}.csv`;
+                filename = `Laps_${round}${no}.csv`;
             } else {
                 csv = buildClassificationCsv(session.snapshot);
-                filename = `Classification_${dateYmd}_${round}_s${sessionIndex}.csv`;
+                filename = `Classification_${round}.csv`;
             }
             if (csv === null) {
                 res.status(404).json({ error: "team not found in session" });

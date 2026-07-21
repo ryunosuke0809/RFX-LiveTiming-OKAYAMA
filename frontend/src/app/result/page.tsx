@@ -146,18 +146,14 @@ function makeTimestamp() {
   return `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}`;
 }
 
-/** CSV ファイル名: 日付 + ラウンド (+ 番号)。カテゴリ全文は入れない（重複・長すぎ防止）。 */
+/** CSV ファイル名: 種別 + ラウンド名のみ（重複・長すぎ防止）。 */
 function buildResultCsvFilename(opts: {
   kind: "Classification" | "Laps";
-  date?: string | null;
   roundName?: string | null;
-  sessionIndex?: number | null;
   carNo?: number | null;
 }): string {
-  const date = (opts.date || "").replace(/-/g, "").slice(0, 8) || makeTimestamp().slice(0, 8);
-  const round = fileSafe(opts.roundName || "Session").slice(0, 24);
-  const parts = [opts.kind, date, round];
-  if (opts.sessionIndex != null && opts.sessionIndex >= 0) parts.push(`s${opts.sessionIndex}`);
+  const round = fileSafe(opts.roundName || "Session").slice(0, 40);
+  const parts = [opts.kind, round];
   if (opts.carNo != null) parts.push(`No${opts.carNo}`);
   return `${parts.join("_")}.csv`;
 }
@@ -456,9 +452,7 @@ export default function ResultPage() {
     if (isArchive && pastResult) {
       const name = buildResultCsvFilename({
         kind: "Classification",
-        date: pastResult.date,
         roundName,
-        sessionIndex: pastResult.index,
       });
       void downloadArchiveCsv(
         archiveCsvUrl(pastResult.date, pastResult.index, "classification"),
@@ -469,7 +463,6 @@ export default function ResultPage() {
     downloadCsv(
       buildResultCsvFilename({
         kind: "Classification",
-        date: makeTimestamp().slice(0, 8),
         roundName,
       }),
       generateClassificationCsv(sortedStandings, csvMeta),
@@ -486,9 +479,7 @@ export default function ResultPage() {
     if (isArchive && pastResult) {
       const name = buildResultCsvFilename({
         kind: "Laps",
-        date: pastResult.date,
         roundName,
-        sessionIndex: pastResult.index,
         carNo: team?.no,
       });
       void downloadArchiveCsv(
@@ -501,7 +492,6 @@ export default function ResultPage() {
     downloadCsv(
       buildResultCsvFilename({
         kind: "Laps",
-        date: makeTimestamp().slice(0, 8),
         roundName,
         carNo: team?.no,
       }),
@@ -653,9 +643,7 @@ export default function ResultPage() {
               const session = dateSessions.find((s) => s.index === sessionIndex);
               const name = buildResultCsvFilename({
                 kind: "Classification",
-                date: selectedDate,
                 roundName: session?.roundName || session?.sessionName || "Session",
-                sessionIndex,
               });
               void downloadArchiveCsv(
                 archiveCsvUrl(selectedDate, sessionIndex, "classification"),
