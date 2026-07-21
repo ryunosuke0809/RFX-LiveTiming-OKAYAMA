@@ -17,8 +17,18 @@ function csvSafe(v: string): string {
     return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
 }
 
-function driverName(s: StandingVm): string {
-    return s.driverNameE || s.driverNameJ || "";
+function driverName(s: StandingVm, team?: { drivers: Array<{ no: number; nameJ: string; nameE: string }> }): string {
+    // MOLA: Driver No=0 はチーム名スロット。実ドライバー (No>=1) を優先。
+    const drivers = team?.drivers ?? [];
+    const byNo =
+        s.driverNo !== 0 ? drivers.find((d) => d.no === s.driverNo) : undefined;
+    const real = byNo ?? drivers.find((d) => d.no !== 0);
+    return (
+        real?.nameE ||
+        real?.nameJ ||
+        (s.driverNo !== 0 ? s.driverNameE || s.driverNameJ : "") ||
+        ""
+    );
 }
 
 export function buildClassificationCsv(snapshot: LiveStateSnapshot): string {
@@ -41,13 +51,14 @@ export function buildClassificationCsv(snapshot: LiveStateSnapshot): string {
         const c = snapshot.classes.find((x) => x.id === classId);
         return c?.nameE || c?.nameJ || classId;
     };
-    const rows = standings.map((s) =>
-        [
+    const rows = standings.map((s) => {
+        const team = snapshot.teams.find((t) => t.id === s.teamId);
+        return [
             s.position > 0 ? s.position : "",
             s.classPosition > 0 ? s.classPosition : "",
             s.teamNo,
             csvSafe(className(s.classId)),
-            csvSafe(driverName(s)),
+            csvSafe(driverName(s, team)),
             csvSafe(s.teamNameE || s.teamNameJ || ""),
             formatTime10000(s.bestTime),
             s.bestTimeLap > 0 ? s.bestTimeLap : "",
@@ -60,8 +71,8 @@ export function buildClassificationCsv(snapshot: LiveStateSnapshot): string {
             s.status.replace(/_/g, " ").toUpperCase(),
             csvSafe(s.gap),
             csvSafe(s.interval),
-        ].join(","),
-    );
+        ].join(",");
+    });
     return [...meta, header, ...rows].join("\n");
 }
 
@@ -80,7 +91,7 @@ export function buildLapsCsv(
         `# Category: ${session?.categoryNameE || session?.categoryNameJ || ""}`,
         `# Session: ${session?.sessionNameE || session?.sessionNameJ || ""}`,
         `# No.${standing?.teamNo ?? team?.no ?? ""} ${standing?.teamNameE || team?.nameE || ""} (${cls?.nameE || cls?.nameJ || ""})`,
-        `# Driver: ${standing ? driverName(standing) : ""}`,
+        `# Driver: ${standing ? driverName(standing, team) : ""}`,
         "",
     ];
     const header = "Lap,Lap Time,S1,S2,S3,Position,Pit";

@@ -98,11 +98,14 @@ export function getClassByStanding(standing: Standing): CarClass | undefined {
 
 export function getDriverName(standing: Standing, team?: Team): string {
   const t = team ?? getTeamByStanding(standing);
-  return (
-    t?.drivers.find((d) => d.no === standing.driverNo)?.nameE ||
-    t?.drivers[1]?.nameE ||
-    "---"
-  );
+  const drivers = t?.drivers ?? [];
+  // MOLA: Driver No=0 はチーム名の複製。実ドライバーは No>=1。
+  const byNo =
+    standing.driverNo !== 0
+      ? drivers.find((d) => d.no === standing.driverNo)
+      : undefined;
+  const real = byNo ?? drivers.find((d) => d.no !== 0) ?? drivers[0];
+  return real?.nameE || real?.nameJ || "---";
 }
 
 // ライブの周回履歴が無い場合のフォールバック（開発用）。実運用ではライブデータを使う。

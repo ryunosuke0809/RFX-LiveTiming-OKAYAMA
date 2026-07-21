@@ -250,7 +250,8 @@ export class SessionStateAggregator {
      */
     private ensurePlaceholderStanding(team: TeamSummaryVm): LiveStatePatch | null {
         if (this.state.standings.has(team.id)) return null;
-        const driver = team.drivers[0];
+        // Driver No=0 はチーム名の複製スロット。表示用には実ドライバー (No>=1) を使う。
+        const driver = resolveDriver(team, 1);
         const standing: StandingVm = {
             position: 0,
             classPosition: 0,
@@ -259,7 +260,7 @@ export class SessionStateAggregator {
             teamNo: team.no,
             teamNameJ: team.nameJ,
             teamNameE: team.nameE,
-            driverNo: driver?.no ?? 0,
+            driverNo: driver?.no ?? 1,
             driverNameJ: driver?.nameJ ?? "",
             driverNameE: driver?.nameE ?? "",
             lap: 0,
@@ -290,12 +291,27 @@ export class SessionStateAggregator {
     }
 
     private applySelect(p: Record<string, unknown>): LiveStatePatch[] {
+        // MOLA の SessionId は "1:1:1:1:1" 等で固定されることが多く、
+        // Id 比較では Select を検知できない。Select 自体をセッション開始境界とする。
+        // → ラップ状態をクリアし、ELAPSED の基点 (sessionStartedAt) も必ず落とす。
         const sessionId = str(p, "sessionId");
-        const patches: LiveStatePatch[] = [];
-        if (sessionId && this.state.session && this.state.session.sessionId !== sessionId) {
-            this.state.resetForNewSession();
-            patches.push({ kind: "session", fields: { sessionId } });
+        this.state.resetForNewSession();
+        const patches: LiveStatePatch[] = [{ kind: "reset" }];
+
+        // マスター (Team) は残るので、表が空にならないようプレースホルダーを再構築する。
+        for (const team of this.state.teams.values()) {
+            const placeholder = this.ensurePlaceholderStanding(team);
+            if (placeholder) patches.push(placeholder);
         }
+        if (this.state.teams.size > 0) {
+            patches.push({ kind: "track_count", value: this.state.trackCount() });
+        }
+
+        const fields: Partial<NonNullable<LiveSessionState["session"]>> = {
+            sessionStartedAt: null,
+        };
+        if (sessionId) fields.sessionId = sessionId;
+        patches.push(...this.mergeSessionInfo(fields));
         return patches;
     }
 
@@ -438,7 +454,8 @@ export class SessionStateAggregator {
 
         const team = this.state.teams.get(teamId);
         const driverNo = int(p, "driverNo") ?? 0;
-        const driver = team?.drivers.find((d) => d.no === driverNo) ?? team?.drivers[0];
+        // Standings の DriverNo=0 もチーム名スロットなので、名前解決時は実ドライバーへフォールバック。
+        const driver = resolveDriver(team, driverNo);
 
         const prevPosition = this.state.previousPosition.get(teamId);
         const positionChange =
@@ -684,6 +701,23 @@ function emptySessionInfo(): NonNullable<LiveSessionState["session"]> {
         sessionRemainingSec: null,
         isRace: false,
     };
+}
+
+/**
+ * MOLA Team の Driver 配列から表示用ドライバーを選ぶ。
+ * No=0 はチーム名の複製 (例: NameE="RAGNO MOTOR SPORTS") なので、
+ * 要求 No が 0 / 未ヒットのときは No>=1 の実ドライバーを優先する。
+ */
+function resolveDriver(
+    team: TeamSummaryVm | undefined,
+    driverNo: number,
+): TeamSummaryVm["drivers"][number] | undefined {
+    if (!team?.drivers?.length) return undefined;
+    if (driverNo !== 0) {
+        const hit = team.drivers.find((d) => d.no === driverNo);
+        if (hit) return hit;
+    }
+    return team.drivers.find((d) => d.no !== 0) ?? team.drivers[0];
 }
 
 /**

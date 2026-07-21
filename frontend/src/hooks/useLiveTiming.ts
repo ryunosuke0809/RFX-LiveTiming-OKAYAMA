@@ -409,10 +409,13 @@ export function useLiveTiming(url?: string): LiveTimingData {
         })()
       : null;
     // 経過秒はデータ時刻 (dataTsMs) 基準。過去ログ再生でも正しい値になる。
+    // Start 前 (sessionStartedAt 未設定) は 0 を出して Select 直後の ELAPSED をリセット表示する。
     const sessionElapsedSec =
       startedAtMs !== null && s.dataTsMs !== null
         ? Math.max(0, Math.floor((s.dataTsMs - startedAtMs) / 1000))
-        : null;
+        : s.session
+          ? 0
+          : null;
     const leaderLap = standings.length > 0 ? standings[0].lap : 0;
     const driverLapsMap = s.driverLaps;
 
