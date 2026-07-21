@@ -42,7 +42,7 @@ export function rebuildSessionsFromMessages(
 
     const flush = (endedAt: string | null) => {
         if (state.teams.size === 0 && state.standings.size === 0) return;
-        const snap = state.snapshot(new Date().toISOString());
+        const snap = trimArchiveSnapshot(state.snapshot(new Date().toISOString()));
         const session = snap.session;
         const key = makeSessionKey(session);
         if (!key) return;
@@ -51,7 +51,11 @@ export function rebuildSessionsFromMessages(
             snap.standings.filter((s) => s.position > 0 || s.lap > 0 || (s.bestTime ?? 0) > 0)
                 .length || snap.teams.length;
 
-        // 名前も車も無い空マスターは一覧に出さない
+        // 走行実績が無い空マスター / 切替途中の残骸は一覧に出さない
+        const hasResults = snap.standings.some(
+            (s) => s.lap > 0 || (s.bestTime ?? 0) > 0 || (s.lastLapTime ?? 0) > 0,
+        );
+        if (!hasResults) return;
         if (carCount === 0 && !displayName(session)) return;
 
         const candidate: ArchiveSessionDetail = {
@@ -137,10 +141,14 @@ function displayName(session: SessionInfoVm | null): string {
 /** より「結果らしい」スナップショットを優先する。 */
 function isRicher(next: ArchiveSessionDetail, prev: ArchiveSessionDetail): boolean {
     const score = (s: ArchiveSessionDetail) => {
-        const withTime = s.snapshot.standings.filter((x) => (x.bestTime ?? 0) > 0 || (x.lastLapTime ?? 0) > 0).length;
+        const withTime = s.snapshot.standings.filter(
+            (x) => (x.bestTime ?? 0) > 0 || (x.lastLapTime ?? 0) > 0,
+        ).length;
         const withLap = s.snapshot.standings.filter((x) => x.lap > 0).length;
         const lapRows = Object.values(s.snapshot.driverLaps).reduce((n, arr) => n + arr.length, 0);
-        return withTime * 1000 + withLap * 100 + lapRows * 10 + s.carCount;
+        const placeholders = Math.max(0, s.snapshot.standings.length - Math.max(withTime, withLap));
+        // タイム付きを優先し、他セッションから混入したプレースホルダーは大きく減点
+        return withTime * 1000 + withLap * 100 + lapRows * 10 + s.carCount - placeholders * 800;
     };
     const sn = score(next);
     const sp = score(prev);
@@ -149,7 +157,64 @@ function isRicher(next: ArchiveSessionDetail, prev: ArchiveSessionDetail): boole
     return (next.endedAt || "") >= (prev.endedAt || "");
 }
 
+/**
+ * アーカイブリザルト用に、走行実績のないコース車・残骸エントリーを落とす。
+ * （ライブ表示のプレースホルダーは残すが、過去結果ではノイズになる）
+ */
+function trimArchiveSnapshot(snap: LiveStateSnapshot): LiveStateSnapshot {
+    const keep = snap.standings.filter((s) => {
+        const cls = snap.classes.find((c) => c.id === s.classId);
+        const className = (cls?.nameE || cls?.nameJ || "").trim().toUpperCase();
+        // コース車・オフィシャルはリザルトから除外
+        if (className === "OIC" || s.teamNo === 999) return false;
+        return s.position > 0 || s.lap > 0 || (s.bestTime ?? 0) > 0 || (s.lastLapTime ?? 0) > 0;
+    });
+    if (keep.length === 0 || keep.length === snap.standings.length) return snap;
+
+    const keepIds = new Set(keep.map((s) => s.teamId));
+    const teams = snap.teams.filter((t) => keepIds.has(t.id));
+    const usedClassIds = new Set(keep.map((s) => s.classId).filter(Boolean));
+    const classes = snap.classes.filter((c) => usedClassIds.has(c.id));
+    const driverLaps: LiveStateSnapshot["driverLaps"] = {};
+    for (const [id, laps] of Object.entries(snap.driverLaps)) {
+        if (keepIds.has(id)) driverLaps[id] = laps;
+    }
+    return {
+        ...snap,
+        standings: keep,
+        teams,
+        classes,
+        driverLaps,
+    };
+}
+
 function willResetSession(state: LiveSessionState, env: IngestEnvelope): boolean {
+    if (env.kind === "Standings") {
+        // 全件 Standings の台数が減ってタイム付き車両が落ちる = 次セッションの結果が割り込んだ
+        const p = (env.payload ?? {}) as Record<string, unknown>;
+        if (!Array.isArray(p["items"])) return false;
+        const keepIds = new Set<string>();
+        for (const item of p["items"] as Array<Record<string, unknown>>) {
+            const id = pickStr(item, "teamId", "TeamId");
+            if (id) keepIds.add(id);
+        }
+        if (keepIds.size === 0) return false;
+        for (const [id, s] of state.standings) {
+            if (keepIds.has(id)) continue;
+            if (s.lap > 0 || (s.bestTime ?? 0) > 0 || (s.lastLapTime ?? 0) > 0) return true;
+        }
+        return false;
+    }
+    if (env.kind === "Team") {
+        // Category より先に次セッションの Team が来て TeamId の車番が差し替わる直前に保存する
+        const p = (env.payload ?? {}) as Record<string, unknown>;
+        const id = pickStr(p, "id", "Id");
+        const noRaw = p["no"] ?? p["No"];
+        const no = typeof noRaw === "number" ? noRaw : typeof noRaw === "string" ? Number(noRaw) : NaN;
+        if (!id || !Number.isFinite(no)) return false;
+        const existing = state.teams.get(id);
+        return Boolean(existing && existing.no !== no);
+    }
     if (env.kind === "Select") {
         return state.teams.size > 0 || state.standings.size > 0 || state.sessionSignature !== null;
     }

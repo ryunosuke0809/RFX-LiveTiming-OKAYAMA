@@ -123,6 +123,56 @@ export class LiveSessionState {
         }
     }
 
+    /**
+     * Standings 全件リストに含まれないチームを除去する。
+     * セッション切替で TeamId が再利用されるため、前セッションのエントリーが残ると
+     * リザルトに他クラスの選手が混ざる。
+     */
+    pruneToTeamIds(keepIds: Set<string>): void {
+        for (const id of [...this.standings.keys()]) {
+            if (!keepIds.has(id)) this.standings.delete(id);
+        }
+        for (const id of [...this.teams.keys()]) {
+            if (!keepIds.has(id)) this.teams.delete(id);
+        }
+        for (const id of [...this.teamLaps.keys()]) {
+            if (!keepIds.has(id)) this.teamLaps.delete(id);
+        }
+        for (const id of [...this.teamPersonalBest.keys()]) {
+            if (!keepIds.has(id)) this.teamPersonalBest.delete(id);
+        }
+        for (const id of [...this.pitCount.keys()]) {
+            if (!keepIds.has(id)) this.pitCount.delete(id);
+        }
+        for (const id of [...this.lastPassingClockMs.keys()]) {
+            if (!keepIds.has(id)) this.lastPassingClockMs.delete(id);
+        }
+        for (const id of [...this.lastPassingDataMs.keys()]) {
+            if (!keepIds.has(id)) this.lastPassingDataMs.delete(id);
+        }
+        for (const id of [...this.previousPosition.keys()]) {
+            if (!keepIds.has(id)) this.previousPosition.delete(id);
+        }
+        for (const id of [...this.teamBestSector.keys()]) {
+            if (!keepIds.has(id)) this.teamBestSector.delete(id);
+        }
+        for (const id of [...this.teamLapAccum.keys()]) {
+            if (!keepIds.has(id)) this.teamLapAccum.delete(id);
+        }
+
+        // どの standing からも参照されないクラスは落とす
+        const usedClassIds = new Set<string>();
+        for (const s of this.standings.values()) {
+            if (s.classId) usedClassIds.add(s.classId);
+        }
+        for (const t of this.teams.values()) {
+            if (t.classId) usedClassIds.add(t.classId);
+        }
+        for (const id of [...this.classes.keys()]) {
+            if (!usedClassIds.has(id)) this.classes.delete(id);
+        }
+    }
+
     /** すべての standings を position 昇順で配列化。position 0 (未出走/無効) は末尾へ。 */
     standingsArray(): StandingVm[] {
         const rank = (pos: number) => (pos > 0 ? pos : Number.MAX_SAFE_INTEGER);

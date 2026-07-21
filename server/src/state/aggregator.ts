@@ -200,6 +200,18 @@ export class SessionStateAggregator {
     }
 
     private applyTeam(p: Record<string, unknown>): LiveStatePatch[] {
+        const id = str(p, "id") ?? "";
+        const no = int(p, "no") ?? 0;
+        const existing = id ? this.state.teams.get(id) : undefined;
+
+        // MOLA はセッションが変わっても TeamId (1:1:N) を使い回す。
+        // Category より先に次セッションの Team が来ると車番だけ差し替わり、
+        // 前セッションのタイムが別クラスの選手に紐づく。車番変更はエントリー入替として全リセットする。
+        const remapped = Boolean(existing && existing.no !== no);
+        if (remapped) {
+            this.state.resetForSessionSwitch();
+        }
+
         const drivers = Array.isArray(p["drivers"])
             ? (p["drivers"] as Array<Record<string, unknown>>).map((d) => ({
                 no: int(d, "no") ?? 0,
@@ -209,15 +221,17 @@ export class SessionStateAggregator {
             : [];
 
         const value: TeamSummaryVm = {
-            id: str(p, "id") ?? "",
+            id,
             classId: str(p, "classId") ?? "",
-            no: int(p, "no") ?? 0,
+            no,
             nameJ: str(p, "nameJ") ?? "",
             nameE: str(p, "nameE") ?? "",
             drivers,
         };
         this.state.teams.set(value.id, value);
-        const patches: LiveStatePatch[] = [{ kind: "team_upsert", value }];
+        const patches: LiveStatePatch[] = [];
+        if (remapped) patches.push({ kind: "reset" });
+        patches.push({ kind: "team_upsert", value });
 
         // エントリー(Team マスター)受信時点でプレースホルダー standing を作る。
         // これで S1 通過前(セッション選択直後)からタイミング表に全エントリーが並ぶ。
@@ -354,15 +368,22 @@ export class SessionStateAggregator {
 
         const extraPatches: LiveStatePatch[] = [];
         let anyChanged = false;
+        const keepIds = new Set<string>();
 
         for (const item of items) {
             const teamId = str(item, "teamId");
             if (!teamId) continue;
+            keepIds.add(teamId);
             extraPatches.push(...this.upsertStanding(teamId, item));
             anyChanged = true;
         }
 
         if (!anyChanged) return [];
+
+        // MOLA の Standings は当該セッションの全車リスト。リストに無い車は前セッションの残りなので除去する。
+        if (Array.isArray(p["items"])) {
+            this.state.pruneToTeamIds(keepIds);
+        }
 
         // gap / interval を全車に対して再計算 (順位は SMIS が決めた position が真)
         const sorted = this.state.standingsArray();
