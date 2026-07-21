@@ -1,0 +1,6 @@
+{"ts":"2026-07-21T08:52:30.0051653+00:00","type":"Category","payload":{"Id":"1:1","NameJ":"ダンロップF4トレーニング CHAMPION CLASS\u30002回目","NameE":"","CourseName":"OKAYAMA International Circuit","CourseLengthCm":370300}}
+{"ts":"2026-07-21T08:52:30.0687246+00:00","type":"Round","payload":{"Id":"1:1:1","NameJ":"予選","NameE":"Qualifying","Type":2}}
+{"ts":"2026-07-21T08:52:30.1337026+00:00","type":"Group","payload":{"Id":"1:1:1:1","NameJ":"","NameE":""}}
+{"ts":"2026-07-21T08:52:30.2022469+00:00","type":"Session","payload":{"Id":"1:1:1:1:1","NameJ":"","NameE":"","Time":"","Lap":""}}
+{"ts":"2026-07-21T08:52:30.2630550+00:00","type":"CarClass","payload":{"Id":"1:1:0","NameJ":"","NameE":"","Record":" 1'32.202"}}
+{"ts":"2026-07-21T08:52:30.4542689+00:00","type":"Select","payload":{"SessionId":"1:1:1:1:1"}}

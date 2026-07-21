@@ -358,7 +358,65 @@ public sealed class SmisXmlParserTests
         Assert.True(teamCount >= 31, $"Expected Team master data, got {teamCount}.");
     }
 
+    [Fact]
+    public void ParseMessages_MolaInput20260721_CompetitionTypoAndBatches()
+    {
+        string? logPath = ResolveArchiveLogPath("MOLA_INPUT_20260721.log");
+        Assert.True(logPath is not null, "exports/archive/**/MOLA_INPUT_20260721.log が必要です");
+
+        string[] lines = File.ReadAllLines(logPath!);
+        int parseFailures = 0;
+        int competition = 0;
+        int teams = 0;
+        int transponders = 0;
+        int loops = 0;
+
+        foreach (string line in lines)
+        {
+            if (!TryExtractXml(line, out string xml))
+            {
+                continue;
+            }
+
+            try
+            {
+                IReadOnlyList<SmisMessage> messages = SmisXmlParser.ParseMessages(xml);
+                competition += messages.OfType<Competition>().Count();
+                teams += messages.OfType<Team>().Count();
+                transponders += messages.OfType<Transponder>().Count();
+                loops += messages.OfType<Loop>().Count();
+            }
+            catch (SmisXmlParseException)
+            {
+                parseFailures++;
+            }
+        }
+
+        Assert.Equal(0, parseFailures);
+        Assert.Equal(1, competition);
+        Assert.True(teams >= 31, $"teams={teams}");
+        Assert.True(transponders >= 31, $"transponders={transponders}");
+        Assert.True(loops >= 6, $"loops={loops}");
+    }
+
+    [Fact]
+    public void ParseMessages_CompetitionStartDataeTypo_FromLiveLog()
+    {
+        const string xml =
+            """<Competition ID="1" NameJ="2026 seven × seven FIA-F4 JAPANESE CHAMPIONSHIP" NameE="" StartDatae="2026/06/11" "2026/06/12" />""";
+
+        var competition = Assert.IsType<Competition>(SmisXmlParser.Parse(xml));
+        Assert.Equal("1", competition.Id);
+        Assert.Equal("2026/06/11", competition.StartDate);
+        Assert.Equal("2026/06/12", competition.EndDate);
+    }
+
     private static string? ResolveOkayamaArchiveLogPath()
+    {
+        return ResolveArchiveLogPath("MOLA_INPUT_*.log");
+    }
+
+    private static string? ResolveArchiveLogPath(string fileGlob)
     {
         DirectoryInfo? dir = new(Directory.GetCurrentDirectory());
         while (dir is not null)
@@ -366,7 +424,7 @@ public sealed class SmisXmlParserTests
             string archiveDir = Path.Combine(dir.FullName, "exports", "archive");
             if (Directory.Exists(archiveDir))
             {
-                foreach (string candidate in Directory.EnumerateFiles(archiveDir, "MOLA_INPUT_*.log", SearchOption.AllDirectories))
+                foreach (string candidate in Directory.EnumerateFiles(archiveDir, fileGlob, SearchOption.AllDirectories))
                 {
                     return candidate;
                 }

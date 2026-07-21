@@ -147,7 +147,7 @@ public static class SmisXmlParser
                 }
 
                 XElement el = (XElement)XNode.ReadFrom(reader)!;
-                messages.Add(ParseElement(el));
+                messages.Add(ParseElementSafe(el));
             }
         }
         catch (XmlException ex)
@@ -173,6 +173,7 @@ public static class SmisXmlParser
     /// <summary>
     /// 複数ルート要素を <c>&lt;SmisBatch&gt;</c> で包んで読む。
     /// MOLA 実機のマスターデータ一括送信向け。
+    /// 子要素の個別パース失敗は <see cref="UnknownMessage"/> に落とし、バッチ全体は捨てない。
     /// </summary>
     private static bool TryParseWrappedBatch(string normalized, out List<SmisMessage> messages)
     {
@@ -184,7 +185,7 @@ public static class SmisXmlParser
                 LoadOptions.None);
             foreach (XElement child in batch.Elements())
             {
-                messages.Add(ParseElement(child));
+                messages.Add(ParseElementSafe(child));
             }
         }
         catch (XmlException)
@@ -197,13 +198,23 @@ public static class SmisXmlParser
             messages = new List<SmisMessage>();
             return false;
         }
-        catch (SmisXmlParseException)
-        {
-            messages = new List<SmisMessage>();
-            return false;
-        }
 
         return messages.Count > 0;
+    }
+
+    /// <summary>
+    /// 要素パース。属性不正などで失敗しても UnknownMessage として残す。
+    /// </summary>
+    private static SmisMessage ParseElementSafe(XElement el)
+    {
+        try
+        {
+            return ParseElement(el);
+        }
+        catch (SmisXmlParseException)
+        {
+            return new UnknownMessage(el.Name.LocalName, el.ToString(SaveOptions.DisableFormatting));
+        }
     }
 
     /// <summary>

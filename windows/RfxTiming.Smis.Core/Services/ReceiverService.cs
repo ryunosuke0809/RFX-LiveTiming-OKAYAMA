@@ -174,11 +174,12 @@ public sealed class ReceiverService : IAsyncDisposable
                     messages = SmisXmlParser.ParseMessages(frame.Xml);
                     SetParseStatus(StageStatus.Active);
                 }
-                catch (SmisXmlParseException)
+                catch (SmisXmlParseException ex)
                 {
                     ParseErrors++;
                     messages = Array.Empty<SmisMessage>();
                     SetParseStatus(StageStatus.Warning);
+                    ErrorOccurred?.Invoke(this, ex);
                 }
 
                 // 4. 解析済 JSONL 書込 (1 フレームに複数ルートが含まれる場合は要素ごとに 1 行)
