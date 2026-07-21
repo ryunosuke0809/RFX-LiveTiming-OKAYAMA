@@ -79,7 +79,7 @@ function getColumns(isRaceMode: boolean): TableColumn[] {
     { key: "best", minW: 88, pct: "8%", align: "text-right pr-3" },
     { key: "s1", minW: 72, pct: "6.5%", align: "text-right pr-3" },
     { key: "s2", minW: 72, pct: "6.5%", align: "text-right pr-3" },
-    { key: "s3", minW: 72, pct: "6%", align: "text-right pr-3" },
+    { key: "s3", minW: 64, pct: "6%", align: "text-right pr-3" },
     { key: "pit", minW: 60, pct: "5.5%", align: "text-right pr-3" },
   );
   return cols;

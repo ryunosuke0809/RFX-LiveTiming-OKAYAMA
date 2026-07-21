@@ -127,28 +127,28 @@ export default function TimingRow({ standing, team, carClass, isEven, carCol, ga
       </td>
       <td className="py-px pl-2 pr-1 text-zinc-200 truncate overflow-hidden whitespace-nowrap">{driverName}</td>
       <td className="py-px pl-2 pr-1 text-zinc-400 truncate overflow-hidden whitespace-nowrap">{carCellValue}</td>
-      <td className={`py-px text-center font-mono ${lapCellColor}`}
+      <td className={`py-px text-center font-mono whitespace-nowrap ${lapCellColor}`}
         style={lapCol !== "laps" ? { fontSize: "0.85em" } : undefined}>
         {lapCellValue}
       </td>
-      <td className="py-px px-2 sm:pr-3 text-right font-mono text-zinc-300">{gapCellValue}</td>
-      <td className={`py-px px-2 sm:pr-3 text-right font-mono ${bestCol === "bestlap" ? "text-zinc-300" : TIME_COLORS[standing.bestTimeType]}`}>
+      <td className="py-px px-2 sm:pr-3 text-right font-mono text-zinc-300 whitespace-nowrap">{gapCellValue}</td>
+      <td className={`py-px px-2 sm:pr-3 text-right font-mono whitespace-nowrap ${bestCol === "bestlap" ? "text-zinc-300" : TIME_COLORS[standing.bestTimeType]}`}>
         {bestCol === "bestlap"
           ? (standing.bestTimeLap > 0 ? `L${standing.bestTimeLap}` : "—")
           : formatTime(standing.bestTime)}
       </td>
-      <td className={`py-px px-2 sm:pr-3 text-right font-mono ${TIME_COLORS[standing.sectors[0]?.type || "none"]} ${s1Flash}`}>
+      <td className={`py-px px-2 sm:pr-3 text-right font-mono whitespace-nowrap ${TIME_COLORS[standing.sectors[0]?.type || "none"]} ${s1Flash}`}>
         {formatTime(standing.sectors[0]?.time)}
       </td>
-      <td className={`py-px px-2 sm:pr-3 text-right font-mono ${TIME_COLORS[standing.sectors[1]?.type || "none"]} ${s2Flash}`}>
+      <td className={`py-px px-2 sm:pr-3 text-right font-mono whitespace-nowrap ${TIME_COLORS[standing.sectors[1]?.type || "none"]} ${s2Flash}`}>
         {formatTime(standing.sectors[1]?.time)}
       </td>
-      <td className={`py-px px-2 sm:pr-3 text-right font-mono ${standing.status === "in_pit" && !standing.sectors[2]?.time ? "text-red-500 font-bold" : TIME_COLORS[standing.sectors[2]?.type || "none"]} ${s3Flash}`}>
+      <td className={`py-px px-2 sm:pr-3 text-right font-mono whitespace-nowrap ${standing.status === "in_pit" && !standing.sectors[2]?.time ? "text-red-500 font-bold" : TIME_COLORS[standing.sectors[2]?.type || "none"]} ${s3Flash}`}>
         {standing.status === "in_pit" && !standing.sectors[2]?.time
           ? "In Pit"
           : formatTime(standing.sectors[2]?.time)}
       </td>
-      <td className="py-px px-2 sm:pr-3 text-right">{renderPitCell()}</td>
+      <td className="py-px px-2 sm:pr-3 text-right whitespace-nowrap">{renderPitCell()}</td>
     </tr>
   );
 }
