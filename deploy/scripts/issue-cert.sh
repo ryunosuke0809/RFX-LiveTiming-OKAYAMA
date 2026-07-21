@@ -22,8 +22,14 @@ certbot certonly --webroot \
 
 # certbot が作る options / dhparam が無い場合のフォールバック
 if [[ ! -f /etc/letsencrypt/options-ssl-nginx.conf ]]; then
-  curl -fsSL https://raw.githubusercontent.com/certbot/certbot/master/certbot-nginx/certbot_nginx/_internal/tls_configs/options-ssl-nginx.conf \
-    -o /etc/letsencrypt/options-ssl-nginx.conf
+  cat > /etc/letsencrypt/options-ssl-nginx.conf <<'SSL'
+ssl_session_cache shared:le_nginx_SSL:10m;
+ssl_session_timeout 1440m;
+ssl_session_tickets off;
+ssl_protocols TLSv1.2 TLSv1.3;
+ssl_prefer_server_ciphers off;
+ssl_ciphers "ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384";
+SSL
 fi
 if [[ ! -f /etc/letsencrypt/ssl-dhparams.pem ]]; then
   openssl dhparam -out /etc/letsencrypt/ssl-dhparams.pem 2048
