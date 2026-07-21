@@ -116,7 +116,11 @@ export function createApiRouter(
             }
             let csv: string | null = null;
             let filename = "result.csv";
-            const round = safeName(session.roundName || session.sessionName || "Session").slice(0, 40);
+            const sessionLabel = shortSessionLabel(session.categoryName, session.sessionName);
+            const round = safeName(session.roundName || "Session").slice(0, 24);
+            const base = sessionLabel && sessionLabel !== round
+                ? `${sessionLabel}_${round}`
+                : round;
             if (kind === "laps") {
                 if (!teamId) {
                     res.status(400).json({ error: "teamId is required for kind=laps" });
@@ -125,10 +129,10 @@ export function createApiRouter(
                 csv = buildLapsCsv(session.snapshot, teamId);
                 const team = session.snapshot.teams.find((t) => t.id === teamId);
                 const no = team?.no != null ? `_No${team.no}` : "";
-                filename = `Laps_${round}${no}.csv`;
+                filename = `Laps_${base}${no}.csv`;
             } else {
                 csv = buildClassificationCsv(session.snapshot);
-                filename = `Classification_${round}.csv`;
+                filename = `Classification_${base}.csv`;
             }
             if (csv === null) {
                 res.status(404).json({ error: "team not found in session" });
@@ -157,4 +161,47 @@ function safeName(v: string): string {
             .replace(/_+/g, "_")
             .replace(/^_|_$/g, "") || "session"
     );
+}
+
+/** 長いカテゴリ名から短いセッション識別子を作る (FIA-F4 等)。 */
+function shortSessionLabel(categoryName?: string | null, sessionName?: string | null): string {
+    const raw = (categoryName || sessionName || "").trim();
+    if (!raw) return "";
+
+    const upper = raw.toUpperCase();
+    const tags: string[] = [];
+
+    if (/FIA[- ]?F4/.test(upper) || (/F4/.test(upper) && /CHAMPIONSHIP|CHAMPION|INDEPENDENT/.test(upper))) {
+        tags.push("FIA-F4");
+    }
+    if (/スーパーフォーミュラ.?ライツ|SUPER\s*FORMULA\s*LIGHTS|SF\s*LIGHTS|ｽｰﾊﾟｰﾌｫｰﾐｭﾗ.?ﾗｲﾂ/.test(raw)) {
+        tags.push("SF-Lights");
+    }
+    if (/VITZ|YARIS|ｳﾞｨｯﾂ|ヴィッツ/.test(upper) || /Nｾﾞｯﾄ|Netz/i.test(raw)) {
+        tags.push("Vitz-Yaris");
+    }
+    if (/サーキットトライアル|CIRCUIT\s*TRIAL|ｻｰｷｯﾄﾄﾗｲｱﾙ/.test(raw)) {
+        tags.push("Circuit-Trial");
+    }
+    if (/INDEPENDENT/.test(upper) || /インデペンデント/.test(raw)) {
+        tags.push("Independent");
+    }
+    if (/CHAMPION\s*CLASS/.test(upper) && !tags.includes("Independent")) {
+        tags.push("Champion");
+    }
+
+    const roundMatch = raw.match(/第\s*(\d+)\s*戦/);
+    if (roundMatch) tags.push(`R${roundMatch[1]}`);
+
+    if (tags.length > 0) return safeName(tags.join("_")).slice(0, 48);
+
+    const fallback = raw
+        .replace(/^20\d{2}\s*/g, "")
+        .replace(/seven\s*[x×]\s*seven/gi, "")
+        .replace(/JAPANESE\s+CHAMPIONSHIP/gi, "")
+        .replace(/全日本[^　\s]*/g, "")
+        .replace(/第\s*\d+\s*戦[^　\s]*/g, "")
+        .replace(/公式予選|決勝|予選|走行\d*回目/g, "")
+        .trim();
+    return safeName(fallback).slice(0, 40);
 }

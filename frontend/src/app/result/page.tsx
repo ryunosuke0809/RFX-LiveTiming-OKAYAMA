@@ -141,19 +141,65 @@ function fileSafe(v: string): string {
   );
 }
 
-function makeTimestamp() {
-  const now = new Date();
-  return `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}`;
+/**
+ * 長いカテゴリ名から短いセッション識別子を作る。
+ * 例: "...FIA-F4...INDEPENDENT CLASS 第3戦 公式予選" → "FIA-F4_Independent_R3"
+ */
+function shortSessionLabel(categoryName?: string | null, sessionName?: string | null): string {
+  const raw = (categoryName || sessionName || "").trim();
+  if (!raw) return "";
+
+  const upper = raw.toUpperCase();
+  const tags: string[] = [];
+
+  if (/FIA[- ]?F4|ＦＩＡ.?Ｆ４/.test(upper) || (/F4/.test(upper) && /CHAMPIONSHIP|CHAMPION|INDEPENDENT/.test(upper))) {
+    tags.push("FIA-F4");
+  }
+  if (/スーパーフォーミュラ.?ライツ|SUPER\s*FORMULA\s*LIGHTS|SF\s*LIGHTS|ｽｰﾊﾟｰﾌｫｰﾐｭﾗ.?ﾗｲﾂ/.test(raw)) {
+    tags.push("SF-Lights");
+  }
+  if (/VITZ|YARIS|ｳﾞｨｯﾂ|ヴィッツ/.test(upper) || /Nｾﾞｯﾄ|Netz/i.test(raw)) {
+    tags.push("Vitz-Yaris");
+  }
+  if (/サーキットトライアル|CIRCUIT\s*TRIAL|ｻｰｷｯﾄﾄﾗｲｱﾙ/.test(raw)) {
+    tags.push("Circuit-Trial");
+  }
+  if (/INDEPENDENT/.test(upper) || /インデペンデント/.test(raw)) {
+    tags.push("Independent");
+  }
+  if (/CHAMPION\s*CLASS/.test(upper) && !tags.includes("Independent")) {
+    tags.push("Champion");
+  }
+
+  const roundMatch = raw.match(/第\s*(\d+)\s*戦/);
+  if (roundMatch) tags.push(`R${roundMatch[1]}`);
+
+  if (tags.length > 0) return fileSafe(tags.join("_")).slice(0, 48);
+
+  const fallback = raw
+    .replace(/^20\d{2}\s*/g, "")
+    .replace(/seven\s*[x×]\s*seven/gi, "")
+    .replace(/JAPANESE\s+CHAMPIONSHIP/gi, "")
+    .replace(/全日本[^　\s]*/g, "")
+    .replace(/第\s*\d+\s*戦[^　\s]*/g, "")
+    .replace(/公式予選|決勝|予選|走行\d*回目/g, "")
+    .trim();
+  return fileSafe(fallback).slice(0, 40);
 }
 
-/** CSV ファイル名: 種別 + ラウンド名のみ（重複・長すぎ防止）。 */
+/** CSV ファイル名: 種別_短いセッション名_ラウンド名 */
 function buildResultCsvFilename(opts: {
   kind: "Classification" | "Laps";
+  categoryName?: string | null;
+  sessionName?: string | null;
   roundName?: string | null;
   carNo?: number | null;
 }): string {
-  const round = fileSafe(opts.roundName || "Session").slice(0, 40);
-  const parts = [opts.kind, round];
+  const session = shortSessionLabel(opts.categoryName, opts.sessionName);
+  const round = fileSafe(opts.roundName || "Session").slice(0, 24);
+  const parts: string[] = [opts.kind];
+  if (session && session !== round) parts.push(session);
+  parts.push(round);
   if (opts.carNo != null) parts.push(`No${opts.carNo}`);
   return `${parts.join("_")}.csv`;
 }
@@ -452,6 +498,8 @@ export default function ResultPage() {
     if (isArchive && pastResult) {
       const name = buildResultCsvFilename({
         kind: "Classification",
+        categoryName,
+        sessionName,
         roundName,
       });
       void downloadArchiveCsv(
@@ -463,6 +511,8 @@ export default function ResultPage() {
     downloadCsv(
       buildResultCsvFilename({
         kind: "Classification",
+        categoryName,
+        sessionName,
         roundName,
       }),
       generateClassificationCsv(sortedStandings, csvMeta),
@@ -479,6 +529,8 @@ export default function ResultPage() {
     if (isArchive && pastResult) {
       const name = buildResultCsvFilename({
         kind: "Laps",
+        categoryName,
+        sessionName,
         roundName,
         carNo: team?.no,
       });
@@ -492,6 +544,8 @@ export default function ResultPage() {
     downloadCsv(
       buildResultCsvFilename({
         kind: "Laps",
+        categoryName,
+        sessionName,
         roundName,
         carNo: team?.no,
       }),
@@ -643,7 +697,9 @@ export default function ResultPage() {
               const session = dateSessions.find((s) => s.index === sessionIndex);
               const name = buildResultCsvFilename({
                 kind: "Classification",
-                roundName: session?.roundName || session?.sessionName || "Session",
+                categoryName: session?.categoryName,
+                sessionName: session?.sessionName,
+                roundName: session?.roundName || "Session",
               });
               void downloadArchiveCsv(
                 archiveCsvUrl(selectedDate, sessionIndex, "classification"),
