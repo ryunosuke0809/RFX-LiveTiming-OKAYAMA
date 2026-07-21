@@ -177,7 +177,7 @@ body {
 /* 横スクロール可能ヒント（右端フェード + シェブロン） */
 .h-scroll-hint-fade {
   background: linear-gradient(to right, transparent, rgba(12, 12, 15, 0.92) 45%);
-  animation: h-scroll-hint-pulse 1.6s ease-in-out infinite;
+  animation: scroll-hint-pulse 1.6s ease-in-out infinite;
 }
 
 .h-scroll-hint-chevron {
@@ -185,7 +185,18 @@ body {
   text-shadow: 0 0 8px rgba(245, 158, 11, 0.45);
 }
 
-@keyframes h-scroll-hint-pulse {
+/* 縦スクロール可能ヒント（下端フェード + シェブロン） */
+.v-scroll-hint-fade {
+  background: linear-gradient(to bottom, transparent, rgba(12, 12, 15, 0.92) 45%);
+  animation: scroll-hint-pulse 1.6s ease-in-out infinite;
+}
+
+.v-scroll-hint-chevron {
+  animation: v-scroll-hint-nudge 1.2s ease-in-out infinite;
+  text-shadow: 0 0 8px rgba(245, 158, 11, 0.45);
+}
+
+@keyframes scroll-hint-pulse {
   0%,
   100% {
     opacity: 0.55;
@@ -205,9 +216,21 @@ body {
   }
 }
 
+@keyframes v-scroll-hint-nudge {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(5px);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .h-scroll-hint-fade,
-  .h-scroll-hint-chevron {
+  .h-scroll-hint-chevron,
+  .v-scroll-hint-fade,
+  .v-scroll-hint-chevron {
     animation: none;
   }
 }

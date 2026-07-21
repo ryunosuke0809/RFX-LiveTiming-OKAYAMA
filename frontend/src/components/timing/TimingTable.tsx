@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { Standing } from "@/types/smis";
 import TimingRow from "./TimingRow";
 import ColumnToggle from "./ColumnToggle";
+import ScrollHintArea from "@/components/shared/ScrollHintArea";
 import { getTeamByStanding, getClassByStanding } from "@/data/mock";
 import {
   colWidthStyle,
@@ -133,7 +134,11 @@ export default function TimingTable({ standings, classFilter, flashKey = 0, isRa
   const totalMinW = columns.reduce((sum, c) => sum + c.minW, 0);
 
   return (
-    <div className="flex-1 timing-table-scroll">
+    <ScrollHintArea
+      axis="both"
+      className="flex-1 min-h-0"
+      contentClassName="timing-table-scroll h-full"
+    >
       <table
         className="timing-table"
         style={{ tableLayout: "fixed", fontSize: "var(--timing-fs)", minWidth: `${totalMinW}px`, width: "100%" }}
@@ -199,6 +204,6 @@ export default function TimingTable({ standings, classFilter, flashKey = 0, isRa
           })}
         </tbody>
       </table>
-    </div>
+    </ScrollHintArea>
   );
 }

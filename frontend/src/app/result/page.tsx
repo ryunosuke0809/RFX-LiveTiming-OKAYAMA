@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import SideMenu from "@/components/layout/SideMenu";
 import DriverDetailPanel from "@/components/shared/DriverDetailPanel";
-import HorizontalScrollArea from "@/components/shared/HorizontalScrollArea";
+import ScrollHintArea, { HorizontalScrollArea } from "@/components/shared/ScrollHintArea";
 import {
   mockStandings,
   mockClasses,
@@ -640,32 +640,12 @@ export default function ResultPage() {
           Individual タブはラップテーブルを画面いっぱいに伸ばしたいので overflow-hidden + flex で
           子側 (IndividualView) がスクロール領域を管理する。
           Classification / Calendar は縦に長いコンテンツを外側スクロールで読む。 */}
-      <div
-        ref={mainScrollRef}
-        className={`flex-1 transition-all duration-300 min-w-0 ${
-          activeTab === "individual"
-            ? "overflow-hidden flex flex-col min-h-0"
-            : "overflow-y-auto overflow-x-hidden"
-        }`}
-        style={{ paddingLeft: menuOpen ? "220px" : "40px" }}
-      >
-        {activeTab === "classification" && (
-          <ClassificationView
-            standings={sortedStandings}
-            classFilter={classFilter}
-            sessionLabel={sessionHeadline}
-            courseLabel={
-              isArchive
-                ? [pastResult?.date, sessionDetail || categoryName].filter(Boolean).join(" · ")
-                : sessionMeta.category.courseName || "OKAYAMA International Circuit"
-            }
-            mode={isArchive ? "archive" : "live"}
-            onBackToLive={isArchive ? clearArchive : undefined}
-            onDownload={handleDownloadClassification}
-            onRowClick={(s) => setSelectedStanding(s)}
-          />
-        )}
-        {activeTab === "individual" && (
+      {activeTab === "individual" ? (
+        <div
+          ref={mainScrollRef}
+          className="flex-1 overflow-hidden flex flex-col min-h-0 transition-all duration-300 min-w-0"
+          style={{ paddingLeft: menuOpen ? "220px" : "40px" }}
+        >
           <IndividualView
             standings={sortedStandings}
             target={individualTarget}
@@ -673,42 +653,68 @@ export default function ResultPage() {
             onDownload={handleDownloadIndividual}
             getPersonal={getPersonal}
           />
-        )}
-        {activeTab === "calendar" && (
-          <CalendarView
-            year={calYear}
-            month={calMonth}
-            days={calDays}
-            monthNames={monthNames}
-            dayNames={dayNames}
-            onPrevMonth={prevMonth}
-            onNextMonth={nextMonth}
-            selectedDate={selectedDate}
-            onSelectDate={setSelectedDate}
-            archiveDays={archiveDays}
-            dateSessions={dateSessions}
-            sessionsLoading={sessionsLoading}
-            archiveError={archiveError}
-            onOpenSession={(sessionIndex) => {
-              if (selectedDate) void openArchiveSession(selectedDate, sessionIndex);
-            }}
-            onDownloadSessionCsv={(sessionIndex) => {
-              if (!selectedDate) return;
-              const session = dateSessions.find((s) => s.index === sessionIndex);
-              const name = buildResultCsvFilename({
-                kind: "Classification",
-                categoryName: session?.categoryName,
-                sessionName: session?.sessionName,
-                roundName: session?.roundName || "Session",
-              });
-              void downloadArchiveCsv(
-                archiveCsvUrl(selectedDate, sessionIndex, "classification"),
-                name,
-              ).catch((err) => setArchiveError((err as Error).message));
-            }}
-          />
-        )}
-      </div>
+        </div>
+      ) : (
+        <ScrollHintArea
+          axis="y"
+          scrollerRef={mainScrollRef}
+          className="flex-1 transition-all duration-300 min-w-0"
+          contentClassName="h-full"
+        >
+          <div style={{ paddingLeft: menuOpen ? "220px" : "40px" }}>
+            {activeTab === "classification" && (
+              <ClassificationView
+                standings={sortedStandings}
+                classFilter={classFilter}
+                sessionLabel={sessionHeadline}
+                courseLabel={
+                  isArchive
+                    ? [pastResult?.date, sessionDetail || categoryName].filter(Boolean).join(" · ")
+                    : sessionMeta.category.courseName || "OKAYAMA International Circuit"
+                }
+                mode={isArchive ? "archive" : "live"}
+                onBackToLive={isArchive ? clearArchive : undefined}
+                onDownload={handleDownloadClassification}
+                onRowClick={(s) => setSelectedStanding(s)}
+              />
+            )}
+            {activeTab === "calendar" && (
+              <CalendarView
+                year={calYear}
+                month={calMonth}
+                days={calDays}
+                monthNames={monthNames}
+                dayNames={dayNames}
+                onPrevMonth={prevMonth}
+                onNextMonth={nextMonth}
+                selectedDate={selectedDate}
+                onSelectDate={setSelectedDate}
+                archiveDays={archiveDays}
+                dateSessions={dateSessions}
+                sessionsLoading={sessionsLoading}
+                archiveError={archiveError}
+                onOpenSession={(sessionIndex) => {
+                  if (selectedDate) void openArchiveSession(selectedDate, sessionIndex);
+                }}
+                onDownloadSessionCsv={(sessionIndex) => {
+                  if (!selectedDate) return;
+                  const session = dateSessions.find((s) => s.index === sessionIndex);
+                  const name = buildResultCsvFilename({
+                    kind: "Classification",
+                    categoryName: session?.categoryName,
+                    sessionName: session?.sessionName,
+                    roundName: session?.roundName || "Session",
+                  });
+                  void downloadArchiveCsv(
+                    archiveCsvUrl(selectedDate, sessionIndex, "classification"),
+                    name,
+                  ).catch((err) => setArchiveError((err as Error).message));
+                }}
+              />
+            )}
+          </div>
+        </ScrollHintArea>
+      )}
 
       {selectedStanding && (
         <DriverDetailPanel
@@ -783,7 +789,7 @@ function ClassificationView({
         </div>
       )}
 
-      <HorizontalScrollArea className="min-w-0" contentClassName="timing-table-scroll-x">
+      <ScrollHintArea className="min-w-0" contentClassName="timing-table-scroll-x" axis="x">
         <table
           className="timing-table w-full"
           style={{
@@ -862,7 +868,7 @@ function ClassificationView({
             })}
           </tbody>
         </table>
-      </HorizontalScrollArea>
+      </ScrollHintArea>
 
       {standings.length === 0 && (
         <div className="text-center py-16 text-zinc-600">
@@ -902,7 +908,7 @@ function IndividualView({
         <div className="px-4 py-2.5 border-b border-zinc-700 bg-zinc-800/50">
           <span className="text-xs text-zinc-400 uppercase tracking-wider font-semibold">Select Name</span>
         </div>
-        <div className="flex-1 overflow-y-auto">
+        <ScrollHintArea axis="y" className="flex-1 min-h-0" contentClassName="h-full">
           {standings.map((s) => {
             const t = getTeamByStanding(s);
             const c = getClassByStanding(s);
@@ -936,7 +942,7 @@ function IndividualView({
               </button>
             );
           })}
-        </div>
+        </ScrollHintArea>
       </div>
 
       {/* スマホ: 水平スクロールの chips リスト */}
@@ -1073,10 +1079,11 @@ function IndividualView({
               </div>
             </div>
 
-            {/* ラップテーブル: flex-1 で残りの高さを全部使う。横スクロールも維持。 */}
-            <HorizontalScrollArea
+            {/* ラップテーブル: flex-1 で残りの高さを全部使う。横・縦スクロールヒント付き。 */}
+            <ScrollHintArea
+              axis="both"
               className="flex-1 min-h-[200px] border border-zinc-700 rounded-xl overflow-hidden"
-              contentClassName="h-full max-h-full overflow-auto"
+              contentClassName="h-full max-h-full"
             >
               <table className="w-full border-collapse text-[11px] sm:text-xs min-w-[440px]">
                 <thead className="sticky top-0 z-10">
@@ -1126,7 +1133,7 @@ function IndividualView({
                   ))}
                 </tbody>
               </table>
-            </HorizontalScrollArea>
+            </ScrollHintArea>
           </>
         )}
       </div>
