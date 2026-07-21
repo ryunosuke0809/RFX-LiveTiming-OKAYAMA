@@ -1,17 +1,20 @@
 import { Router } from "express";
 import type { TimingRepository } from "../db/repository.js";
 import type { BroadcastHub } from "../broadcast/hub.js";
+import { ArchiveService } from "../archive/service.js";
+import { buildClassificationCsv, buildLapsCsv } from "../archive/csv.js";
 
 /**
  * REST API。
- * Phase 2 では最低限の health / latest メッセージ取得のみ提供する。
- * リザルト集計やセッション一覧は Phase 2.x で順次追加。
+ * - health / messages: 運用・デバッグ
+ * - archive/*: 過去セッション一覧・リザルト JSON / CSV
  */
 export function createApiRouter(
     repository: TimingRepository,
     hub: BroadcastHub,
 ): Router {
     const router = Router();
+    const archive = new ArchiveService(repository);
 
     router.get("/health", (_req, res) => {
         res.json({
@@ -36,5 +39,112 @@ export function createApiRouter(
         res.json({ circuit, count: messages.length, messages });
     });
 
+    // ---- 過去データ ----
+
+    /** GET /api/archive/days → { days: ["2026-07-21", ...] } */
+    router.get("/archive/days", (_req, res) => {
+        res.json({ days: archive.listDays() });
+    });
+
+    /**
+     * GET /api/archive/sessions?date=2026-07-21&circuit=okayama
+     */
+    router.get("/archive/sessions", (req, res) => {
+        const date = String(req.query["date"] ?? "");
+        if (!date) {
+            res.status(400).json({ error: "date is required (YYYY-MM-DD or YYYYMMDD)" });
+            return;
+        }
+        const circuit = req.query["circuit"]
+            ? String(req.query["circuit"])
+            : undefined;
+        try {
+            const sessions = archive.listSessions(date, circuit);
+            res.json({ date, count: sessions.length, sessions });
+        } catch (err) {
+            res.status(500).json({ error: (err as Error).message });
+        }
+    });
+
+    /**
+     * GET /api/archive/results?date=2026-07-21&sessionIndex=0&circuit=okayama
+     */
+    router.get("/archive/results", (req, res) => {
+        const date = String(req.query["date"] ?? "");
+        const sessionIndex = Number.parseInt(String(req.query["sessionIndex"] ?? "0"), 10);
+        if (!date || !Number.isFinite(sessionIndex) || sessionIndex < 0) {
+            res.status(400).json({
+                error: "date and sessionIndex (>=0) are required",
+            });
+            return;
+        }
+        const circuit = req.query["circuit"]
+            ? String(req.query["circuit"])
+            : undefined;
+        try {
+            const session = archive.getSession(date, sessionIndex, circuit);
+            if (!session) {
+                res.status(404).json({ error: "session not found" });
+                return;
+            }
+            res.json(session);
+        } catch (err) {
+            res.status(500).json({ error: (err as Error).message });
+        }
+    });
+
+    /**
+     * GET /api/archive/csv?date=...&sessionIndex=0&kind=classification|laps&teamId=
+     */
+    router.get("/archive/csv", (req, res) => {
+        const date = String(req.query["date"] ?? "");
+        const sessionIndex = Number.parseInt(String(req.query["sessionIndex"] ?? "0"), 10);
+        const kind = String(req.query["kind"] ?? "classification");
+        const teamId = req.query["teamId"] ? String(req.query["teamId"]) : "";
+        if (!date || !Number.isFinite(sessionIndex) || sessionIndex < 0) {
+            res.status(400).json({ error: "date and sessionIndex are required" });
+            return;
+        }
+        const circuit = req.query["circuit"]
+            ? String(req.query["circuit"])
+            : undefined;
+        try {
+            const session = archive.getSession(date, sessionIndex, circuit);
+            if (!session) {
+                res.status(404).json({ error: "session not found" });
+                return;
+            }
+            let csv: string | null = null;
+            let filename = "result.csv";
+            if (kind === "laps") {
+                if (!teamId) {
+                    res.status(400).json({ error: "teamId is required for kind=laps" });
+                    return;
+                }
+                csv = buildLapsCsv(session.snapshot, teamId);
+                filename = `Laps_${safeName(session.sessionName)}_idx${sessionIndex}_${teamId}.csv`;
+            } else {
+                csv = buildClassificationCsv(session.snapshot);
+                filename = `Classification_${safeName(session.sessionName)}_idx${sessionIndex}.csv`;
+            }
+            if (csv === null) {
+                res.status(404).json({ error: "team not found in session" });
+                return;
+            }
+            res.setHeader("Content-Type", "text/csv; charset=utf-8");
+            res.setHeader(
+                "Content-Disposition",
+                `attachment; filename="${filename}"`,
+            );
+            res.send("\uFEFF" + csv);
+        } catch (err) {
+            res.status(500).json({ error: (err as Error).message });
+        }
+    });
+
     return router;
+}
+
+function safeName(v: string): string {
+    return (v || "session").trim().replace(/[\\/:*?"<>|]/g, "").replace(/\s+/g, "_") || "session";
 }

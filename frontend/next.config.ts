@@ -25,6 +25,15 @@ const nextConfig: NextConfig = {
     "10.*.*.*",
     "192.168.*.*",
   ],
+  // 開発時: Results カレンダー等の /api/* をクラウドサーバーへプロキシ
+  async rewrites() {
+    return [
+      {
+        source: "/api/:path*",
+        destination: "http://127.0.0.1:4000/api/:path*",
+      },
+    ];
+  },
 };
 
 export default nextConfig;

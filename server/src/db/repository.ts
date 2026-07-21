@@ -1,4 +1,6 @@
 import type Database from "better-sqlite3";
+import fs from "node:fs";
+import path from "node:path";
 import { formatYyyymmdd, openDateDatabase } from "./schema.js";
 import type { IngestEnvelope } from "../types/ingest.js";
 import type { Logger } from "../logger.js";
@@ -117,6 +119,93 @@ export class TimingRepository {
         }
     }
 
+    /**
+     * `dataDir` 内の `timing_YYYYMMDD.db` から利用可能な日付一覧を返す (昇順, YYYYMMDD)。
+     */
+    listAvailableDays(): string[] {
+        try {
+            if (!fs.existsSync(this.dataDir)) return [];
+            const days: string[] = [];
+            for (const name of fs.readdirSync(this.dataDir)) {
+                const m = /^timing_(\d{8})\.db$/.exec(name);
+                if (m) days.push(m[1]!);
+            }
+            days.sort();
+            return days;
+        } catch (err) {
+            this.logger.error("repository.listAvailableDays failed", {
+                error: (err as Error).message,
+            });
+            return [];
+        }
+    }
+
+    /**
+     * 指定日の DB を読み取り専用で開き、全 messages を時系列で返す。
+     * 当日の書込接続 (`ensureDb`) とは別接続なので、ライブ書き込みを邪魔しない。
+     */
+    loadDayMessages(yyyymmdd: string, circuitId?: string): IngestEnvelope[] {
+        const day = yyyymmdd.replace(/-/g, "");
+        if (!/^\d{8}$/.test(day)) {
+            throw new Error(`invalid date: ${yyyymmdd}`);
+        }
+        const filePath = path.join(this.dataDir, `timing_${day}.db`);
+        if (!fs.existsSync(filePath)) {
+            return [];
+        }
+
+        let db: Database.Database | null = null;
+        try {
+            db = openDateDatabase(this.dataDir, parseYyyymmddLocal(day));
+            const rows = circuitId
+                ? (db
+                      .prepare(
+                          `SELECT circuit_id, kind, client_ts, payload_json
+                           FROM messages
+                           WHERE circuit_id = ?
+                           ORDER BY id ASC`,
+                      )
+                      .all(circuitId) as Array<{
+                      circuit_id: string;
+                      kind: string;
+                      client_ts: string;
+                      payload_json: string;
+                  }>)
+                : (db
+                      .prepare(
+                          `SELECT circuit_id, kind, client_ts, payload_json
+                           FROM messages
+                           ORDER BY id ASC`,
+                      )
+                      .all() as Array<{
+                      circuit_id: string;
+                      kind: string;
+                      client_ts: string;
+                      payload_json: string;
+                  }>);
+
+            return rows.map((r, i) => ({
+                seq: i + 1,
+                circuitId: r.circuit_id,
+                ts: r.client_ts,
+                kind: r.kind as IngestEnvelope["kind"],
+                payload: JSON.parse(r.payload_json) as Record<string, unknown>,
+            }));
+        } catch (err) {
+            this.logger.error("repository.loadDayMessages failed", {
+                day,
+                error: (err as Error).message,
+            });
+            throw err;
+        } finally {
+            try {
+                db?.close();
+            } catch {
+                /* ignore */
+            }
+        }
+    }
+
     close(): void {
         if (this.db) {
             try {
@@ -183,4 +272,12 @@ function pickStr(obj: Record<string, unknown>, ...keys: string[]): string | null
         if (typeof v === "number") return String(v);
     }
     return null;
+}
+
+/** YYYYMMDD → その日の正午 (ローカル) 。DST 跨ぎで日付がずれないようにする。 */
+function parseYyyymmddLocal(yyyymmdd: string): Date {
+    const y = Number(yyyymmdd.slice(0, 4));
+    const m = Number(yyyymmdd.slice(4, 6)) - 1;
+    const d = Number(yyyymmdd.slice(6, 8));
+    return new Date(y, m, d, 12, 0, 0, 0);
 }

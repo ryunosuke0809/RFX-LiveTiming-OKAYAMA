@@ -323,10 +323,20 @@
                               Content="解析済メッセージをクラウドサーバーへ転送" Margin="0,0,0,8" />
 
                     <TextBlock Grid.Row="1" Grid.Column="0" Text="サーバー URL" VerticalAlignment="Center" Margin="0,0,12,8" />
-                    <TextBox Grid.Row="1" Grid.Column="1" x:Name="CloudUrlBox" Height="28" Margin="0,0,0,8" />
+                    <StackPanel Grid.Row="1" Grid.Column="1" Margin="0,0,0,8">
+                        <TextBox x:Name="CloudUrlBox" Height="28" />
+                        <TextBlock Margin="0,4,0,0" FontSize="11" Foreground="#FF9CA3AF"
+                                   Text="本番: wss://mola-timing-okayama.com/ingest　／　ローカル: ws://127.0.0.1:4000/ingest"
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
 
                     <TextBlock Grid.Row="2" Grid.Column="0" Text="認証トークン" VerticalAlignment="Center" Margin="0,0,12,8" />
-                    <TextBox Grid.Row="2" Grid.Column="1" x:Name="CloudTokenBox" Height="28" Margin="0,0,0,8" />
+                    <StackPanel Grid.Row="2" Grid.Column="1" Margin="0,0,0,8">
+                        <TextBox x:Name="CloudTokenBox" Height="28" />
+                        <TextBlock Margin="0,4,0,0" FontSize="11" Foreground="#FF9CA3AF"
+                                   Text="サーバー shared/server.env の RECEIVER_INGEST_TOKEN と同じ値"
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
 
                     <TextBlock Grid.Row="3" Grid.Column="0" Text="サーキット ID" VerticalAlignment="Center" Margin="0,0,12,8" />
                     <TextBox Grid.Row="3" Grid.Column="1" x:Name="CloudCircuitIdBox" Width="220" Height="28"

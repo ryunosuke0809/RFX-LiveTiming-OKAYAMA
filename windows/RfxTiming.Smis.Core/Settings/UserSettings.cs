@@ -167,10 +167,10 @@ public sealed class CloudSettings
 
     /// <summary>
     /// クラウドの ingest エンドポイント URL。
-    /// 例: <c>wss://livetiming.example.com/ingest</c>。
-    /// 開発時は <c>ws://localhost:4000/ingest</c>。
+    /// 本番: <c>wss://mola-timing-okayama.com/ingest</c>。
+    /// 開発: <c>ws://127.0.0.1:4000/ingest</c> または <c>ws://localhost:4000/ingest</c>。
     /// </summary>
-    public string IngestUrl { get; set; } = "ws://localhost:4000/ingest";
+    public string IngestUrl { get; set; } = "ws://127.0.0.1:4000/ingest";
 
     /// <summary>
     /// 共有シークレットトークン (Bearer)。

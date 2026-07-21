@@ -1,13 +1,12 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import SideMenu from "@/components/layout/SideMenu";
 import DriverDetailPanel from "@/components/shared/DriverDetailPanel";
 import {
   mockStandings,
   mockClasses,
   mockSessionInfo,
-  mockSchedule,
   getTeamByStanding,
   getClassByStanding,
   getDriverName,
@@ -16,6 +15,16 @@ import {
 import { formatTime } from "@/lib/format";
 import { TIME_COLORS } from "@/lib/colors";
 import { useLiveTiming } from "@/hooks/useLiveTiming";
+import { setLiveEntities } from "@/lib/entityRegistry";
+import {
+  fetchArchiveDays,
+  fetchArchiveSessions,
+  fetchArchiveResult,
+  archiveCsvUrl,
+  type ArchiveSessionSummary,
+  type ArchiveResultPayload,
+  type ArchiveStanding,
+} from "@/lib/archiveApi";
 import {
   colWidthStyle,
   getStickyLeftOffsets,
@@ -23,7 +32,7 @@ import {
   stickyTdStyle,
   type TableColumn,
 } from "@/lib/timingTableLayout";
-import type { Standing, DriverPersonalData } from "@/types/smis";
+import type { CarClass, DriverPersonalData, Standing, Team, TimeType } from "@/types/smis";
 
 const CLASSIFICATION_COLUMNS: TableColumn[] = [
   { key: "p", minW: 36, pct: "3.5%", align: "text-center" },
@@ -140,14 +149,137 @@ function generateCalendarDays(year: number, month: number) {
   return days;
 }
 
-const EVENT_DATES: Record<string, string[]> = {
-  // 本番では Receiver / サーバー側のセッション一覧から埋める（Phase 2c）。
-  // テスト用の Free Practice / Qualifying / Race 仮データは削除済み。
-};
+const EVENT_DATES: Record<string, string[]> = {};
 
-function getEventsForDate(year: number, month: number, day: number): string[] {
+function archiveStandingToStanding(s: ArchiveStanding): Standing {
+  return {
+    position: s.position,
+    classPosition: s.classPosition,
+    classId: s.classId,
+    teamId: s.teamId,
+    driverNo: s.driverNo,
+    lap: s.lap,
+    bestTime: s.bestTime,
+    bestTimeLap: s.bestTimeLap,
+    lastLapTime: s.lastLapTime,
+    lastPassingTime: s.lastPassingTime,
+    sectorNo: s.sectorNo,
+    sectorTime: s.sectorTime,
+    order: s.order,
+    refSectors: s.refSectors ?? [],
+    gap: s.gap,
+    interval: s.interval,
+    status: s.status as Standing["status"],
+    sectors: (s.sectors ?? []).map((sec) => ({
+      time: sec.time,
+      type: (sec.type as TimeType) || "none",
+    })),
+    bestTimeType: (s.bestTimeType as TimeType) || "none",
+    lastLapTimeType: (s.lastLapTimeType as TimeType) || "none",
+    pits: s.pits,
+    pitTime: s.pitTime,
+    positionChange: s.positionChange,
+  };
+}
+
+function personalFromArchive(payload: ArchiveResultPayload, teamId: string): DriverPersonalData {
+  const laps = [...(payload.snapshot.driverLaps[teamId] ?? [])].sort((a, b) => a.lap - b.lap);
+  const min = (vals: Array<number | null>) => {
+    const nums = vals.filter((v): v is number => v !== null && v > 0);
+    return nums.length ? Math.min(...nums) : null;
+  };
+  const lapTimes = laps.map((l) => l.lapTime);
+  const bestLapTime = min(lapTimes);
+  const bestLap = bestLapTime !== null ? (laps.find((l) => l.lapTime === bestLapTime)?.lap ?? 0) : 0;
+  const valid = lapTimes.filter((v): v is number => v !== null && v > 0);
+  return {
+    teamId,
+    laps: laps.map((l) => ({
+      lap: l.lap,
+      lapTime: l.lapTime,
+      s1: l.s1,
+      s2: l.s2,
+      s3: l.s3,
+      s1Type: (l.s1Type as TimeType) || "none",
+      s2Type: (l.s2Type as TimeType) || "none",
+      s3Type: (l.s3Type as TimeType) || "none",
+      lapTimeType: (l.lapTimeType as TimeType) || "none",
+      isPit: l.isPit,
+      position: l.position,
+    })),
+    bestLapTime,
+    bestLap,
+    bestS1: min(laps.map((l) => l.s1)),
+    bestS2: min(laps.map((l) => l.s2)),
+    bestS3: min(laps.map((l) => l.s3)),
+    totalPits: laps.filter((l) => l.isPit).length,
+    avgLapTime:
+      valid.length > 0 ? Math.round(valid.reduce((a, b) => a + b, 0) / valid.length) : null,
+  };
+}
+
+function registerArchiveEntities(payload: ArchiveResultPayload): void {
+  const teams = new Map<string, Team>();
+  for (const t of payload.snapshot.teams) {
+    teams.set(t.id, {
+      id: t.id,
+      classId: t.classId,
+      no: t.no,
+      nameJ: t.nameJ,
+      nameE: t.nameE || t.nameJ,
+      engine: "",
+      machine: "",
+      tire: "",
+      nation: "",
+      drivers: t.drivers.map((d) => ({
+        no: d.no,
+        nameJ: d.nameJ,
+        nameE: d.nameE || d.nameJ,
+        nation: "",
+      })),
+    });
+  }
+  // StandingVm にも名前があるので、teams に無い場合のフォールバックを足す
+  for (const s of payload.snapshot.standings) {
+    if (!teams.has(s.teamId)) {
+      teams.set(s.teamId, {
+        id: s.teamId,
+        classId: s.classId,
+        no: s.teamNo,
+        nameJ: s.teamNameJ,
+        nameE: s.teamNameE || s.teamNameJ,
+        engine: "",
+        machine: "",
+        tire: "",
+        nation: "",
+        drivers: [
+          {
+            no: s.driverNo,
+            nameJ: s.driverNameJ,
+            nameE: s.driverNameE || s.driverNameJ,
+            nation: "",
+          },
+        ],
+      });
+    }
+  }
+  const classes = new Map<string, CarClass>();
+  for (const c of payload.snapshot.classes) {
+    classes.set(c.id, {
+      id: c.id,
+      nameJ: c.nameJ,
+      nameE: c.nameE || c.nameJ,
+      record: c.record,
+      color: c.color,
+    });
+  }
+  setLiveEntities(teams, classes);
+}
+
+function getEventsForDate(year: number, month: number, day: number, archiveDays: Set<string>): string[] {
   const key = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-  return EVENT_DATES[key] || [];
+  if (EVENT_DATES[key]?.length) return EVENT_DATES[key]!;
+  return archiveDays.has(key) ? ["Recorded"] : [];
 }
 
 // --- Main ---
@@ -161,24 +293,100 @@ export default function ResultPage() {
   const [selectedStanding, setSelectedStanding] = useState<Standing | null>(null);
   const [individualTarget, setIndividualTarget] = useState<Standing | null>(null);
 
-  const [calYear, setCalYear] = useState(2026);
-  const [calMonth, setCalMonth] = useState(new Date().getMonth());
+  const [calYear, setCalYear] = useState(() => new Date().getFullYear());
+  const [calMonth, setCalMonth] = useState(() => new Date().getMonth());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [archiveDays, setArchiveDays] = useState<Set<string>>(() => new Set());
+  const [dateSessions, setDateSessions] = useState<ArchiveSessionSummary[]>([]);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [pastResult, setPastResult] = useState<ArchiveResultPayload | null>(null);
+  const [archiveError, setArchiveError] = useState<string | null>(null);
 
   const calDays = useMemo(() => generateCalendarDays(calYear, calMonth), [calYear, calMonth]);
   const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
   const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-  // ライブ接続 (/ws)。データ受信時は mock の代わりにライブ順位を使う。
   const live = useLiveTiming();
-  const isLive = live.hasData;
-  const baseStandings = isLive ? live.standings : mockStandings;
-  const classes = isLive ? live.classes : mockClasses;
+  const isArchive = pastResult !== null;
+  const isLive = !isArchive && live.hasData;
+
+  const pastStandings = useMemo(
+    () => (pastResult ? pastResult.snapshot.standings.map(archiveStandingToStanding) : []),
+    [pastResult],
+  );
+  const pastClasses = useMemo(() => {
+    if (!pastResult) return [];
+    return pastResult.snapshot.classes.map((c) => ({
+      id: c.id,
+      nameJ: c.nameJ,
+      nameE: c.nameE || c.nameJ,
+      record: c.record,
+      color: c.color,
+    }));
+  }, [pastResult]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchArchiveDays()
+      .then((days) => {
+        if (!cancelled) setArchiveDays(new Set(days));
+      })
+      .catch(() => {
+        if (!cancelled) setArchiveDays(new Set());
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!selectedDate) {
+      setDateSessions([]);
+      return;
+    }
+    let cancelled = false;
+    setSessionsLoading(true);
+    setArchiveError(null);
+    fetchArchiveSessions(selectedDate)
+      .then((sessions) => {
+        if (!cancelled) setDateSessions(sessions);
+      })
+      .catch((err: Error) => {
+        if (!cancelled) {
+          setDateSessions([]);
+          setArchiveError(err.message);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setSessionsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedDate]);
+
+  useEffect(() => {
+    if (pastResult) registerArchiveEntities(pastResult);
+  }, [pastResult]);
+
+  const baseStandings = isArchive ? pastStandings : isLive ? live.standings : mockStandings;
+  const classes = isArchive ? pastClasses : isLive ? live.classes : mockClasses;
   const sessionMeta = isLive && live.sessionInfo ? live.sessionInfo : mockSessionInfo;
-  const competitionName = sessionMeta.competition.nameE || sessionMeta.competition.nameJ;
-  // カテゴリー名は Competition 名（例:「2026 … FIA-F4 JAPANESE CHAMPIONSHIP」）をそのまま使う。
-  const categoryName = competitionName;
-  const sessionName = sessionMeta.session.nameE || sessionMeta.session.nameJ;
+  const competitionName = isArchive
+    ? pastResult!.competitionName ||
+      pastResult!.snapshot.session?.competitionNameE ||
+      pastResult!.snapshot.session?.competitionNameJ ||
+      ""
+    : sessionMeta.competition.nameE || sessionMeta.competition.nameJ;
+  const categoryName = isArchive
+    ? pastResult!.categoryName || competitionName
+    : competitionName;
+  const sessionName = isArchive
+    ? pastResult!.sessionName ||
+      pastResult!.snapshot.session?.sessionNameE ||
+      pastResult!.snapshot.session?.sessionNameJ ||
+      ""
+    : sessionMeta.session.nameE || sessionMeta.session.nameJ;
   const csvMeta: CsvMeta = {
     competition: competitionName,
     category: categoryName,
@@ -192,35 +400,69 @@ export default function ResultPage() {
     return sortStandingsForResult(base);
   }, [classFilter, baseStandings]);
 
-  const selectedDateEvents = useMemo(() => {
-    if (!selectedDate) return [];
-    return EVENT_DATES[selectedDate] || [];
-  }, [selectedDate]);
-
   const handleDownloadClassification = () => {
+    if (isArchive && pastResult) {
+      window.location.href = archiveCsvUrl(pastResult.date, pastResult.index, "classification");
+      return;
+    }
     const cat = fileSafe(categoryName);
     const ses = fileSafe(sessionName);
-    downloadCsv(`Classification_${cat}_${ses}_${makeTimestamp()}.csv`, generateClassificationCsv(sortedStandings, csvMeta));
+    downloadCsv(
+      `Classification_${cat}_${ses}_${makeTimestamp()}.csv`,
+      generateClassificationCsv(sortedStandings, csvMeta),
+    );
   };
 
-  const getPersonal = (s: Standing) =>
-    isLive ? live.getPersonalData(s.teamId) : getMockPersonalData(s);
+  const getPersonal = (s: Standing) => {
+    if (isArchive && pastResult) return personalFromArchive(pastResult, s.teamId);
+    return isLive ? live.getPersonalData(s.teamId) : getMockPersonalData(s);
+  };
 
   const handleDownloadIndividual = (s: Standing) => {
+    if (isArchive && pastResult) {
+      window.location.href = archiveCsvUrl(pastResult.date, pastResult.index, "laps", s.teamId);
+      return;
+    }
     const team = getTeamByStanding(s);
     const data = getPersonal(s);
     const cat = fileSafe(categoryName);
     const ses = fileSafe(sessionName);
-    downloadCsv(`Laps_${cat}_${ses}_No${team?.no}_${makeTimestamp()}.csv`, generateIndividualCsv(s, data, csvMeta));
+    downloadCsv(
+      `Laps_${cat}_${ses}_No${team?.no}_${makeTimestamp()}.csv`,
+      generateIndividualCsv(s, data, csvMeta),
+    );
+  };
+
+  const openArchiveSession = useCallback(async (date: string, sessionIndex: number) => {
+    setArchiveError(null);
+    try {
+      const result = await fetchArchiveResult(date, sessionIndex);
+      setPastResult(result);
+      setIndividualTarget(null);
+      setSelectedStanding(null);
+      setActiveTab("classification");
+    } catch (err) {
+      setArchiveError((err as Error).message);
+    }
+  }, []);
+
+  const clearArchive = () => {
+    setPastResult(null);
+    setIndividualTarget(null);
+    setSelectedStanding(null);
   };
 
   const prevMonth = () => {
-    if (calMonth === 0) { setCalMonth(11); setCalYear(calYear - 1); }
-    else setCalMonth(calMonth - 1);
+    if (calMonth === 0) {
+      setCalMonth(11);
+      setCalYear(calYear - 1);
+    } else setCalMonth(calMonth - 1);
   };
   const nextMonth = () => {
-    if (calMonth === 11) { setCalMonth(0); setCalYear(calYear + 1); }
-    else setCalMonth(calMonth + 1);
+    if (calMonth === 11) {
+      setCalMonth(0);
+      setCalYear(calYear + 1);
+    } else setCalMonth(calMonth + 1);
   };
 
   const tabs: { key: ResultTab; label: string }[] = [
@@ -284,7 +526,13 @@ export default function ResultPage() {
             standings={sortedStandings}
             classFilter={classFilter}
             sessionLabel={sessionName}
-            courseLabel={sessionMeta.category.courseName || "OKAYAMA International Circuit"}
+            courseLabel={
+              isArchive
+                ? pastResult?.date || ""
+                : sessionMeta.category.courseName || "OKAYAMA International Circuit"
+            }
+            mode={isArchive ? "archive" : "live"}
+            onBackToLive={isArchive ? clearArchive : undefined}
             onDownload={handleDownloadClassification}
             onRowClick={(s) => setSelectedStanding(s)}
           />
@@ -309,8 +557,18 @@ export default function ResultPage() {
             onNextMonth={nextMonth}
             selectedDate={selectedDate}
             onSelectDate={setSelectedDate}
-            selectedDateEvents={selectedDateEvents}
-            onViewSession={() => setActiveTab("classification")}
+            archiveDays={archiveDays}
+            dateSessions={dateSessions}
+            sessionsLoading={sessionsLoading}
+            archiveError={archiveError}
+            onOpenSession={(sessionIndex) => {
+              if (selectedDate) void openArchiveSession(selectedDate, sessionIndex);
+            }}
+            onDownloadSessionCsv={(sessionIndex) => {
+              if (selectedDate) {
+                window.location.href = archiveCsvUrl(selectedDate, sessionIndex, "classification");
+              }
+            }}
           />
         )}
       </div>
@@ -331,12 +589,14 @@ export default function ResultPage() {
 // ========== Classification (全体順位リザルト) ==========
 
 function ClassificationView({
-  standings, classFilter, sessionLabel, courseLabel, onDownload, onRowClick,
+  standings, classFilter, sessionLabel, courseLabel, mode, onBackToLive, onDownload, onRowClick,
 }: {
   standings: Standing[];
   classFilter: string | null;
   sessionLabel: string;
   courseLabel: string;
+  mode: "live" | "archive";
+  onBackToLive?: () => void;
   onDownload: () => void;
   onRowClick: (s: Standing) => void;
 }) {
@@ -352,12 +612,23 @@ function ClassificationView({
       <div className="flex-shrink-0 flex items-center justify-between mb-3 sm:mb-4 flex-wrap gap-2">
         <div className="flex items-center gap-2 sm:gap-3 flex-wrap min-w-0">
           <div className="flex items-center gap-2 flex-shrink-0">
-            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-xs text-emerald-400 font-semibold uppercase tracking-wider">Live</span>
+            <div className={`w-2 h-2 rounded-full ${mode === "live" ? "bg-emerald-500 animate-pulse" : "bg-amber-400"}`} />
+            <span className={`text-xs font-semibold uppercase tracking-wider ${mode === "live" ? "text-emerald-400" : "text-amber-400"}`}>
+              {mode === "live" ? "Live" : "Archive"}
+            </span>
           </div>
           <span className="text-xs sm:text-sm text-zinc-300 font-medium truncate">{sessionLabel || "—"}</span>
           <span className="text-xs text-zinc-600 hidden sm:inline">|</span>
           <span className="text-xs text-zinc-500 truncate hidden sm:inline">{courseLabel}</span>
+          {mode === "archive" && onBackToLive && (
+            <button
+              type="button"
+              onClick={onBackToLive}
+              className="text-[10px] sm:text-xs px-2 py-1 rounded bg-zinc-700 text-zinc-200 hover:bg-zinc-600"
+            >
+              Back to Live
+            </button>
+          )}
         </div>
         <button
           onClick={onDownload}
@@ -724,16 +995,25 @@ function IndividualView({
 
 function CalendarView({
   year, month, days, monthNames, dayNames,
-  onPrevMonth, onNextMonth, selectedDate, onSelectDate, selectedDateEvents,
-  onViewSession,
+  onPrevMonth, onNextMonth, selectedDate, onSelectDate,
+  archiveDays, dateSessions, sessionsLoading, archiveError,
+  onOpenSession, onDownloadSessionCsv,
 }: {
   year: number; month: number; days: (number | null)[];
   monthNames: string[]; dayNames: string[];
   onPrevMonth: () => void; onNextMonth: () => void;
   selectedDate: string | null; onSelectDate: (d: string | null) => void;
-  selectedDateEvents: string[];
-  onViewSession: (session: string) => void;
+  archiveDays: Set<string>;
+  dateSessions: ArchiveSessionSummary[];
+  sessionsLoading: boolean;
+  archiveError: string | null;
+  onOpenSession: (sessionIndex: number) => void;
+  onDownloadSessionCsv: (sessionIndex: number) => void;
 }) {
+  const pastRows = useMemo(() => {
+    return [...archiveDays].sort().reverse().slice(0, 30);
+  }, [archiveDays]);
+
   return (
     <div className="p-3 sm:p-4 max-w-4xl mx-auto">
       <div className="flex items-center justify-between mb-4 sm:mb-6">
@@ -756,13 +1036,14 @@ function CalendarView({
         {days.map((day, idx) => {
           if (day === null) return <div key={`empty-${idx}`} className="h-14 sm:h-20" />;
           const dateKey = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-          const events = getEventsForDate(year, month, day);
+          const events = getEventsForDate(year, month, day, archiveDays);
           const hasEvents = events.length > 0;
           const isSelected = selectedDate === dateKey;
           const isToday = year === new Date().getFullYear() && month === new Date().getMonth() && day === new Date().getDate();
           return (
             <button
               key={day}
+              type="button"
               onClick={() => onSelectDate(isSelected ? null : dateKey)}
               className={`h-14 sm:h-20 rounded-md sm:rounded-lg border transition-all text-left p-1 sm:p-2 flex flex-col overflow-hidden ${
                 isSelected ? "border-amber-500 bg-amber-600/10"
@@ -774,8 +1055,7 @@ function CalendarView({
               {hasEvents && (
                 <div className="mt-0.5 sm:mt-1 flex flex-col gap-0.5 overflow-hidden">
                   <span className="sm:hidden w-1 h-1 rounded-full bg-amber-400" />
-                  {events.slice(0, 2).map((ev) => (<span key={ev} className="hidden sm:inline text-[9px] text-amber-400/80 truncate leading-tight">{ev}</span>))}
-                  {events.length > 2 && <span className="hidden sm:inline text-[9px] text-zinc-500">+{events.length - 2} more</span>}
+                  <span className="hidden sm:inline text-[9px] text-amber-400/80 truncate leading-tight">Data</span>
                 </div>
               )}
             </button>
@@ -788,22 +1068,38 @@ function CalendarView({
           <div className="px-4 py-3 border-b border-zinc-800 bg-zinc-800/50">
             <h3 className="text-sm font-bold text-white">{selectedDate}</h3>
           </div>
-          {selectedDateEvents.length > 0 ? (
+          {sessionsLoading ? (
+            <div className="px-4 py-8 text-center text-zinc-500 text-sm">Loading sessions…</div>
+          ) : archiveError ? (
+            <div className="px-4 py-8 text-center text-red-400 text-sm">{archiveError}</div>
+          ) : dateSessions.length > 0 ? (
             <div className="divide-y divide-zinc-800/50">
-              {selectedDateEvents.map((session) => (
-                <div key={session} className="flex items-center justify-between px-4 py-3 hover:bg-zinc-800/30 transition-colors">
-                  <div>
-                    <span className="text-sm text-zinc-200">{session}</span>
-                    <span className="text-xs text-zinc-500 ml-2">OKAYAMA</span>
+              {dateSessions.map((session) => (
+                <div key={session.index} className="flex items-center justify-between px-4 py-3 hover:bg-zinc-800/30 transition-colors gap-2">
+                  <div className="min-w-0">
+                    <span className="text-sm text-zinc-200 block truncate">
+                      {session.sessionName || session.roundName || `Session ${session.index + 1}`}
+                    </span>
+                    <span className="text-xs text-zinc-500 truncate block">
+                      {[session.competitionName, session.categoryName].filter(Boolean).join(" / ") || "OKAYAMA"}
+                      {session.carCount > 0 ? ` · ${session.carCount} cars` : ""}
+                    </span>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-shrink-0">
                     <button
-                      onClick={() => onViewSession(session)}
+                      type="button"
+                      onClick={() => onOpenSession(session.index)}
                       className="px-3 py-1.5 rounded-md text-xs font-bold bg-zinc-700 text-zinc-300 hover:bg-zinc-600 hover:text-white transition-colors"
                     >
                       View
                     </button>
-                    <button className="px-3 py-1.5 rounded-md text-xs font-bold bg-amber-600 text-white hover:bg-amber-500 transition-colors">CSV</button>
+                    <button
+                      type="button"
+                      onClick={() => onDownloadSessionCsv(session.index)}
+                      className="px-3 py-1.5 rounded-md text-xs font-bold bg-amber-600 text-white hover:bg-amber-500 transition-colors"
+                    >
+                      CSV
+                    </button>
                   </div>
                 </div>
               ))}
@@ -821,35 +1117,32 @@ function CalendarView({
             <thead>
               <tr className="border-b border-zinc-700 bg-zinc-800/50">
                 <th className="py-2.5 px-4 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider">Date</th>
-                <th className="py-2.5 px-4 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider">Event</th>
-                <th className="py-2.5 px-4 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider">Session</th>
-                <th className="py-2.5 px-4 text-center text-xs font-semibold text-zinc-400 uppercase tracking-wider">Results</th>
+                <th className="py-2.5 px-4 text-left text-xs font-semibold text-zinc-400 uppercase tracking-wider">Status</th>
+                <th className="py-2.5 px-4 text-center text-xs font-semibold text-zinc-400 uppercase tracking-wider">Open</th>
               </tr>
             </thead>
             <tbody>
-              {mockSchedule.length === 0 ? (
+              {pastRows.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="py-8 text-center text-sm text-zinc-600">
-                    No past events yet
+                  <td colSpan={3} className="py-8 text-center text-sm text-zinc-600">
+                    No archived days yet. Data appears after Receiver uploads to the cloud.
                   </td>
                 </tr>
               ) : (
-                mockSchedule.map((entry, idx) => (
-                <tr key={idx} className={`border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-colors ${idx % 2 === 0 ? "bg-zinc-900/40" : ""}`}>
-                  <td className="py-2.5 px-4 text-sm text-zinc-500 font-mono">{entry.localTime.split(" ")[0]}</td>
-                  <td className="py-2.5 px-4 text-sm text-amber-400">{entry.event}</td>
-                  <td className="py-2.5 px-4 text-sm text-zinc-300">{entry.session}</td>
-                  <td className="py-2.5 px-4 text-center">
-                    {entry.hasResults ? (
+                pastRows.map((date) => (
+                  <tr key={date} className="border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-colors">
+                    <td className="py-2.5 px-4 text-sm text-zinc-500 font-mono">{date}</td>
+                    <td className="py-2.5 px-4 text-sm text-amber-400">Recorded</td>
+                    <td className="py-2.5 px-4 text-center">
                       <button
-                        onClick={() => onViewSession(entry.session)}
+                        type="button"
+                        onClick={() => onSelectDate(date)}
                         className="px-3 py-1 rounded text-xs font-bold bg-amber-600 text-white hover:bg-amber-500 transition-colors"
-                      >Results</button>
-                    ) : (
-                      <span className="text-xs text-zinc-600">—</span>
-                    )}
-                  </td>
-                </tr>
+                      >
+                        Open
+                      </button>
+                    </td>
+                  </tr>
                 ))
               )}
             </tbody>
