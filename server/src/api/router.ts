@@ -116,16 +116,20 @@ export function createApiRouter(
             }
             let csv: string | null = null;
             let filename = "result.csv";
+            const dateYmd = session.date.replace(/-/g, "");
+            const round = safeName(session.roundName || session.sessionName || "Session").slice(0, 24);
             if (kind === "laps") {
                 if (!teamId) {
                     res.status(400).json({ error: "teamId is required for kind=laps" });
                     return;
                 }
                 csv = buildLapsCsv(session.snapshot, teamId);
-                filename = `Laps_${safeName(session.sessionName)}_idx${sessionIndex}_${teamId}.csv`;
+                const team = session.snapshot.teams.find((t) => t.id === teamId);
+                const no = team?.no != null ? `_No${team.no}` : "";
+                filename = `Laps_${dateYmd}_${round}_s${sessionIndex}${no}.csv`;
             } else {
                 csv = buildClassificationCsv(session.snapshot);
-                filename = `Classification_${safeName(session.sessionName)}_idx${sessionIndex}.csv`;
+                filename = `Classification_${dateYmd}_${round}_s${sessionIndex}.csv`;
             }
             if (csv === null) {
                 res.status(404).json({ error: "team not found in session" });
@@ -146,5 +150,12 @@ export function createApiRouter(
 }
 
 function safeName(v: string): string {
-    return (v || "session").trim().replace(/[\\/:*?"<>|]/g, "").replace(/\s+/g, "_") || "session";
+    return (
+        (v || "session")
+            .trim()
+            .replace(/[\\/:*?"<>|·・']/g, "")
+            .replace(/[^\w\u3040-\u30ff\u3400-\u9fff\-]+/g, "_")
+            .replace(/_+/g, "_")
+            .replace(/^_|_$/g, "") || "session"
+    );
 }

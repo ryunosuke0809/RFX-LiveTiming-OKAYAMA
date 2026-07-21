@@ -131,12 +131,50 @@ function generateIndividualCsv(standing: Standing, data: DriverPersonalData, met
 }
 
 function fileSafe(v: string): string {
-  return (v || "").trim().replace(/[\\/:*?"<>|]/g, "").replace(/\s+/g, "_") || "NA";
+  return (
+    (v || "")
+      .trim()
+      .replace(/[\\/:*?"<>|·・]/g, "")
+      .replace(/[^\w\u3040-\u30ff\u3400-\u9fff\-]+/g, "_")
+      .replace(/_+/g, "_")
+      .replace(/^_|_$/g, "") || "NA"
+  );
 }
 
 function makeTimestamp() {
   const now = new Date();
   return `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}`;
+}
+
+/** CSV ファイル名: 日付 + ラウンド (+ 番号)。カテゴリ全文は入れない（重複・長すぎ防止）。 */
+function buildResultCsvFilename(opts: {
+  kind: "Classification" | "Laps";
+  date?: string | null;
+  roundName?: string | null;
+  sessionIndex?: number | null;
+  carNo?: number | null;
+}): string {
+  const date = (opts.date || "").replace(/-/g, "").slice(0, 8) || makeTimestamp().slice(0, 8);
+  const round = fileSafe(opts.roundName || "Session").slice(0, 24);
+  const parts = [opts.kind, date, round];
+  if (opts.sessionIndex != null && opts.sessionIndex >= 0) parts.push(`s${opts.sessionIndex}`);
+  if (opts.carNo != null) parts.push(`No${opts.carNo}`);
+  return `${parts.join("_")}.csv`;
+}
+
+async function downloadArchiveCsv(
+  url: string,
+  filename: string,
+): Promise<void> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`CSV download failed (${res.status})`);
+  const blob = await res.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = objectUrl;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(objectUrl);
 }
 
 // --- Calendar helpers ---
@@ -416,13 +454,24 @@ export default function ResultPage() {
 
   const handleDownloadClassification = () => {
     if (isArchive && pastResult) {
-      window.location.href = archiveCsvUrl(pastResult.date, pastResult.index, "classification");
+      const name = buildResultCsvFilename({
+        kind: "Classification",
+        date: pastResult.date,
+        roundName,
+        sessionIndex: pastResult.index,
+      });
+      void downloadArchiveCsv(
+        archiveCsvUrl(pastResult.date, pastResult.index, "classification"),
+        name,
+      ).catch((err) => setArchiveError((err as Error).message));
       return;
     }
-    const cat = fileSafe(categoryName || competitionName);
-    const ses = fileSafe(sessionHeadline);
     downloadCsv(
-      `Classification_${cat}_${ses}_${makeTimestamp()}.csv`,
+      buildResultCsvFilename({
+        kind: "Classification",
+        date: makeTimestamp().slice(0, 8),
+        roundName,
+      }),
       generateClassificationCsv(sortedStandings, csvMeta),
     );
   };
@@ -433,16 +482,29 @@ export default function ResultPage() {
   };
 
   const handleDownloadIndividual = (s: Standing) => {
+    const team = getTeamByStanding(s);
     if (isArchive && pastResult) {
-      window.location.href = archiveCsvUrl(pastResult.date, pastResult.index, "laps", s.teamId);
+      const name = buildResultCsvFilename({
+        kind: "Laps",
+        date: pastResult.date,
+        roundName,
+        sessionIndex: pastResult.index,
+        carNo: team?.no,
+      });
+      void downloadArchiveCsv(
+        archiveCsvUrl(pastResult.date, pastResult.index, "laps", s.teamId),
+        name,
+      ).catch((err) => setArchiveError((err as Error).message));
       return;
     }
-    const team = getTeamByStanding(s);
     const data = getPersonal(s);
-    const cat = fileSafe(categoryName || competitionName);
-    const ses = fileSafe(sessionHeadline);
     downloadCsv(
-      `Laps_${cat}_${ses}_No${team?.no}_${makeTimestamp()}.csv`,
+      buildResultCsvFilename({
+        kind: "Laps",
+        date: makeTimestamp().slice(0, 8),
+        roundName,
+        carNo: team?.no,
+      }),
       generateIndividualCsv(s, data, csvMeta),
     );
   };
@@ -587,9 +649,18 @@ export default function ResultPage() {
               if (selectedDate) void openArchiveSession(selectedDate, sessionIndex);
             }}
             onDownloadSessionCsv={(sessionIndex) => {
-              if (selectedDate) {
-                window.location.href = archiveCsvUrl(selectedDate, sessionIndex, "classification");
-              }
+              if (!selectedDate) return;
+              const session = dateSessions.find((s) => s.index === sessionIndex);
+              const name = buildResultCsvFilename({
+                kind: "Classification",
+                date: selectedDate,
+                roundName: session?.roundName || session?.sessionName || "Session",
+                sessionIndex,
+              });
+              void downloadArchiveCsv(
+                archiveCsvUrl(selectedDate, sessionIndex, "classification"),
+                name,
+              ).catch((err) => setArchiveError((err as Error).message));
             }}
           />
         )}
