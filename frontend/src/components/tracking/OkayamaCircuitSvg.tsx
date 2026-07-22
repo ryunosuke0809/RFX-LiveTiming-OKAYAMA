@@ -34,8 +34,10 @@ const SECTOR_COLORS = {
 /** FL(スタート/フィニッシュ) と 一周終端の samples インデックス比率。S1/S2 境界は geom.bounds から取る。 */
 const BOUND_CL = 0.0;
 const BOUND_LAP = 1.0;
-/** 区間ごとの既定移動時間(ms)。区間タイム未取得時のフォールバック。 */
-const DEFAULT_SEG_MS = [22000, 42000, 33000];
+/** 区間ごとの既定移動時間(ms)。区間タイム未取得時のフォールバック。
+ *  1周目・ピットアウト直後など基準が無いときは意図的に遅めにし、
+ *  実測より先にゴールラインへ飛び込むのを防ぐ。 */
+const DEFAULT_SEG_MS = [40000, 70000, 50000];
 
 /**
  * sectorNo から「今いる区間の始点/終点/移動に使う区間index」を返す。
@@ -726,10 +728,12 @@ export default function OkayamaCircuitSvg({
                   }
                   // 実秒ベースの推定移動時間は「1周前のその区間タイム」。未計測時のみ既定値。
                   const secTime = s.refSectors?.[seg.durIdx] ?? null;
-                  const estMs =
-                    secTime && secTime > 0 ? secTime / 10 : DEFAULT_SEG_MS[seg.durIdx];
-                  // 実際の移動時間は推定値に配信レートを掛けたもの。
-                  const durMs = Math.max(MIN_DUR_MS, estMs * rateRef.current);
+                  const hasRef = secTime != null && secTime > 0;
+                  const estMs = hasRef ? secTime / 10 : DEFAULT_SEG_MS[seg.durIdx];
+                  // 基準タイムがあるときだけ配信レートを掛ける。
+                  // 未計測時にレート(<1)を掛けるとデフォルトが更に短縮され高速に見える。
+                  const rate = hasRef ? rateRef.current : 1;
+                  const durMs = Math.max(MIN_DUR_MS, estMs * rate);
                   animRef.current.set(s.teamId, {
                     start: seg.start,
                     target: seg.target,
