@@ -247,6 +247,8 @@ export default function OkayamaCircuitSvg({
   // データ配信レート(=実測の区間所要壁時計 / 実秒推定)の平滑化値。
   // ライブなら ≈1、加速再生なら小さくなり、マーカー移動がデータ更新に追従する。
   const rateRef = useRef<number>(1);
+  // 初回にコース上の車を見たあと true。開いた瞬間の一斉移動を防ぎ、以降の通過から動かす。
+  const seededRef = useRef(false);
   const [, setAnimFrame] = useState(0);
   useEffect(() => {
     if (!showCarMarkers) return;
@@ -716,32 +718,46 @@ export default function OkayamaCircuitSvg({
                 const legKey = s.lap * 4 + s.sectorNo; // (周,区間)が変わったら新レグ
                 const prev = animRef.current.get(s.teamId);
                 if (!prev || prev.leg !== legKey) {
-                  // 新しい通過を検知した瞬間。直前レグの「実測壁時計 / 実秒推定」から
-                  // 配信レートを推定し、平滑化しておく (加速再生でもマーカーが追従する)。
-                  if (prev && prev.estMs > 0) {
-                    const observed = (now - prev.startT) / prev.estMs;
-                    if (observed > 0 && Number.isFinite(observed)) {
-                      const clamped = Math.min(RATE_MAX, Math.max(RATE_MIN, observed));
-                      rateRef.current =
-                        rateRef.current * (1 - RATE_EMA) + clamped * RATE_EMA;
+                  // Tracking を開いた直後の既存車は「今いる区間を推定で走らせない」。
+                  // 直近の通過点に固定し、次の通過を見てから動き出す
+                  // （開いた瞬間に全員が S1 へ一斉移動するのを防ぐ）。
+                  if (!prev && !seededRef.current) {
+                    animRef.current.set(s.teamId, {
+                      start: seg.start,
+                      target: seg.start,
+                      startT: now,
+                      durMs: 1,
+                      estMs: 0,
+                      leg: legKey,
+                    });
+                  } else {
+                    // 新しい通過を検知した瞬間。直前レグの「実測壁時計 / 実秒推定」から
+                    // 配信レートを推定し、平滑化しておく (加速再生でもマーカーが追従する)。
+                    if (prev && prev.estMs > 0) {
+                      const observed = (now - prev.startT) / prev.estMs;
+                      if (observed > 0 && Number.isFinite(observed)) {
+                        const clamped = Math.min(RATE_MAX, Math.max(RATE_MIN, observed));
+                        rateRef.current =
+                          rateRef.current * (1 - RATE_EMA) + clamped * RATE_EMA;
+                      }
                     }
+                    // 実秒ベースの推定移動時間は「1周前のその区間タイム」。未計測時のみ既定値。
+                    const secTime = s.refSectors?.[seg.durIdx] ?? null;
+                    const hasRef = secTime != null && secTime > 0;
+                    const estMs = hasRef ? secTime / 10 : DEFAULT_SEG_MS[seg.durIdx];
+                    // 基準タイムがあるときだけ配信レートを掛ける。
+                    // 未計測時にレート(<1)を掛けるとデフォルトが更に短縮され高速に見える。
+                    const rate = hasRef ? rateRef.current : 1;
+                    const durMs = Math.max(MIN_DUR_MS, estMs * rate);
+                    animRef.current.set(s.teamId, {
+                      start: seg.start,
+                      target: seg.target,
+                      startT: now,
+                      durMs,
+                      estMs,
+                      leg: legKey,
+                    });
                   }
-                  // 実秒ベースの推定移動時間は「1周前のその区間タイム」。未計測時のみ既定値。
-                  const secTime = s.refSectors?.[seg.durIdx] ?? null;
-                  const hasRef = secTime != null && secTime > 0;
-                  const estMs = hasRef ? secTime / 10 : DEFAULT_SEG_MS[seg.durIdx];
-                  // 基準タイムがあるときだけ配信レートを掛ける。
-                  // 未計測時にレート(<1)を掛けるとデフォルトが更に短縮され高速に見える。
-                  const rate = hasRef ? rateRef.current : 1;
-                  const durMs = Math.max(MIN_DUR_MS, estMs * rate);
-                  animRef.current.set(s.teamId, {
-                    start: seg.start,
-                    target: seg.target,
-                    startT: now,
-                    durMs,
-                    estMs,
-                    leg: legKey,
-                  });
                 }
                 const a = animRef.current.get(s.teamId)!;
                 const p = Math.max(0, Math.min(1, (now - a.startT) / a.durMs));
@@ -770,6 +786,11 @@ export default function OkayamaCircuitSvg({
                 dimmed: hasHighlights && !isHi,
                 stopped,
               });
+            }
+
+            // 初回にコース上の車を描いたらシード完了。以降は通過検知で動かす。
+            if (!seededRef.current && marks.length > 0) {
+              seededRef.current = true;
             }
 
             // 2) ラベルの重なりを回避（集団でも CARNO が読めるように）。
