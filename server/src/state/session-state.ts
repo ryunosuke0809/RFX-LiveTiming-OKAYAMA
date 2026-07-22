@@ -179,15 +179,28 @@ export class LiveSessionState {
         }
     }
 
+    /** START前など、まだコース上の通過が無い車はピット待機とみなす。 */
+    private isGarageWaiting(s: StandingVm): boolean {
+        if (s.status === "in_pit") return true;
+        if (s.status !== "on_track" && s.status !== "pit_out") return false;
+        return (
+            (s.lastPassingTime == null || s.lastPassingTime <= 0) &&
+            s.lap === 0 &&
+            s.sectorNo === 0
+        );
+    }
+
     /** すべての standings を position 昇順で配列化。position 0 (未出走/無効) は末尾へ。 */
     standingsArray(): StandingVm[] {
         const rank = (pos: number) => (pos > 0 ? pos : Number.MAX_SAFE_INTEGER);
-        return Array.from(this.standings.values()).sort((a, b) => {
-            const ra = rank(a.position);
-            const rb = rank(b.position);
-            if (ra !== rb) return ra - rb;
-            return a.order - b.order;
-        });
+        return Array.from(this.standings.values())
+            .map((s) => (this.isGarageWaiting(s) ? { ...s, status: "in_pit" as const } : s))
+            .sort((a, b) => {
+                const ra = rank(a.position);
+                const rb = rank(b.position);
+                if (ra !== rb) return ra - rb;
+                return a.order - b.order;
+            });
     }
 
     trackCount(): TrackCountVm {
@@ -196,7 +209,8 @@ export class LiveSessionState {
         let stopped = 0;
         let retired = 0;
         for (const s of this.standings.values()) {
-            switch (s.status) {
+            const status = this.isGarageWaiting(s) ? "in_pit" : s.status;
+            switch (status) {
                 case "on_track":
                 case "pit_out":
                     onTrack++;

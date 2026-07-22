@@ -274,7 +274,8 @@ export class SessionStateAggregator {
             refSectors: [null, null, null],
             gap: "—",
             interval: "—",
-            status: "on_track",
+            // START 前 / 未出走はピット待機。PitOut (Loop 10) で on_track 側へ移る。
+            status: "in_pit",
             sectors: [
                 { time: null, type: "none" },
                 { time: null, type: "none" },
@@ -494,7 +495,20 @@ export class SessionStateAggregator {
         const lastLapTimeType = classifyTimeType(newLast, this.state.overallBest, personalBefore);
 
         const existing = this.state.standings.get(teamId);
-        const status: CarStatus = existing?.status ?? "on_track";
+        // 未通過の新規エントリーはピット待機扱い (START前は全車ピット)。
+        let status: CarStatus = existing?.status ?? "in_pit";
+        // 既存が誤って on_track のままでも、通過が無いならピットへ戻す。
+        if (
+            status === "on_track" &&
+            (newLastPass == null || newLastPass <= 0) &&
+            newLap === 0 &&
+            newSectorNo === 0 &&
+            !(existing?.lastPassingTime != null && existing.lastPassingTime > 0) &&
+            (existing?.lap ?? 0) === 0 &&
+            (existing?.sectorNo ?? 0) === 0
+        ) {
+            status = "in_pit";
+        }
 
         // セクタータイム (S1/S2/S3) を「進行中の周」で集計する。
         // SMIS: S1→SectorNo=1, S2→SectorNo=2, S3→SectorNo=3 (S3 は Lap が +1 済で届く)。
