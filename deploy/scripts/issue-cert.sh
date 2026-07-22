@@ -4,6 +4,7 @@ set -euo pipefail
 
 APP_ROOT=/opt/mola-timing-okayama
 DOMAIN=mola-timing-okayama.com
+PRIVATE_DOMAIN=oic-private.mola-timing-okayama.com
 
 if [[ "$(id -u)" -ne 0 ]]; then
   echo "root で実行してください: sudo bash $0" >&2
@@ -12,12 +13,15 @@ fi
 
 mkdir -p /var/www/certbot
 
+# apex + 関係者サブドメインを同一証明書に含める（既存証明書は --expand）
 certbot certonly --webroot \
   -w /var/www/certbot \
   -d "$DOMAIN" \
+  -d "$PRIVATE_DOMAIN" \
   --email "admin@${DOMAIN}" \
   --agree-tos \
   --non-interactive \
+  --expand \
   --keep-until-expiring
 
 # certbot が作る options / dhparam が無い場合のフォールバック
@@ -43,4 +47,4 @@ systemctl reload nginx
 # 自動更新タイマーは Ubuntu の certbot パッケージで有効なことが多い
 systemctl enable --now certbot.timer 2>/dev/null || true
 
-echo "certificate issued for https://${DOMAIN}/"
+echo "certificate issued for https://${DOMAIN}/ and https://${PRIVATE_DOMAIN}/"

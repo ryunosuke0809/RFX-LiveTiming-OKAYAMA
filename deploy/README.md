@@ -2,6 +2,13 @@
 
 さくらの VPS 上で LiveTiming を HTTPS 公開するための配置・更新手順。
 
+| ホスト | 用途 |
+|--------|------|
+| `https://mola-timing-okayama.com` | 一般向け（将来 GPS / IP 制限） |
+| `https://oic-private.mola-timing-okayama.com` | 関係者向け（当面は同一画面・制限なし） |
+
+ムームー DNS: `oic-private` の A レコード → VPS IP（apex と同じ）。証明書は `issue-cert.sh` で両ホストを含む。
+
 ## ディレクトリ構成
 
 ```
