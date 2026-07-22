@@ -23,7 +23,6 @@ export interface VenueGeofenceState {
   required: boolean;
   status: GeofenceStatus;
   allowed: boolean;
-  /** 取得中（初回判定・再試行共通） */
   checking: boolean;
   message: string;
   distanceM: number | null;
@@ -31,7 +30,7 @@ export interface VenueGeofenceState {
 }
 
 /** Safari 等でコールバックが来ない場合の打ち切り */
-const GEO_HARD_TIMEOUT_MS = 12_000;
+const GEO_HARD_TIMEOUT_MS = 8_000;
 
 function statusMessage(status: GeofenceStatus): string {
   switch (status) {
@@ -55,13 +54,13 @@ function statusMessage(status: GeofenceStatus): string {
 
 const GEO_OPTIONS: PositionOptions = {
   enableHighAccuracy: false,
-  timeout: 10_000,
-  maximumAge: 30_000,
+  timeout: 7_000,
+  maximumAge: 60_000,
 };
 
 /**
- * 一般向けホストで岡山国際サーキット場内かどうかを監視する。
- * 範囲外になったら `allowed` が false になり、呼び出し側は画面・WS を止める。
+ * 一般向けホストで場内かどうかを監視する。
+ * ※ startWatching の依存で effect が再実行されるとタイムアウトが消えるため、起動は mount 1 回のみ。
  */
 export function useVenueGeofence(): VenueGeofenceState {
   const [ready, setReady] = useState(false);
@@ -69,17 +68,19 @@ export function useVenueGeofence(): VenueGeofenceState {
   const [status, setStatus] = useState<GeofenceStatus>("idle");
   const [checking, setChecking] = useState(false);
   const [distanceM, setDistanceM] = useState<number | null>(null);
+
   const watchIdRef = useRef<number | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const hardTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const statusRef = useRef<GeofenceStatus>("idle");
+  const requiredRef = useRef(false);
 
   useEffect(() => {
     statusRef.current = status;
   }, [status]);
 
-  const clearTimers = useCallback(() => {
-    if (watchIdRef.current != null && typeof navigator !== "undefined") {
+  const clearGeo = useCallback(() => {
+    if (typeof navigator !== "undefined" && watchIdRef.current != null) {
       navigator.geolocation.clearWatch(watchIdRef.current);
       watchIdRef.current = null;
     }
@@ -93,7 +94,7 @@ export function useVenueGeofence(): VenueGeofenceState {
     }
   }, []);
 
-  const applyPosition = useCallback((coords: GeolocationCoordinates) => {
+  const finishInsideOrOutside = useCallback((coords: GeolocationCoordinates) => {
     const inside = isInsideVenue(coords.latitude, coords.longitude);
     const d = distanceMeters(
       coords.latitude,
@@ -110,101 +111,75 @@ export function useVenueGeofence(): VenueGeofenceState {
     setStatus(inside ? "inside" : "outside");
   }, []);
 
-  const onGeoError = useCallback(
-    (err: GeolocationPositionError) => {
+  const finishError = useCallback(
+    (next: "denied" | "error" | "unsupported") => {
       setChecking(false);
-      if (hardTimeoutRef.current) {
-        clearTimeout(hardTimeoutRef.current);
-        hardTimeoutRef.current = null;
-      }
-      if (err.code === err.PERMISSION_DENIED) {
-        setStatus("denied");
-        setDistanceM(null);
-        clearTimers();
-        return;
-      }
-      setStatus("error");
-      clearTimers();
+      setStatus(next);
+      if (next === "denied") setDistanceM(null);
+      clearGeo();
     },
-    [clearTimers],
+    [clearGeo],
   );
 
-  const pollOnce = useCallback(() => {
+  const requestPosition = useCallback(() => {
     if (typeof navigator === "undefined" || !navigator.geolocation) {
-      setStatus("unsupported");
-      setChecking(false);
+      finishError("unsupported");
       return;
     }
-    const prev = statusRef.current;
-    if (
-      prev !== "inside" &&
-      prev !== "outside" &&
-      prev !== "denied" &&
-      prev !== "error" &&
-      prev !== "unsupported"
-    ) {
-      setStatus("prompting");
-      setChecking(true);
-    }
+
     navigator.geolocation.getCurrentPosition(
-      (pos) => applyPosition(pos.coords),
-      onGeoError,
+      (pos) => finishInsideOrOutside(pos.coords),
+      (err) => {
+        if (err.code === err.PERMISSION_DENIED) finishError("denied");
+        else finishError("error");
+      },
       GEO_OPTIONS,
     );
-  }, [applyPosition, onGeoError]);
+  }, [finishError, finishInsideOrOutside]);
 
   const startWatching = useCallback(() => {
     if (typeof navigator === "undefined" || !navigator.geolocation) {
-      setStatus("unsupported");
-      setChecking(false);
+      finishError("unsupported");
       return;
     }
 
-    clearTimers();
+    clearGeo();
     setChecking(true);
     setStatus("prompting");
 
-    // Permissions API（対応ブラウザ）: 拒否済みなら即表示
-    const permissions = navigator.permissions;
-    if (permissions?.query) {
-      void permissions
-        .query({ name: "geolocation" as PermissionName })
-        .then((result) => {
-          if (result.state === "denied" && statusRef.current === "prompting") {
-            setChecking(false);
-            setStatus("denied");
-            clearTimers();
-          }
-        })
-        .catch(() => {
-          /* Safari 等で未対応の場合は無視 */
-        });
-    }
-
-    pollOnce();
-
-    watchIdRef.current = navigator.geolocation.watchPosition(
-      (pos) => applyPosition(pos.coords),
-      onGeoError,
-      GEO_OPTIONS,
-    );
-
-    intervalRef.current = setInterval(pollOnce, GEO_RECHECK_INTERVAL_MS);
-
-    // Safari で位置情報 OFF だとコールバックが来ないことがある → 強制終了
+    // ハードタイムアウト（Safari で位置 OFF だと成功も失敗も来ないことがある）
     hardTimeoutRef.current = setTimeout(() => {
       const cur = statusRef.current;
       if (cur === "prompting" || cur === "idle") {
-        setChecking(false);
-        setStatus("error");
-        clearTimers();
+        finishError("error");
       }
     }, GEO_HARD_TIMEOUT_MS);
-  }, [applyPosition, clearTimers, onGeoError, pollOnce]);
 
+    requestPosition();
+
+    // 場内入場後の離脱監視（初回失敗時は clearGeo で止まる）
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      (pos) => finishInsideOrOutside(pos.coords),
+      (err) => {
+        // watch のエラーは初回 getCurrentPosition 側で扱う。denied のみ反映。
+        if (err.code === err.PERMISSION_DENIED) finishError("denied");
+      },
+      GEO_OPTIONS,
+    );
+
+    intervalRef.current = setInterval(() => {
+      const cur = statusRef.current;
+      if (cur === "inside" || cur === "outside") {
+        requestPosition();
+      }
+    }, GEO_RECHECK_INTERVAL_MS);
+  }, [clearGeo, finishError, finishInsideOrOutside, requestPosition]);
+
+  // mount 時のみ起動（依存配列に startWatching を入れない）
   useEffect(() => {
     const host = window.location.hostname;
     const need = requiresVenueGeofence(host);
+    requiredRef.current = need;
     setRequired(need);
     setReady(true);
     if (!need) {
@@ -212,22 +187,25 @@ export function useVenueGeofence(): VenueGeofenceState {
       return;
     }
     startWatching();
-    return () => clearTimers();
-  }, [startWatching, clearTimers]);
+    return () => clearGeo();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 初回のみ
+  }, []);
 
   const recheck = useCallback(() => {
-    if (!required) return;
+    if (!requiredRef.current) return;
     startWatching();
-  }, [required, startWatching]);
+  }, [startWatching]);
 
   const allowed = !required || status === "inside";
+  const isChecking =
+    checking || status === "prompting" || (required && status === "idle");
 
   return {
     ready,
     required,
     status,
     allowed,
-    checking: checking || status === "prompting" || status === "idle",
+    checking: isChecking,
     message: statusMessage(status),
     distanceM,
     recheck,
