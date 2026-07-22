@@ -42,6 +42,7 @@ export interface ArchiveStanding {
   lastLapTimeType: string;
   pits: number;
   pitTime: number | null;
+  pitEnteredAt?: string | null;
   positionChange: number;
 }
 

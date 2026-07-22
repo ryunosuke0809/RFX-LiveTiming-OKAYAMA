@@ -566,6 +566,7 @@ function vmToStanding(v: StandingVm): Standing {
     lastLapTimeType: v.lastLapTimeType,
     pits: v.pits,
     pitTime: v.pitTime,
+    pitEnteredAt: v.pitEnteredAt ?? null,
     positionChange: v.positionChange,
   };
 }

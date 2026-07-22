@@ -90,7 +90,9 @@ export interface Standing {
   bestTimeType: TimeType;
   lastLapTimeType: TimeType;
   pits: number;
-  pitTime: number | null; // 最後のピット滞在時間 (1/10000秒)
+  pitTime: number | null; // 最後のピット滞在時間 (1/10000秒)。PitOut 後に保持
+  /** In Pit 中の進入時刻 (ISO)。無い/未ピットは null */
+  pitEnteredAt?: string | null;
   positionChange: number; // +/- 表示用
 }
 

@@ -259,6 +259,7 @@ function archiveStandingToStanding(s: ArchiveStanding): Standing {
     lastLapTimeType: (s.lastLapTimeType as TimeType) || "none",
     pits: s.pits,
     pitTime: s.pitTime,
+    pitEnteredAt: s.pitEnteredAt ?? null,
     positionChange: s.positionChange,
   };
 }

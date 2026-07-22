@@ -58,6 +58,8 @@ export class LiveSessionState {
     readonly standings = new Map<string, StandingVm>(); // teamId → standing
     readonly teamPersonalBest = new Map<string, number>(); // teamId → bestTime (1/10000s)
     readonly pitCount = new Map<string, number>(); // teamId → pit count
+    /** teamId → In Pit になった壁時計 (ms)。PitOut で pitTime 確定に使う。 */
+    readonly pitEnteredAtMs = new Map<string, number>();
     readonly lastPassingClockMs = new Map<string, number>(); // teamId → 最終受信時刻 (Date.now())
     /** teamId → 最終 Passing の「データ時刻」(ms)。再生でも正しく stall 判定するため wall clock ではなくデータ時刻を使う。 */
     readonly lastPassingDataMs = new Map<string, number>();
@@ -91,6 +93,7 @@ export class LiveSessionState {
         this.standings.clear();
         this.teamPersonalBest.clear();
         this.pitCount.clear();
+        this.pitEnteredAtMs.clear();
         this.lastPassingClockMs.clear();
         this.lastPassingDataMs.clear();
         this.previousPosition.clear();
@@ -143,6 +146,9 @@ export class LiveSessionState {
         }
         for (const id of [...this.pitCount.keys()]) {
             if (!keepIds.has(id)) this.pitCount.delete(id);
+        }
+        for (const id of [...this.pitEnteredAtMs.keys()]) {
+            if (!keepIds.has(id)) this.pitEnteredAtMs.delete(id);
         }
         for (const id of [...this.lastPassingClockMs.keys()]) {
             if (!keepIds.has(id)) this.lastPassingClockMs.delete(id);

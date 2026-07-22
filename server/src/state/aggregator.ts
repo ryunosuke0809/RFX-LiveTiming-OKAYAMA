@@ -284,6 +284,7 @@ export class SessionStateAggregator {
             lastLapTimeType: "none",
             pits: 0,
             pitTime: null,
+            pitEnteredAt: null,
             positionChange: 0,
         };
         this.state.standings.set(team.id, standing);
@@ -351,6 +352,19 @@ export class SessionStateAggregator {
         let changed = false;
 
         if (status !== null && status !== existing.status) {
+            if (status === "in_pit") {
+                const at = Date.now();
+                this.state.pitEnteredAtMs.set(teamId, at);
+                existing.pitEnteredAt = new Date(at).toISOString();
+            } else if (existing.status === "in_pit") {
+                const entered = this.state.pitEnteredAtMs.get(teamId);
+                if (entered != null) {
+                    // 1/10000 秒単位で確定し、次の PitIn まで保持する
+                    existing.pitTime = Math.max(0, Math.round((Date.now() - entered) * 10));
+                }
+                this.state.pitEnteredAtMs.delete(teamId);
+                existing.pitEnteredAt = null;
+            }
             existing.status = status;
             changed = true;
         }
@@ -606,6 +620,7 @@ export class SessionStateAggregator {
             lastLapTimeType,
             pits: this.state.pitCount.get(teamId) ?? existing?.pits ?? 0,
             pitTime: existing?.pitTime ?? null,
+            pitEnteredAt: existing?.pitEnteredAt ?? null,
             positionChange,
         };
 

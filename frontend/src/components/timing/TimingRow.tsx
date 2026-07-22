@@ -67,12 +67,16 @@ export default function TimingRow({ standing, team, carClass, isEven, carCol, ga
       return <span className="text-zinc-400 font-mono">{standing.pits}</span>;
     }
     if (standing.status === "in_pit") {
-      return <PitTimer />;
+      const start = standing.pitEnteredAt ? Date.parse(standing.pitEnteredAt) : NaN;
+      if (Number.isFinite(start)) {
+        return <PitTimer startedAtMs={start} />;
+      }
+      return <span className="text-zinc-600 font-mono">{formatPitTime(0)}</span>;
     }
-    if (standing.pitTime != null && standing.pits > 0) {
+    if (standing.pitTime != null && standing.pitTime > 0) {
       return <span className="text-zinc-300 font-mono">{formatPitTime(standing.pitTime / 10000)}</span>;
     }
-    return <span className="text-zinc-600">---</span>;
+    return <span className="text-zinc-600 font-mono">{formatPitTime(0)}</span>;
   };
 
   const change = standing.positionChange;

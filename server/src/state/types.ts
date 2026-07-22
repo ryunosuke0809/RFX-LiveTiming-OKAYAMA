@@ -62,7 +62,10 @@ export interface StandingVm {
     bestTimeType: TimeType;
     lastLapTimeType: TimeType;
     pits: number;
+    /** 最後のピット滞在時間 (1/10000秒)。PitOut 後に確定・保持。 */
     pitTime: number | null;
+    /** いま In Pit 中なら進入時刻 (ISO)。カウント用。 */
+    pitEnteredAt: string | null;
     positionChange: number;
 }
 
