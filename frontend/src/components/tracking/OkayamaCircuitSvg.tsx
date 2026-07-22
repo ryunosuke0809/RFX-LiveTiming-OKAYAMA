@@ -96,6 +96,55 @@ const MARKER_SCALE_MAX = 2.2;
 const MARKER_SCALE_STEP = 0.2;
 const MARKER_SCALE_DEFAULT = 1.5;
 
+/** Timing 往復でも地図の向き・ズーム・アイコンサイズを維持する。 */
+const MAP_VIEW_STORAGE_KEY = "rfx-okayama-tracking-map-view";
+
+type MapViewPrefs = {
+  zoom: number;
+  rotation: number;
+  pan: Vec2;
+  markerScale: number;
+};
+
+function clampMapView(raw: Partial<MapViewPrefs> | null | undefined): MapViewPrefs | null {
+  if (!raw || typeof raw !== "object") return null;
+  const zoom =
+    typeof raw.zoom === "number" && Number.isFinite(raw.zoom)
+      ? Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, raw.zoom))
+      : ZOOM_DEFAULT;
+  const rotation =
+    typeof raw.rotation === "number" && Number.isFinite(raw.rotation) ? raw.rotation : 0;
+  const panX =
+    raw.pan && typeof raw.pan.x === "number" && Number.isFinite(raw.pan.x) ? raw.pan.x : 0;
+  const panY =
+    raw.pan && typeof raw.pan.y === "number" && Number.isFinite(raw.pan.y) ? raw.pan.y : 0;
+  const markerScale =
+    typeof raw.markerScale === "number" && Number.isFinite(raw.markerScale)
+      ? Math.min(MARKER_SCALE_MAX, Math.max(MARKER_SCALE_MIN, raw.markerScale))
+      : MARKER_SCALE_DEFAULT;
+  return { zoom, rotation, pan: { x: panX, y: panY }, markerScale };
+}
+
+function loadMapViewPrefs(): MapViewPrefs | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(MAP_VIEW_STORAGE_KEY);
+    if (!raw) return null;
+    return clampMapView(JSON.parse(raw) as Partial<MapViewPrefs>);
+  } catch {
+    return null;
+  }
+}
+
+function saveMapViewPrefs(prefs: MapViewPrefs): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(MAP_VIEW_STORAGE_KEY, JSON.stringify(prefs));
+  } catch {
+    // Private mode 等は無視
+  }
+}
+
 /** マーカー: 実位置ドット / リード線 / CARNO ラベルの基準寸法 (markerScale=1・ワールド座標)。 */
 const DOT_R = 4;
 const LABEL_H = 18;
@@ -241,6 +290,25 @@ export default function OkayamaCircuitSvg({
   const [rotation, setRotation] = useState(0);
   const [pan, setPan] = useState<Vec2>({ x: 0, y: 0 });
   const [markerScale, setMarkerScale] = useState(MARKER_SCALE_DEFAULT);
+  const skipMapViewSaveRef = useRef(true);
+
+  // Timing 往復・再訪でも地図設定を復元
+  useEffect(() => {
+    const saved = loadMapViewPrefs();
+    if (!saved) return;
+    setZoom(saved.zoom);
+    setRotation(saved.rotation);
+    setPan(saved.pan);
+    setMarkerScale(saved.markerScale);
+  }, []);
+
+  useEffect(() => {
+    if (skipMapViewSaveRef.current) {
+      skipMapViewSaveRef.current = false;
+      return;
+    }
+    saveMapViewPrefs({ zoom, rotation, pan, markerScale });
+  }, [zoom, rotation, pan, markerScale]);
 
   // 車両アニメーション: teamId ごとに「現区間の始点→終点を区間タイムかけて移動」する状態を保持し、
   // requestAnimationFrame で毎フレーム再描画する。
