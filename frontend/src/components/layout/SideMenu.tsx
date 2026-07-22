@@ -165,6 +165,30 @@ export default function SideMenu({ isOpen, onClose, classes = [], activeClassFil
             </span>
           )}
         </Link>
+
+        {/* About */}
+        <Link
+          href="/about"
+          className={`flex items-center gap-3 rounded-lg transition-colors h-10 flex-shrink-0 ${
+            isOpen ? "px-3" : "justify-center px-0"
+          } ${
+            pathname === "/about"
+              ? "bg-zinc-700 text-white"
+              : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
+          }`}
+          title={!isOpen ? "About" : undefined}
+        >
+          <span className="flex-shrink-0">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z" />
+            </svg>
+          </span>
+          {isOpen && (
+            <span className="text-sm font-medium whitespace-nowrap overflow-hidden">
+              About
+            </span>
+          )}
+        </Link>
       </nav>
     </div>
   );

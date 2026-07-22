@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import TimingHeader from "@/components/timing/TimingHeader";
 import TimingTable from "@/components/timing/TimingTable";
 import type { SectorFlash } from "@/components/timing/TimingTable";
@@ -22,6 +22,7 @@ import {
 } from "@/data/mock";
 import { formatLocalTime } from "@/lib/format";
 import { useLiveTiming } from "@/hooks/useLiveTiming";
+import { excludeOicClasses, excludeOicStandings, isOicStanding } from "@/lib/entryFilter";
 import type { SessionInfo, Standing, TimeType, SectorTime } from "@/types/smis";
 
 function shufflePositions(standings: Standing[]): Standing[] {
@@ -187,9 +188,21 @@ export default function TimingPage() {
     };
   }, []);
 
-  const trackCount = isLive ? live.trackCount : getMockTrackCount(standings);
-  const classes = isLive ? live.classes : mockClasses;
-  const fastestLap = isLive && live.fastestLap ? live.fastestLap : mockFastestLap;
+  const visibleStandings = useMemo(() => excludeOicStandings(standings), [standings]);
+  const trackCount = getMockTrackCount(visibleStandings);
+  const classes = useMemo(
+    () => excludeOicClasses(isLive ? live.classes : mockClasses),
+    [isLive, live.classes],
+  );
+  const fastestLapRaw = isLive && live.fastestLap ? live.fastestLap : mockFastestLap;
+  const fastestLap = useMemo(() => {
+    if (!fastestLapRaw) return mockFastestLap;
+    const hidden = standings.find((s) => {
+      const t = getTeamByStanding(s);
+      return t?.no === fastestLapRaw.teamNo && isOicStanding(s);
+    });
+    return hidden ? mockFastestLap : fastestLapRaw;
+  }, [fastestLapRaw, standings]);
   // ライブ時はセッション種別 (予選=time / 決勝=race) に従う。
   const effectiveRaceMode = isLive ? live.isRace : isRaceMode;
 
@@ -296,7 +309,7 @@ export default function TimingPage() {
 
         <div className="flex-1 flex flex-col overflow-hidden">
           <TimingTable
-            standings={standings}
+            standings={visibleStandings}
             classFilter={classFilter}
             flashKey={flashKey}
             isRaceMode={effectiveRaceMode}

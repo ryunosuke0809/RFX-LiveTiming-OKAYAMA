@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import SideMenu from "@/components/layout/SideMenu";
 import OkayamaCircuitSvg from "@/components/tracking/OkayamaCircuitSvg";
 import { mockClasses, mockSessionInfo, mockStandings, getTeamByStanding, getClassByStanding } from "@/data/mock";
 import { formatTime } from "@/lib/format";
 import { useLiveTiming } from "@/hooks/useLiveTiming";
+import { excludeOicClasses, excludeOicStandings } from "@/lib/entryFilter";
 import type { Standing } from "@/types/smis";
 
 /** コース状況パネル用の CARNO のみのバッジ（丸み帯びた四角）。 */
@@ -48,8 +49,14 @@ export default function TrackingPage() {
   // ライブ接続 (/ws)。データ受信時は mock の代わりにライブ順位を使う。
   const live = useLiveTiming();
   const isLive = live.hasData;
-  const baseStandings = isLive ? live.standings : mockStandings;
-  const classes = isLive ? live.classes : mockClasses;
+  const baseStandings = useMemo(
+    () => excludeOicStandings(isLive ? live.standings : mockStandings),
+    [isLive, live.standings],
+  );
+  const classes = useMemo(
+    () => excludeOicClasses(isLive ? live.classes : mockClasses),
+    [isLive, live.classes],
+  );
   const competitionName = isLive && live.sessionInfo ? live.sessionInfo.competition.nameE : mockSessionInfo.competition.nameE;
   const sessionName = isLive && live.sessionInfo ? live.sessionInfo.session.nameE : mockSessionInfo.session.nameE;
 
