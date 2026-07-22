@@ -14,6 +14,11 @@ import type {
 } from "@/types/smis";
 import { formatLocalTime } from "@/lib/format";
 import { setLiveEntities } from "@/lib/entityRegistry";
+import {
+  clearAllSectorEnters,
+  clearSectorEnter,
+  noteSectorEnter,
+} from "@/lib/sectorEnterClock";
 
 // ============================================================
 // サーバー (/ws) が送る ViewModel 型 (server/src/state/types.ts と対応)
@@ -231,6 +236,7 @@ export function useLiveTiming(url?: string): LiveTimingData {
             s.classes.clear();
             s.teams.clear();
           }
+          clearAllSectorEnters();
           break;
         case "session":
           s.session = { ...(s.session ?? emptySessionVm()), ...patch.fields };
@@ -245,11 +251,21 @@ export function useLiveTiming(url?: string): LiveTimingData {
         case "team_upsert":
           s.teams.set(patch.value.id, patch.value);
           break;
-        case "standing_upsert":
+        case "standing_upsert": {
+          const prevSt = s.standings.get(patch.value.teamId);
           s.standings.set(patch.value.teamId, patch.value);
+          if (
+            !prevSt ||
+            prevSt.lap !== patch.value.lap ||
+            prevSt.sectorNo !== patch.value.sectorNo
+          ) {
+            noteSectorEnter(patch.value.teamId, patch.value.lap, patch.value.sectorNo);
+          }
           break;
+        }
         case "standing_remove":
           s.standings.delete(patch.teamId);
+          clearSectorEnter(patch.teamId);
           break;
         case "fastest_lap":
           s.fastestLap = patch.value;
@@ -295,6 +311,7 @@ export function useLiveTiming(url?: string): LiveTimingData {
         }
         if (msg.type === "state") {
           const s = stateRef.current;
+          const prevStandings = s.standings;
           s.session = msg.state.session;
           s.fastestLap = msg.state.fastestLap;
           s.trackCount = msg.state.trackCount;
@@ -305,6 +322,14 @@ export function useLiveTiming(url?: string): LiveTimingData {
           s.driverLaps = new Map(Object.entries(msg.state.driverLaps ?? {}));
           s.bestSectors = msg.state.bestSectors ?? [null, null, null];
           s.dataTsMs = msg.state.dataTs ? Date.parse(msg.state.dataTs) || null : s.dataTsMs;
+          // フル state では全車の進入時刻を now にしない（一斉ダッシュ防止）。
+          // 既に持っている区間時計は維持し、接続中に周/区間が変わった分だけ更新する。
+          for (const x of msg.state.standings) {
+            const old = prevStandings.get(x.teamId);
+            if (old && (old.lap !== x.lap || old.sectorNo !== x.sectorNo)) {
+              noteSectorEnter(x.teamId, x.lap, x.sectorNo);
+            }
+          }
           scheduleFlush();
         } else if (msg.type === "patch") {
           for (const p of msg.patches) applyPatch(p);
