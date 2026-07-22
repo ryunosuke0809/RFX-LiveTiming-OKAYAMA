@@ -179,8 +179,12 @@ export class LiveSessionState {
         }
     }
 
-    /** START前など、まだコース上の通過が無い車はピット待機とみなす。 */
+    /** 予選・専有などピットスタート時、まだ通過が無い車はピット待機とみなす。
+     *  決勝 (race) はグリッドスタートなので未通過でも on_track のまま。 */
     private isGarageWaiting(s: StandingVm): boolean {
+        if (this.sessionMode === "race") {
+            return s.status === "in_pit";
+        }
         if (s.status === "in_pit") return true;
         if (s.status !== "on_track" && s.status !== "pit_out") return false;
         return (

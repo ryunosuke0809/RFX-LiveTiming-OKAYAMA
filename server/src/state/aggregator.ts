@@ -160,6 +160,7 @@ export class SessionStateAggregator {
         const nameE = str(p, "nameE") ?? "";
         // MOLA の Round.Type は当該データでは常に "L" で信頼できないため、
         // ラウンド名から race / time を推定する (決勝・Race・Final → race、他は time)。
+        const prevMode = this.state.sessionMode;
         this.state.sessionMode = deriveSessionMode(nameJ, nameE, str(p, "type"));
         const fields = {
             roundId: str(p, "id") ?? "",
@@ -167,7 +168,26 @@ export class SessionStateAggregator {
             roundNameE: nameE,
             isRace: this.state.sessionMode === "race",
         };
-        return this.mergeSessionInfo(fields);
+        const patches = this.mergeSessionInfo(fields);
+
+        // 決勝はグリッドスタート。未通過のまま in_pit になっている車は on_track へ戻す。
+        if (prevMode !== "race" && this.state.sessionMode === "race") {
+            for (const s of this.state.standings.values()) {
+                if (
+                    s.status === "in_pit" &&
+                    (s.lastPassingTime == null || s.lastPassingTime <= 0) &&
+                    s.lap === 0 &&
+                    s.sectorNo === 0
+                ) {
+                    s.status = "on_track";
+                    s.pitEnteredAt = null;
+                    this.state.pitEnteredAtMs.delete(s.teamId);
+                    patches.push({ kind: "standing_upsert", value: { ...s } });
+                }
+            }
+            patches.push({ kind: "track_count", value: this.state.trackCount() });
+        }
+        return patches;
     }
 
     private applySession(p: Record<string, unknown>): LiveStatePatch[] {
@@ -274,8 +294,8 @@ export class SessionStateAggregator {
             refSectors: [null, null, null],
             gap: "—",
             interval: "—",
-            // START 前 / 未出走はピット待機。PitOut (Loop 10) で on_track 側へ移る。
-            status: "in_pit",
+            // 予選等はピット待機、決勝 (race) はグリッド＝on_track。
+            status: this.state.sessionMode === "race" ? "on_track" : "in_pit",
             sectors: [
                 { time: null, type: "none" },
                 { time: null, type: "none" },
@@ -495,10 +515,12 @@ export class SessionStateAggregator {
         const lastLapTimeType = classifyTimeType(newLast, this.state.overallBest, personalBefore);
 
         const existing = this.state.standings.get(teamId);
-        // 未通過の新規エントリーはピット待機扱い (START前は全車ピット)。
-        let status: CarStatus = existing?.status ?? "in_pit";
-        // 既存が誤って on_track のままでも、通過が無いならピットへ戻す。
+        // 未通過の新規: 予選等はピット、決勝はグリッド (on_track)。
+        let status: CarStatus =
+            existing?.status ?? (this.state.sessionMode === "race" ? "on_track" : "in_pit");
+        // 予選等で誤って on_track のままなら、通過が無いあいだはピットへ戻す。
         if (
+            this.state.sessionMode !== "race" &&
             status === "on_track" &&
             (newLastPass == null || newLastPass <= 0) &&
             newLap === 0 &&
