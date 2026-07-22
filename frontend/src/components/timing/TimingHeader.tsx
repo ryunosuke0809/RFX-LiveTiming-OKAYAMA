@@ -1,13 +1,13 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import type { SessionInfo } from "@/types/smis";
 import { formatRemainingTime } from "@/lib/format";
 
 interface TimingHeaderProps {
   sessionInfo: SessionInfo;
-  /** ライブ: セッション開始からの経過秒 (データ時刻基準)。指定時に経過/残時間を出す。 */
+  /** @deprecated sessionInfo.sessionStartedAt から計算。互換のため残す。 */
   elapsedSec?: number | null;
   /** セッション総時間(秒)。>0 なら残時間カウントダウン、0/未指定なら経過時間。 */
   durationSec?: number;
@@ -21,39 +21,45 @@ interface TimingHeaderProps {
 
 export default function TimingHeader({
   sessionInfo,
-  elapsedSec = null,
   durationSec = 0,
   leaderLap = 0,
   maxLaps = 0,
   isLive = false,
 }: TimingHeaderProps) {
-  const { competition, category, round, session, remainingTime, localTime } = sessionInfo;
+  const { competition, category, round, session, remainingTime, localTime, sessionStartedAt } =
+    sessionInfo;
 
-  // データ更新の合間も秒が進むよう、受信した経過秒を基準にローカルで補間する。
+  const startedAtMs = (() => {
+    if (!sessionStartedAt) return null;
+    const t = Date.parse(sessionStartedAt);
+    return Number.isNaN(t) ? null : t;
+  })();
+  const hasStart = startedAtMs !== null;
+
+  // Start があるときだけ壁時計で秒を進める（途中参加・再表示・終了後も同じ）。
   const [tick, setTick] = useState(0);
-  const baseRef = useRef<{ elapsed: number; at: number }>({ elapsed: 0, at: Date.now() });
   useEffect(() => {
-    if (elapsedSec !== null) baseRef.current = { elapsed: elapsedSec, at: Date.now() };
-  }, [elapsedSec]);
-  useEffect(() => {
-    if (!isLive || elapsedSec === null) return;
+    if (!isLive || !hasStart) return;
     const t = setInterval(() => setTick((n) => n + 1), 1000);
     return () => clearInterval(t);
-  }, [isLive, elapsedSec]);
+  }, [isLive, hasStart, sessionStartedAt]);
 
   let bigTime: string;
   let timeLabel = "";
-  if (isLive && elapsedSec !== null) {
+  if (isLive && hasStart && startedAtMs !== null) {
     void tick;
-    const interpolated =
-      baseRef.current.elapsed + Math.floor((Date.now() - baseRef.current.at) / 1000);
+    const elapsed = Math.max(0, Math.floor((Date.now() - startedAtMs) / 1000));
     if (durationSec > 0) {
-      bigTime = formatRemainingTime(Math.max(0, durationSec - interpolated));
+      bigTime = formatRemainingTime(Math.max(0, durationSec - elapsed));
       timeLabel = "REMAINING";
     } else {
-      bigTime = formatRemainingTime(interpolated);
+      bigTime = formatRemainingTime(elapsed);
       timeLabel = "ELAPSED";
     }
+  } else if (isLive) {
+    // Start 前: 0:00 のまま止め、Select 直後などに動かない
+    bigTime = formatRemainingTime(0);
+    timeLabel = "ELAPSED";
   } else {
     bigTime = formatRemainingTime(remainingTime);
   }
@@ -84,89 +90,86 @@ export default function TimingHeader({
           style={{ fontSize: "var(--timing-fs-sm)" }}
         >
           <span className="text-zinc-300 uppercase tracking-wider truncate whitespace-nowrap">
-            {competition.nameE || competition.nameJ}
+            {competition.nameJ || competition.nameE}
           </span>
           <span className="text-zinc-600 hidden sm:inline flex-shrink-0">|</span>
           <span className="text-zinc-400 uppercase tracking-wider hidden sm:inline truncate whitespace-nowrap">
-            {sessionLabel}
+            {roundLabel} {sessionLabel}
           </span>
         </div>
         <div className="flex items-center gap-3 sm:gap-4 flex-shrink-0">
           <Image
             src="/images/okayama-logo.png"
             alt="Okayama International Circuit"
-            width={140}
-            height={32}
+            width={120}
+            height={28}
             className="hidden sm:block object-contain h-6 w-auto"
             priority
           />
           <Image
             src="/images/mola-logo.png"
-            alt="MOLA System Engineering"
-            width={80}
-            height={28}
+            alt="MOLA"
+            width={72}
+            height={24}
             className="object-contain h-5 sm:h-6 w-auto invert brightness-90"
             priority
           />
         </div>
       </div>
 
-      {/* スマホ: ラウンド/セッションは1行に収め、改行させない */}
-      {mobileSessionLine ? (
-        <div className="sm:hidden px-3 py-1 border-b border-zinc-800/40 min-w-0">
-          <p
-            className="text-zinc-400 uppercase tracking-wider truncate whitespace-nowrap leading-tight"
-            style={{ fontSize: "var(--timing-fs-sm)" }}
-            title={mobileSessionLine}
-          >
-            {mobileSessionLine}
-          </p>
-        </div>
-      ) : null}
+      {/* スマホ: セッション名を下段に（1行 truncate） */}
+      <div className="sm:hidden px-3 py-1 border-b border-zinc-800/40 min-w-0">
+        <p
+          className="text-zinc-400 uppercase tracking-wider truncate whitespace-nowrap leading-tight"
+          style={{ fontSize: "var(--timing-fs-sm)" }}
+          title={mobileSessionLine}
+        >
+          {mobileSessionLine}
+        </p>
+      </div>
 
-      {/* 下段: 残り/経過時間 + 周回 (左) ... 現在時刻 (右) */}
+      {/* 下段: タイマー */}
       <div className="flex items-end justify-between px-3 sm:px-5 py-3 sm:py-5 gap-2">
         <div className="flex items-end gap-3 sm:gap-4 min-w-0">
           <div className="flex flex-col flex-shrink-0">
-            {timeLabel && (
+            {timeLabel ? (
               <span
                 className="text-zinc-500 uppercase tracking-widest leading-none mb-1"
                 style={{ fontSize: "var(--timing-fs-sm)" }}
               >
                 {timeLabel}
               </span>
-            )}
-            <div
+            ) : null}
+            <span
               className="font-bold font-mono text-white tracking-wider leading-none whitespace-nowrap"
               style={{ fontSize: "var(--timing-fs-xl)" }}
             >
               {bigTime}
-            </div>
+            </span>
           </div>
-          {lapText && (
+          {lapText ? (
             <div className="flex flex-col flex-shrink-0">
               <span
                 className="text-zinc-500 uppercase tracking-widest leading-none mb-1"
                 style={{ fontSize: "var(--timing-fs-sm)" }}
               >
-                LAPS
+                &nbsp;
               </span>
-              <div
+              <span
                 className="font-bold font-mono text-emerald-400 tracking-wider leading-none whitespace-nowrap"
                 style={{ fontSize: "var(--timing-fs-lg)" }}
               >
-                {lapText.replace("LAP ", "")}
-              </div>
+                {lapText}
+              </span>
             </div>
-          )}
+          ) : null}
         </div>
-
-        <div
+        <span
           className="font-bold font-mono text-emerald-400 tracking-wider leading-none whitespace-nowrap flex-shrink-0"
           style={{ fontSize: "var(--timing-fs-xl)" }}
         >
           {localTime}
-        </div>
+        </span>
       </div>
     </header>
   );

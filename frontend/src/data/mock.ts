@@ -52,6 +52,7 @@ export const mockSessionInfo: SessionInfo = {
   flag: "green",
   remainingTime: 0,
   elapsedTime: 0,
+  sessionStartedAt: null,
   localTime: "",
 };
 

@@ -411,14 +411,13 @@ export function useLiveTiming(url?: string): LiveTimingData {
           return Number.isNaN(t) ? null : t;
         })()
       : null;
-    // 経過秒はデータ時刻 (dataTsMs) 基準。過去ログ再生でも正しい値になる。
-    // Start 前 (sessionStartedAt 未設定) は 0 を出して Select 直後の ELAPSED をリセット表示する。
+    // ELAPSED は壁時計で Start から計算する。
+    // - Start 前: null（タイマー停止）
+    // - 途中参加 / 再表示 / 終了後: いずれも now - startedAt（動き続ける）
     const sessionElapsedSec =
-      startedAtMs !== null && s.dataTsMs !== null
-        ? Math.max(0, Math.floor((s.dataTsMs - startedAtMs) / 1000))
-        : s.session
-          ? 0
-          : null;
+      startedAtMs !== null
+        ? Math.max(0, Math.floor((Date.now() - startedAtMs) / 1000))
+        : null;
     const leaderLap = standings.length > 0 ? standings[0].lap : 0;
     const driverLapsMap = s.driverLaps;
 
@@ -588,7 +587,11 @@ function vmToSessionInfo(v: SessionInfoVm): SessionInfo {
     },
     flag: v.flag,
     remainingTime,
-    elapsedTime: 0,
+    elapsedTime:
+      v.sessionStartedAt && !Number.isNaN(Date.parse(v.sessionStartedAt))
+        ? Math.max(0, Math.floor((Date.now() - Date.parse(v.sessionStartedAt)) / 1000))
+        : 0,
+    sessionStartedAt: v.sessionStartedAt,
     localTime: formatLocalTime(),
   };
 }

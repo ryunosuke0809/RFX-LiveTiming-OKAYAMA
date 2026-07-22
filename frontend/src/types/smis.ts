@@ -111,6 +111,8 @@ export interface SessionInfo {
   flag: TrackFlag;
   remainingTime: number; // 秒
   elapsedTime: number; // 秒
+  /** SMIS Start の開始時刻 (ISO)。未スタート時は null。 */
+  sessionStartedAt: string | null;
   localTime: string;
 }
 
