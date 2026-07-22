@@ -29,9 +29,6 @@ export default function VenueAccessGate({ children }: { children: ReactNode }) {
       <p className="mb-2 text-xs uppercase tracking-[0.2em] text-zinc-500">
         Okayama International Circuit
       </p>
-      <h1 className="mb-4 max-w-md text-xl font-semibold text-zinc-100 sm:text-2xl">
-        場内限定の Live Timing
-      </h1>
       <p className="mb-2 max-w-md text-sm leading-relaxed text-zinc-300">{message}</p>
       <p className="mb-8 max-w-md text-xs leading-relaxed text-zinc-500">
         Live Timing is available only inside Okayama International Circuit.
