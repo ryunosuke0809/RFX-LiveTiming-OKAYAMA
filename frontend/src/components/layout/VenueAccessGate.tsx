@@ -10,20 +10,28 @@ import { useVenueGeofence } from "@/hooks/useVenueGeofence";
  * 範囲外に出た場合は子をアンマウントして WebSocket を切断する。
  */
 export default function VenueAccessGate({ children }: { children: ReactNode }) {
-  const { ready, required, allowed, status, retrying, message, recheck } = useVenueGeofence();
+  const { ready, required, allowed, status, checking, message, recheck } = useVenueGeofence();
 
-  // 初回の位置取得中だけ暗幕（再表示時の文言チラつき防止）
-  // 再試行中は説明画面を残す
-  if (
-    !ready ||
-    (required && !allowed && (status === "prompting" || status === "idle") && !retrying)
-  ) {
-    return <div className="fixed inset-0 z-[200] bg-[#0c0c0f]" aria-hidden />;
+  if (!ready) {
+    return (
+      <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-[#0c0c0f] px-6 text-center">
+        <p className="mb-2 text-xs uppercase tracking-[0.2em] text-zinc-500">
+          Okayama International Circuit
+        </p>
+        <div
+          className="mb-4 h-8 w-8 animate-spin rounded-full border-2 border-zinc-600 border-t-emerald-400"
+          aria-hidden
+        />
+        <p className="text-sm text-zinc-300">読み込み中…</p>
+      </div>
+    );
   }
 
   if (!required || allowed) {
     return <>{children}</>;
   }
+
+  const isChecking = checking || status === "prompting" || status === "idle";
 
   return (
     <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-[#0c0c0f] px-6 text-center">
@@ -35,9 +43,9 @@ export default function VenueAccessGate({ children }: { children: ReactNode }) {
         Live Timing is available only inside Okayama International Circuit.
         Location access is required.
       </p>
-      {retrying ? (
+      {isChecking ? (
         <div
-          className="mb-2 h-8 w-8 animate-spin rounded-full border-2 border-zinc-600 border-t-emerald-400"
+          className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-600 border-t-emerald-400"
           aria-hidden
         />
       ) : (
