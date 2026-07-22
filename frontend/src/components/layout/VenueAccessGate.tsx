@@ -8,7 +8,8 @@ import { useVenueGeofence } from "@/hooks/useVenueGeofence";
  * 関係者サブドメイン・localhost ではそのまま通す。
  */
 export default function VenueAccessGate({ children }: { children: ReactNode }) {
-  const { ready, required, allowed, checking, message, recheck } = useVenueGeofence();
+  const { ready, required, allowed, checking, message, distanceM, status, recheck } =
+    useVenueGeofence();
 
   // ホスト判定前は一般向け扱い（誤って WS を先に繋がない）
   if (ready && (!required || allowed)) {
@@ -26,10 +27,17 @@ export default function VenueAccessGate({ children }: { children: ReactNode }) {
         {message ||
           "位置情報を確認しています。許可を求められたら「許可」を選んでください。"}
       </p>
-      <p className="mb-8 max-w-md text-xs leading-relaxed text-zinc-500">
+      <p className="mb-2 max-w-md text-xs leading-relaxed text-zinc-500">
         Live Timing is available only inside Okayama International Circuit.
         Location access is required.
       </p>
+      {/* テスト切り分け用（本番前に削除可） */}
+      {ready && status !== "prompting" && status !== "idle" && (
+        <p className="mb-6 font-mono text-[11px] text-zinc-600">
+          status={status}
+          {distanceM != null ? ` / ${distanceM}m` : ""}
+        </p>
+      )}
       {showRetry ? (
         <button
           type="button"

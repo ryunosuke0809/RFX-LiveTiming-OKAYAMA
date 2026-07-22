@@ -16,9 +16,9 @@ export const VENUE_CENTER = {
 
 /**
  * 場内とみなす半径（メートル）。
- * テスト用に自宅周辺。本番はコース・駐車場カバーで 3000 程度に戻す。
+ * テスト用（Mac の Wi‑Fi 測位ズレを見込む）。本番は 3000 程度に戻す。
  */
-export const VENUE_RADIUS_M = 1000;
+export const VENUE_RADIUS_M = 5000;
 
 /** 位置の再確認間隔（ミリ秒）。移動後の切断用。 */
 export const GEO_RECHECK_INTERVAL_MS = 30_000;
