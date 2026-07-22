@@ -15,6 +15,8 @@ interface TimingHeaderProps {
   leaderLap?: number;
   /** 総周回数 (>0 で "n/max" 表示)。 */
   maxLaps?: number;
+  /** 決勝など周回レースのときだけ LAP を出す。 */
+  isRace?: boolean;
   /** ライブデータ受信中か。 */
   isLive?: boolean;
 }
@@ -24,6 +26,7 @@ export default function TimingHeader({
   durationSec = 0,
   leaderLap = 0,
   maxLaps = 0,
+  isRace = false,
   isLive = false,
 }: TimingHeaderProps) {
   const { competition, category, round, session, remainingTime, localTime, sessionStartedAt } =
@@ -65,7 +68,7 @@ export default function TimingHeader({
   }
 
   const lapText =
-    isLive && leaderLap > 0
+    isLive && isRace && leaderLap > 0
       ? maxLaps > 0
         ? `LAP ${leaderLap}/${maxLaps}`
         : `LAP ${leaderLap}`

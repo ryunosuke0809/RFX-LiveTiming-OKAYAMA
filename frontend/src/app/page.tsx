@@ -221,6 +221,7 @@ export default function TimingPage() {
           durationSec={0}
           leaderLap={live.leaderLap}
           maxLaps={live.sessionLaps}
+          isRace={effectiveRaceMode}
         />
       </div>
 
