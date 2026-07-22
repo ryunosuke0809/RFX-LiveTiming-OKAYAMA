@@ -41,8 +41,8 @@ const CAR_OPTIONS = [
 ];
 
 const GAP_OPTIONS = [
-  { value: "gap", label: "Gap" },
-  { value: "int", label: "Int" },
+  { value: "gap", label: "Behind" },
+  { value: "int", label: "Gap" },
 ];
 
 const LAP_OPTIONS = [
