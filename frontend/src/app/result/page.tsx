@@ -17,6 +17,7 @@ import { formatTime } from "@/lib/format";
 import { TIME_COLORS } from "@/lib/colors";
 import { useLiveTiming } from "@/hooks/useLiveTiming";
 import { setLiveEntities } from "@/lib/entityRegistry";
+import { excludeOicClasses, excludeOicStandings } from "@/lib/entryFilter";
 import {
   fetchArchiveDays,
   fetchArchiveSessions,
@@ -451,8 +452,18 @@ export default function ResultPage() {
     if (pastResult) registerArchiveEntities(pastResult);
   }, [pastResult]);
 
-  const baseStandings = isArchive ? pastStandings : isLive ? live.standings : mockStandings;
-  const classes = isArchive ? pastClasses : isLive ? live.classes : mockClasses;
+  const baseStandings = useMemo(
+    () =>
+      excludeOicStandings(
+        isArchive ? pastStandings : isLive ? live.standings : mockStandings,
+      ),
+    [isArchive, pastStandings, isLive, live.standings],
+  );
+  const classes = useMemo(
+    () =>
+      excludeOicClasses(isArchive ? pastClasses : isLive ? live.classes : mockClasses),
+    [isArchive, pastClasses, isLive, live.classes],
+  );
   const sessionMeta = isLive && live.sessionInfo ? live.sessionInfo : mockSessionInfo;
   const snapSession = isArchive ? pastResult!.snapshot.session : null;
   const competitionName = isArchive
