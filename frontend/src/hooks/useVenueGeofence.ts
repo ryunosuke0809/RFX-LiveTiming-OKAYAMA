@@ -41,9 +41,9 @@ function statusMessage(status: GeofenceStatus): string {
     case "idle":
       return "位置情報を確認しています。許可を求められたら「許可」を選んでください。";
     case "denied":
-      return "位置情報の許可が必要です。ブラウザ／システム設定で位置情報をオンにし、再試行してください。";
+      return "位置情報の許可が必要です。設定で位置情報を許可したうえで、再試行してください。";
     case "error":
-      return "位置情報を取得できませんでした。位置情報サービスがオンか確認し、再試行してください。";
+      return "位置情報を取得できませんでした。位置情報をオンにして再試行してください。";
     case "outside":
       return "会場の範囲外のため閲覧できません。場内で再度お試しください。";
     case "inside":
