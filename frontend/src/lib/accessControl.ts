@@ -7,18 +7,17 @@
  *   設定例は `deploy/nginx/snippets/mola-public-ip-allowlist.conf.example`
  */
 
-/** ジオフェンス中心（テスト中は自宅。本番前に岡山へ戻す） */
-// 岡山国際サーキット: { lat: 34.915, lng: 134.22111 }
+/** 岡山国際サーキット中心（Wikipedia / 公開座標） */
 export const VENUE_CENTER = {
-  lat: 35.8398687655161,
-  lng: 139.6894840054884,
+  lat: 34.915,
+  lng: 134.22111,
 } as const;
 
 /**
  * 場内とみなす半径（メートル）。
- * テスト用（Mac の Wi‑Fi 測位ズレを見込む）。本番は 3000 程度に戻す。
+ * コース・ピット・駐車場をカバーしつつ、遠方は確実に外す。
  */
-export const VENUE_RADIUS_M = 5000;
+export const VENUE_RADIUS_M = 3000;
 
 /** 位置の再確認間隔（ミリ秒）。移動後の切断用。 */
 export const GEO_RECHECK_INTERVAL_MS = 30_000;
