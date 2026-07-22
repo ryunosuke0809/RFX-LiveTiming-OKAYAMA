@@ -4,10 +4,20 @@
 
 | ホスト | 用途 |
 |--------|------|
-| `https://mola-timing-okayama.com` | 一般向け（将来 GPS / IP 制限） |
-| `https://oic-private.mola-timing-okayama.com` | 関係者向け（当面は同一画面・制限なし） |
+| `https://mola-timing-okayama.com` | 一般向け（**GPS 場内制限**。将来 IP 制限可） |
+| `https://oic-private.mola-timing-okayama.com` | 関係者向け（制限なし・同一画面） |
 
 ムームー DNS: `oic-private` の A レコード → VPS IP（apex と同じ）。証明書は `issue-cert.sh` で両ホストを含む。
+
+### 閲覧制限
+
+| 層 | 状態 | 対象 |
+|----|------|------|
+| ブラウザ GPS（ジオフェンス） | **有効** | 一般向けのみ。半径約 3km・30秒ごと再確認。範囲外で画面停止・WS 切断 |
+| IP 許可リスト | **準備のみ** | 一般向け nginx server に include 枠あり。`deploy/nginx/snippets/mola-public-ip-allowlist.conf.example` |
+| 関係者 (`oic-private`) | 制限なし | GPS / IP とも適用しない |
+
+localhost での開発時は GPS チェックをスキップする。
 
 ## ディレクトリ構成
 
@@ -102,10 +112,24 @@ awk '{print $1}' /var/log/nginx/mola-timing-access.log | sort -u | wc -l
 設定反映（初回 or nginx 変更後）:
 
 ```bash
+sudo mkdir -p /etc/nginx/snippets
+sudo install -m 644 /opt/mola-timing-okayama/repo/deploy/nginx/snippets/mola-proxy-locations.conf \
+  /etc/nginx/snippets/mola-proxy-locations.conf
 sudo install -m 644 /opt/mola-timing-okayama/repo/deploy/nginx/mola-timing-okayama.conf \
   /etc/nginx/sites-available/mola-timing-okayama
 sudo install -m 644 /opt/mola-timing-okayama/repo/deploy/logrotate/mola-timing-nginx \
   /etc/logrotate.d/mola-timing-nginx
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+IP 制限を有効化するとき（お客様承認後）:
+
+```bash
+sudo install -m 644 \
+  /opt/mola-timing-okayama/repo/deploy/nginx/snippets/mola-public-ip-allowlist.conf.example \
+  /etc/nginx/snippets/mola-public-ip-allowlist.conf
+# ファイル内の allow を実 IP に書き換え、deny all; を有効化
+# mola-timing-okayama.conf の一般向け server で include 行のコメントを外す
 sudo nginx -t && sudo systemctl reload nginx
 ```
 

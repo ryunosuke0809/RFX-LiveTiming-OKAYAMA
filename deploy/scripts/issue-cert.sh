@@ -41,6 +41,9 @@ fi
 
 install -m 644 "$APP_ROOT/repo/deploy/nginx/mola-timing-okayama.conf" \
   /etc/nginx/sites-available/mola-timing-okayama
+mkdir -p /etc/nginx/snippets
+install -m 644 "$APP_ROOT/repo/deploy/nginx/snippets/mola-proxy-locations.conf" \
+  /etc/nginx/snippets/mola-proxy-locations.conf
 nginx -t
 systemctl reload nginx
 

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Titillium_Web, Roboto_Mono } from "next/font/google";
+import VenueAccessGate from "@/components/layout/VenueAccessGate";
 import "./globals.css";
 
 const titillium = Titillium_Web({
@@ -39,7 +40,7 @@ export default function RootLayout({
       className={`${titillium.variable} ${robotoMono.variable} antialiased`}
     >
       <body className="flex flex-col bg-[#0c0c0f] text-zinc-200 overflow-hidden app-shell">
-        {children}
+        <VenueAccessGate>{children}</VenueAccessGate>
       </body>
     </html>
   );

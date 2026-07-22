@@ -1,0 +1,22 @@
+# ============================================================
+# 一般向けホスト専用 IP 許可リスト（将来用・未有効）
+# ============================================================
+#
+# 有効化手順:
+# 1. このファイルをサーバーへコピー:
+#      sudo install -m 644 \
+#        /opt/mola-timing-okayama/repo/deploy/nginx/snippets/mola-public-ip-allowlist.conf.example \
+#        /etc/nginx/snippets/mola-public-ip-allowlist.conf
+# 2. 会場 Wi-Fi / 本社の出口 IP を allow に追記
+# 3. mola-timing-okayama.conf の一般向け server ブロックで
+#      include /etc/nginx/snippets/mola-public-ip-allowlist.conf;
+#    のコメントを外す
+# 4. sudo nginx -t && sudo systemctl reload nginx
+#
+# 注意:
+# - oic-private（関係者）の server ブロックには入れない
+# - GPS チェックはフロント側。IP 制限はサーバー側の追加層
+#
+# allow 203.0.113.10;   # 例: 会場 Wi-Fi 出口
+# allow 203.0.113.20;   # 例: 本社固定 IP
+# deny all;

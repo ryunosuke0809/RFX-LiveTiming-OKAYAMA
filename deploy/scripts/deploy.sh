@@ -28,6 +28,9 @@ npm run build
 
 echo "==> sync nginx / logrotate (if present)"
 if [[ -f /etc/nginx/sites-available/mola-timing-okayama ]]; then
+  sudo mkdir -p /etc/nginx/snippets
+  sudo install -m 644 "$REPO/deploy/nginx/snippets/mola-proxy-locations.conf" \
+    /etc/nginx/snippets/mola-proxy-locations.conf
   sudo install -m 644 "$REPO/deploy/nginx/mola-timing-okayama.conf" \
     /etc/nginx/sites-available/mola-timing-okayama
   sudo install -m 644 "$REPO/deploy/logrotate/mola-timing-nginx" \
