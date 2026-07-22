@@ -172,7 +172,8 @@ export interface LiveStateSnapshot {
  * フロントエンドは `kind` で switch して該当部分だけ書き換える。
  */
 export type LiveStatePatch =
-    | { kind: "reset" }
+    /** scope: "timing" = ラップ系のみクリア (Team/Class は保持)。省略時は全クリア。 */
+    | { kind: "reset"; scope?: "all" | "timing" }
     | { kind: "session"; fields: Partial<SessionInfoVm> }
     | { kind: "flag"; flag: TrackFlag }
     | { kind: "class_upsert"; value: CarClassVm }

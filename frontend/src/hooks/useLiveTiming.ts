@@ -90,7 +90,7 @@ interface StateSnapshot {
 }
 
 type LiveStatePatch =
-  | { kind: "reset" }
+  | { kind: "reset"; scope?: "all" | "timing" }
   | { kind: "session"; fields: Partial<SessionInfoVm> }
   | { kind: "flag"; flag: TrackFlag }
   | { kind: "class_upsert"; value: CarClassVm }
@@ -220,14 +220,17 @@ export function useLiveTiming(url?: string): LiveTimingData {
       const s = stateRef.current;
       switch (patch.kind) {
         case "reset":
+          // Select は timing のみ。Category 切替等は all (Team/Class も破棄)。
           s.standings.clear();
-          s.classes.clear();
-          s.teams.clear();
           s.driverLaps.clear();
           s.fastestLap = null;
           s.bestSectors = [null, null, null];
           s.trackCount = { onTrack: 0, inPit: 0, stopped: 0, retired: 0 };
           s.flag = "green";
+          if (patch.scope !== "timing") {
+            s.classes.clear();
+            s.teams.clear();
+          }
           break;
         case "session":
           s.session = { ...(s.session ?? emptySessionVm()), ...patch.fields };

@@ -296,7 +296,7 @@ export class SessionStateAggregator {
         // → ラップ状態をクリアし、ELAPSED の基点 (sessionStartedAt) も必ず落とす。
         const sessionId = str(p, "sessionId");
         this.state.resetForNewSession();
-        const patches: LiveStatePatch[] = [{ kind: "reset" }];
+        const patches: LiveStatePatch[] = [{ kind: "reset", scope: "timing" }];
 
         // マスター (Team) は残るので、表が空にならないようプレースホルダーを再構築する。
         for (const team of this.state.teams.values()) {
