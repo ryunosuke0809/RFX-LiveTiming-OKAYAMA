@@ -12,17 +12,14 @@ import { useVenueGeofence } from "@/hooks/useVenueGeofence";
 export default function VenueAccessGate({ children }: { children: ReactNode }) {
   const { ready, required, allowed, status, message, recheck } = useVenueGeofence();
 
-  // ホスト判定前は何もマウントしない（一般向けでの一瞬の WS 接続を防ぐ）
-  if (!ready) {
+  // ホスト判定前 / 位置取得中は暗幕のみ（再表示時の「許可してください」チラつき防止）
+  if (!ready || (required && !allowed && (status === "prompting" || status === "idle"))) {
     return <div className="fixed inset-0 z-[200] bg-[#0c0c0f]" aria-hidden />;
   }
 
   if (!required || allowed) {
     return <>{children}</>;
   }
-
-  const showRetry =
-    status === "denied" || status === "error" || status === "outside" || status === "unsupported";
 
   return (
     <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-[#0c0c0f] px-6 text-center">
@@ -34,21 +31,13 @@ export default function VenueAccessGate({ children }: { children: ReactNode }) {
         Live Timing is available only inside Okayama International Circuit.
         Location access is required.
       </p>
-      {status === "prompting" && (
-        <div
-          className="mb-6 h-8 w-8 animate-spin rounded-full border-2 border-zinc-600 border-t-emerald-400"
-          aria-hidden
-        />
-      )}
-      {showRetry && (
-        <button
-          type="button"
-          onClick={recheck}
-          className="rounded border border-zinc-600 bg-zinc-900 px-5 py-2.5 text-sm font-semibold uppercase tracking-wider text-zinc-100 transition hover:border-zinc-400 hover:bg-zinc-800"
-        >
-          再試行 / Retry
-        </button>
-      )}
+      <button
+        type="button"
+        onClick={recheck}
+        className="rounded border border-zinc-600 bg-zinc-900 px-5 py-2.5 text-sm font-semibold uppercase tracking-wider text-zinc-100 transition hover:border-zinc-400 hover:bg-zinc-800"
+      >
+        再試行 / Retry
+      </button>
     </div>
   );
 }
