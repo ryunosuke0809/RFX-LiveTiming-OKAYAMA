@@ -335,6 +335,26 @@ export default function OkayamaCircuitSvg({
     moved: boolean;
   } | null>(null);
   const panBlockClickRef = useRef(false);
+  // パン/ピンチの setState を rAF にまとめる。タッチ中の過剰再描画は
+  // iOS Safari で SVG 残像（FL・コースラインのトレイル）を悪化させる。
+  const pendingViewRef = useRef<{ zoom?: number; pan?: Vec2 } | null>(null);
+  const viewRafRef = useRef(0);
+  const flushView = useCallback(() => {
+    viewRafRef.current = 0;
+    const pending = pendingViewRef.current;
+    pendingViewRef.current = null;
+    if (!pending) return;
+    if (pending.zoom != null) setZoom(pending.zoom);
+    if (pending.pan) setPan(pending.pan);
+  }, []);
+  const scheduleView = useCallback(
+    (next: { zoom?: number; pan?: Vec2 }) => {
+      pendingViewRef.current = { ...pendingViewRef.current, ...next };
+      if (viewRafRef.current) return;
+      viewRafRef.current = requestAnimationFrame(flushView);
+    },
+    [flushView],
+  );
   // 2本指ピンチ用: 現在押されているポインタを pointerId で管理する。
   // iOS Safari でもピンチ操作で trackmap をズーム/パンできるようにするため、
   // 1点ドラッグと 2点ピンチを同じハンドラ系で扱う。
@@ -345,6 +365,12 @@ export default function OkayamaCircuitSvg({
     startZoom: number;
     startPan: Vec2;
   } | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (viewRafRef.current) cancelAnimationFrame(viewRafRef.current);
+    };
+  }, []);
 
   const timing = geom?.timing;
   const samples = geom?.samples ?? [];
@@ -462,8 +488,7 @@ export default function OkayamaCircuitSvg({
           y: startPan.y + (centerSvgNow.y - startCenter.y) * nextZoom,
         };
         panBlockClickRef.current = true;
-        setZoom(nextZoom);
-        setPan(nextPan);
+        scheduleView({ zoom: nextZoom, pan: nextPan });
         return;
       }
 
@@ -483,9 +508,9 @@ export default function OkayamaCircuitSvg({
         }
       }
       panBlockClickRef.current = true;
-      setPan({ x: drag.panAtStart.x + dx, y: drag.panAtStart.y + dy });
+      scheduleView({ pan: { x: drag.panAtStart.x + dx, y: drag.panAtStart.y + dy } });
     },
-    [screenToSvg],
+    [scheduleView, screenToSvg],
   );
 
   const handlePointerUp = useCallback(
@@ -499,6 +524,11 @@ export default function OkayamaCircuitSvg({
       }
       if (pointersRef.current.size === 0) {
         dragRef.current = null;
+        // 指を離した瞬間に保留中の pan/zoom を確定（rAF 待ちを飛ばす）
+        if (viewRafRef.current) {
+          cancelAnimationFrame(viewRafRef.current);
+          flushView();
+        }
       } else if (pointersRef.current.size === 1 && wasPinching) {
         // ピンチ→片手放しに移行した場合は残り1点を新たなドラッグ起点に
         const [last] = Array.from(pointersRef.current.values());
@@ -518,7 +548,7 @@ export default function OkayamaCircuitSvg({
         }, 0);
       }
     },
-    [pan],
+    [flushView, pan],
   );
 
   const center = OKAYAMA_TRACK_CENTER;
@@ -541,6 +571,12 @@ export default function OkayamaCircuitSvg({
         // クラス touch-pan-zoom (globals.css) は子孫の SVG 要素にも touch-action: none を再適用する保険。
         touchAction: "none",
         WebkitUserSelect: "none",
+        // 合成レイヤを固定し、パン時の SVG 再描画で前フレームが残るのを抑える（iOS Safari）。
+        transform: "translateZ(0)",
+        WebkitTransform: "translateZ(0)",
+        isolation: "isolate",
+        backfaceVisibility: "hidden",
+        WebkitBackfaceVisibility: "hidden",
       }}
     >
       <svg
@@ -548,24 +584,17 @@ export default function OkayamaCircuitSvg({
         viewBox={OKAYAMA_TRACK_VIEWBOX}
         className="w-full h-full select-none"
         preserveAspectRatio="xMidYMid meet"
-        style={{ touchAction: "none", pointerEvents: "auto", display: "block" }}
+        style={{
+          touchAction: "none",
+          pointerEvents: "auto",
+          display: "block",
+          transform: "translateZ(0)",
+          WebkitTransform: "translateZ(0)",
+        }}
       >
-        <defs>
-          <filter id="glow">
-            <feGaussianBlur stdDeviation="2" result="blur" />
-            <feMerge>
-              <feMergeNode in="blur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
-          <filter id="glow-strong">
-            <feGaussianBlur stdDeviation="3.5" result="blur" />
-            <feMerge>
-              <feMergeNode in="blur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
-        </defs>
+        {/* 不透明背景: 変換グループ外に置き、パン後の dirty region を確実に塗りつぶす。
+            SVG filter(glow) と合わせて iOS で FL/コース線が残る主因だったため filter は未使用。 */}
+        <rect x={-80} y={-80} width={1820} height={940} fill="#0c0c0f" />
 
         <g transform={viewportTransform}>
           {/* 太いグレーの路面（スムージング済み一周） */}
@@ -580,9 +609,20 @@ export default function OkayamaCircuitSvg({
             />
           )}
 
-          {/* セクター別カラーライン（スムージング済み・ワールド座標） */}
+          {/* セクター別カラーライン（スムージング済み・ワールド座標）
+              SVG feGaussianBlur filter は親 <g> の transform 変更時に iOS Safari で
+              残像を残すため使わない。わずかに太い下敷き線で視認性を補う。 */}
           {geom && (
             <>
+              <path
+                d={geom.sectorDs.s1}
+                fill="none"
+                stroke={SECTOR_COLORS.s1}
+                strokeWidth={TRACK_STROKE_LINE + 4}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                opacity={0.28}
+              />
               <path
                 d={geom.sectorDs.s1}
                 fill="none"
@@ -590,8 +630,16 @@ export default function OkayamaCircuitSvg({
                 strokeWidth={TRACK_STROKE_LINE}
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                opacity={0.92}
-                filter="url(#glow)"
+                opacity={0.95}
+              />
+              <path
+                d={geom.sectorDs.s2}
+                fill="none"
+                stroke={SECTOR_COLORS.s2}
+                strokeWidth={TRACK_STROKE_LINE + 4}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                opacity={0.28}
               />
               <path
                 d={geom.sectorDs.s2}
@@ -600,8 +648,16 @@ export default function OkayamaCircuitSvg({
                 strokeWidth={TRACK_STROKE_LINE}
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                opacity={0.92}
-                filter="url(#glow)"
+                opacity={0.95}
+              />
+              <path
+                d={geom.sectorDs.s3}
+                fill="none"
+                stroke={SECTOR_COLORS.s3}
+                strokeWidth={TRACK_STROKE_LINE + 4}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                opacity={0.28}
               />
               <path
                 d={geom.sectorDs.s3}
@@ -610,8 +666,7 @@ export default function OkayamaCircuitSvg({
                 strokeWidth={TRACK_STROKE_LINE}
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                opacity={0.92}
-                filter="url(#glow)"
+                opacity={0.95}
               />
             </>
           )}
@@ -665,8 +720,24 @@ export default function OkayamaCircuitSvg({
                     />
                   ))}
                 </g>
-                {/* FL を視覚中心が labelPos に来るように左寄せ配置 */}
+                {/* FL を視覚中心が labelPos に来るように左寄せ配置。
+                    stroke 付き text は iOS パン時に残像しやすいので、下敷き text で縁取りする。 */}
                 <g transform={`translate(${labelPos.x} ${labelPos.y})`}>
+                  <text
+                    x={6}
+                    y={1}
+                    fill="none"
+                    fontSize={18}
+                    fontWeight={900}
+                    fontFamily="sans-serif"
+                    dominantBaseline="middle"
+                    textAnchor="middle"
+                    stroke="#0a0a0a"
+                    strokeWidth={4}
+                    strokeLinejoin="round"
+                  >
+                    FL
+                  </text>
                   <text
                     x={6}
                     y={1}
@@ -676,10 +747,6 @@ export default function OkayamaCircuitSvg({
                     fontFamily="sans-serif"
                     dominantBaseline="middle"
                     textAnchor="middle"
-                    style={{ paintOrder: "stroke" }}
-                    stroke="#0a0a0a"
-                    strokeWidth={3}
-                    strokeLinejoin="round"
                   >
                     FL
                   </text>
@@ -700,8 +767,7 @@ export default function OkayamaCircuitSvg({
                 fontSize="22"
                 fontWeight="bold"
                 fontFamily="sans-serif"
-                opacity={0.75}
-                filter="url(#glow)"
+                opacity={0.8}
               >
                 S1
               </text>
@@ -714,8 +780,7 @@ export default function OkayamaCircuitSvg({
                 fontSize="22"
                 fontWeight="bold"
                 fontFamily="sans-serif"
-                opacity={0.75}
-                filter="url(#glow)"
+                opacity={0.8}
               >
                 S2
               </text>
@@ -728,8 +793,7 @@ export default function OkayamaCircuitSvg({
                 fontSize="22"
                 fontWeight="bold"
                 fontFamily="sans-serif"
-                opacity={0.75}
-                filter="url(#glow)"
+                opacity={0.8}
               >
                 S3
               </text>
@@ -883,7 +947,6 @@ export default function OkayamaCircuitSvg({
               return (
                 <g
                   key={s.teamId}
-                  filter={isHi ? "url(#glow-strong)" : undefined}
                   style={{ cursor: onMarkerClick ? "pointer" : undefined }}
                   onClick={
                     onMarkerClick
