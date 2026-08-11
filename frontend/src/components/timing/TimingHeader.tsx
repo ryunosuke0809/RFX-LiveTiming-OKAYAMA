@@ -110,9 +110,9 @@ export default function TimingHeader({
             priority
           />
           <Image
-            src="/images/mola-logo.png"
-            alt="MOLA"
-            width={72}
+            src="/images/mola-timing-logo.png"
+            alt="MOLA timing"
+            width={147}
             height={24}
             className="object-contain h-5 sm:h-6 w-auto invert brightness-90"
             priority

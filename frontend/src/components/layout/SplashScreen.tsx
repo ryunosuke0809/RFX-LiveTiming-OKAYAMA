@@ -49,12 +49,12 @@ export default function SplashScreen({ onFinish }: SplashScreenProps) {
         }`}
       >
         <Image
-          src="/images/mola-logo.png"
-          alt="MOLA System Engineering"
-          width={280}
-          height={120}
+          src="/images/mola-timing-logo.png"
+          alt="MOLA timing"
+          width={300}
+          height={49}
           priority
-          className="object-contain brightness-90 invert"
+          className="object-contain max-w-[80vw] h-auto brightness-90 invert"
         />
       </div>
 
