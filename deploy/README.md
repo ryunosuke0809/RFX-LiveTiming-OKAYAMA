@@ -139,3 +139,18 @@ sudo nginx -t && sudo systemctl reload nginx
 
 - URL: `wss://mola-timing-okayama.com/ingest`
 - Token: `shared/server.env` の `RECEIVER_INGEST_TOKEN`
+
+### `/ws` 閲覧保護
+
+- `WS_VIEW_SECRET`（`openssl rand -hex 32`）を `shared/server.env` に設定すると、
+  `/ws` は短期トークン必須。フロントは `GET /api/ws-token` で自動取得する。
+- 既存 env にキーが無い場合の追記例:
+
+```bash
+# 値が空 / 未定義のときだけ生成して追記
+grep -q '^WS_VIEW_SECRET=.\+' /opt/mola-timing-okayama/shared/server.env \
+  || echo "WS_VIEW_SECRET=$(openssl rand -hex 32)" | sudo tee -a /opt/mola-timing-okayama/shared/server.env
+grep -q '^WS_VIEW_TOKEN_TTL_SEC=' /opt/mola-timing-okayama/shared/server.env \
+  || echo "WS_VIEW_TOKEN_TTL_SEC=300" | sudo tee -a /opt/mola-timing-okayama/shared/server.env
+sudo systemctl restart mola-timing-server
+```

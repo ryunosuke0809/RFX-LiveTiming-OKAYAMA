@@ -48,3 +48,29 @@ export function isOriginAllowed(req: IncomingMessage, allowed: string[] | null):
     if (typeof origin !== "string") return false;
     return allowed.includes(origin);
 }
+
+/**
+ * ブラウザ同一オリジンの fetch では Origin が欠ける場合があるため、
+ * Origin → Referer の順で allowlist と照合する。
+ * allowlist 未設定時は常に許可。
+ */
+export function isBrowserOriginAllowed(
+    req: IncomingMessage,
+    allowed: string[] | null,
+): boolean {
+    if (allowed === null) return true;
+
+    const origin = req.headers["origin"];
+    if (typeof origin === "string" && allowed.includes(origin)) return true;
+
+    const referer = req.headers["referer"];
+    if (typeof referer === "string") {
+        try {
+            const refOrigin = new URL(referer).origin;
+            if (allowed.includes(refOrigin)) return true;
+        } catch {
+            /* ignore */
+        }
+    }
+    return false;
+}

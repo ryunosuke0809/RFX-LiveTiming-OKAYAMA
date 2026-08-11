@@ -1,26 +1,74 @@
-import { Router } from "express";
+import { Router, type Request } from "express";
 import type { TimingRepository } from "../db/repository.js";
 import type { BroadcastHub } from "../broadcast/hub.js";
 import { ArchiveService } from "../archive/service.js";
 import { buildClassificationCsv, buildLapsCsv } from "../archive/csv.js";
+import type { AppConfig } from "../config.js";
+import { requiresViewAuth } from "../config.js";
+import { isBrowserOriginAllowed } from "../auth.js";
+import { issueViewToken } from "../view-token.js";
 
 /**
  * REST API。
  * - health / messages: 運用・デバッグ
+ * - ws-token: /ws 用短期トークン発行
  * - archive/*: 過去セッション一覧・リザルト JSON / CSV
  */
 export function createApiRouter(
     repository: TimingRepository,
     hub: BroadcastHub,
+    config: AppConfig,
 ): Router {
     const router = Router();
     const archive = new ArchiveService(repository);
+    const tokenHits = new Map<string, { count: number; resetAt: number }>();
 
     router.get("/health", (_req, res) => {
         res.json({
             ok: true,
             serverTime: new Date().toISOString(),
             subscribers: hub.subscriberCount,
+            viewAuth: requiresViewAuth(config) ? "required" : "off",
+        });
+    });
+
+    /**
+     * /ws 接続用の短期トークンを発行する。
+     * 正規フロントは接続前にここを叩き、?token= を付けて /ws へ繋ぐ。
+     *
+     * - WS_VIEW_SECRET 未設定時: { authRequired: false }（開発用・認証オフ）
+     * - ALLOWED_ORIGINS 設定時: Origin / Referer を検証
+     * - IP あたり簡易レート制限（60秒に 30 回）
+     */
+    router.get("/ws-token", (req, res) => {
+        if (!config.wsViewSecret) {
+            res.json({
+                authRequired: false,
+                token: null,
+                expiresAt: null,
+                expiresIn: null,
+            });
+            return;
+        }
+
+        if (!isBrowserOriginAllowed(req, config.allowedOrigins)) {
+            res.status(403).json({ error: "origin not allowed" });
+            return;
+        }
+
+        const ip = clientIp(req);
+        if (!allowTokenIssue(tokenHits, ip)) {
+            res.status(429).json({ error: "rate limit exceeded" });
+            return;
+        }
+
+        const issued = issueViewToken(config.wsViewSecret, config.wsViewTokenTtlSec);
+        res.setHeader("Cache-Control", "no-store");
+        res.json({
+            authRequired: true,
+            token: issued.token,
+            expiresAt: issued.expiresAt,
+            expiresIn: issued.expiresIn,
         });
     });
 
@@ -204,4 +252,30 @@ function shortSessionLabel(categoryName?: string | null, sessionName?: string | 
         .replace(/公式予選|決勝|予選|走行\d*回目/g, "")
         .trim();
     return safeName(fallback).slice(0, 40);
+}
+
+function clientIp(req: Request): string {
+    const xf = req.headers["x-forwarded-for"];
+    if (typeof xf === "string" && xf.length > 0) {
+        return xf.split(",")[0]?.trim() || req.socket.remoteAddress || "unknown";
+    }
+    return req.socket.remoteAddress || "unknown";
+}
+
+/** 簡易レート制限: IP あたり windowMs 内に maxHits まで。 */
+function allowTokenIssue(
+    hits: Map<string, { count: number; resetAt: number }>,
+    ip: string,
+    maxHits = 30,
+    windowMs = 60_000,
+): boolean {
+    const now = Date.now();
+    const cur = hits.get(ip);
+    if (!cur || cur.resetAt <= now) {
+        hits.set(ip, { count: 1, resetAt: now + windowMs });
+        return true;
+    }
+    if (cur.count >= maxHits) return false;
+    cur.count += 1;
+    return true;
 }

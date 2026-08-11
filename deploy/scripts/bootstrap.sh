@@ -40,10 +40,13 @@ fi
 ENV_FILE="$APP_ROOT/shared/server.env"
 if [[ ! -f "$ENV_FILE" ]]; then
   TOKEN="$(openssl rand -hex 32)"
+  VIEW_SECRET="$(openssl rand -hex 32)"
   cat > "$ENV_FILE" <<EOF
 PORT=4000
 HOST=127.0.0.1
 RECEIVER_INGEST_TOKEN=${TOKEN}
+WS_VIEW_SECRET=${VIEW_SECRET}
+WS_VIEW_TOKEN_TTL_SEC=300
 FRONTEND_VIEW_TOKEN=
 ALLOWED_ORIGINS=https://mola-timing-okayama.com,https://oic-private.mola-timing-okayama.com
 DATA_DIR=/opt/mola-timing-okayama/shared/data
@@ -52,7 +55,7 @@ LOG_LEVEL=info
 EOF
   chown ubuntu:ubuntu "$ENV_FILE"
   chmod 600 "$ENV_FILE"
-  echo "created $ENV_FILE (RECEIVER_INGEST_TOKEN generated)"
+  echo "created $ENV_FILE (RECEIVER_INGEST_TOKEN / WS_VIEW_SECRET generated)"
 fi
 
 # systemd

@@ -191,12 +191,53 @@ function resolveDefaultUrl(): string {
   return "ws://localhost:4000/ws";
 }
 
+/** /api/ws-token のベース URL（開発時は :4000、本番は同一オリジン）。 */
+function resolveApiBase(): string {
+  if (typeof window === "undefined") return "";
+  const port = window.location.port;
+  if (!port || port === "80" || port === "443") {
+    return "";
+  }
+  return `http://${window.location.hostname}:4000`;
+}
+
+/**
+ * 短期 /ws トークンを取得する。認証オフなら null。
+ * 正規ページ経由の視聴者は意識せず、接続前に自動で呼ばれる。
+ */
+async function fetchWsViewToken(signal?: AbortSignal): Promise<string | null> {
+  const res = await fetch(`${resolveApiBase()}/api/ws-token`, {
+    method: "GET",
+    cache: "no-store",
+    credentials: "same-origin",
+    signal,
+  });
+  if (!res.ok) {
+    throw new Error(`ws-token HTTP ${res.status}`);
+  }
+  const body = (await res.json()) as {
+    authRequired?: boolean;
+    token?: string | null;
+  };
+  if (!body.authRequired) return null;
+  if (typeof body.token === "string" && body.token.length > 0) return body.token;
+  throw new Error("ws-token missing");
+}
+
+function withToken(url: string, token: string | null): string {
+  if (!token) return url;
+  const u = new URL(url);
+  u.searchParams.set("token", token);
+  return u.toString();
+}
+
 /**
  * クラウドサーバー `/ws` に接続し、`state` + `patch` を適用して
  * フロントの表示型 (SessionInfo / Standing / CarClass / Team ...) に変換して返すフック。
  *
  * - 未接続 / データ未受信のときは `hasData=false`。呼び出し側は mock にフォールバックする。
  * - 切断時は指数バックオフで自動再接続。
+ * - 本番で /ws 認証が有効なときは接続直前に /api/ws-token を自動取得する。
  */
 export function useLiveTiming(url?: string): LiveTimingData {
   const [connected, setConnected] = useState(false);
@@ -206,11 +247,12 @@ export function useLiveTiming(url?: string): LiveTimingData {
   const rafRef = useRef<number | null>(null);
 
   useEffect(() => {
-    const target = url ?? resolveDefaultUrl();
+    const targetBase = url ?? resolveDefaultUrl();
     let ws: WebSocket | null = null;
     let closedByUs = false;
     let retry = 0;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    const abort = new AbortController();
 
     const scheduleFlush = () => {
       if (dirtyRef.current) return;
@@ -289,7 +331,20 @@ export function useLiveTiming(url?: string): LiveTimingData {
       }
     };
 
-    const connect = () => {
+    const connect = async () => {
+      if (closedByUs) return;
+
+      let token: string | null = null;
+      try {
+        token = await fetchWsViewToken(abort.signal);
+      } catch {
+        if (closedByUs || abort.signal.aborted) return;
+        scheduleReconnect();
+        return;
+      }
+      if (closedByUs || abort.signal.aborted) return;
+
+      const target = withToken(targetBase, token);
       try {
         ws = new WebSocket(target);
       } catch {
@@ -359,13 +414,16 @@ export function useLiveTiming(url?: string): LiveTimingData {
       if (closedByUs) return;
       retry += 1;
       const delay = Math.min(1000 * 2 ** (retry - 1), 10000);
-      reconnectTimer = setTimeout(connect, delay);
+      reconnectTimer = setTimeout(() => {
+        void connect();
+      }, delay);
     };
 
-    connect();
+    void connect();
 
     return () => {
       closedByUs = true;
+      abort.abort();
       if (reconnectTimer) clearTimeout(reconnectTimer);
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       try {

@@ -68,12 +68,44 @@ export default function DebugPage() {
         return c;
     }, [entries]);
 
-    const connect = useCallback(() => {
+    const connect = useCallback(async () => {
         if (wsRef.current) {
             wsRef.current.close();
         }
         setWsState("connecting");
-        const target = token ? `${url}?token=${encodeURIComponent(token)}` : url;
+
+        let effectiveToken = token.trim();
+        if (!effectiveToken) {
+            try {
+                const apiBase =
+                    typeof window !== "undefined" &&
+                    window.location.port &&
+                    window.location.port !== "80" &&
+                    window.location.port !== "443"
+                        ? `http://${window.location.hostname}:4000`
+                        : "";
+                const res = await fetch(`${apiBase}/api/ws-token`, {
+                    cache: "no-store",
+                    credentials: "same-origin",
+                });
+                if (res.ok) {
+                    const body = (await res.json()) as {
+                        authRequired?: boolean;
+                        token?: string | null;
+                    };
+                    if (body.authRequired && typeof body.token === "string") {
+                        effectiveToken = body.token;
+                        setToken(body.token);
+                    }
+                }
+            } catch {
+                /* 手動トークン欄にフォールバック */
+            }
+        }
+
+        const target = effectiveToken
+            ? `${url}?token=${encodeURIComponent(effectiveToken)}`
+            : url;
         const ws = new WebSocket(target);
         wsRef.current = ws;
 

@@ -151,14 +151,17 @@ WebSocket URL とトークンを指定して `/ws` の全 JSON をストリー�
 ## セキュリティ実装メモ
 
 - `RECEIVER_INGEST_TOKEN` は十分長い乱数 (推奨: `openssl rand -hex 32`)。
-- `FRONTEND_VIEW_TOKEN` を設定するとフロントエンドにも Bearer / `?token=` を強制。
-- `ALLOWED_ORIGINS` をカンマ区切りで指定すると `/ws` 接続時に Origin を検証。
+- `WS_VIEW_SECRET`（16文字以上）を設定すると `/ws` は短期トークン必須。
+  フロントは `GET /api/ws-token` で自動取得し、視聴者操作は不要。
+  トークンは接続ハンドシェイク時のみ検証（接続維持中は再検証しない）。
+- `FRONTEND_VIEW_TOKEN`（任意・レガシー）を設定すると静的トークンも `/ws` で受理。
+- `ALLOWED_ORIGINS` をカンマ区切りで指定すると `/ws` と `/api/ws-token` で Origin / Referer を検証。
 - HTTPS / WSS は nginx 側で終端する想定 (この Node は HTTP/WS のみ)。
 - WAL モードを使うのでクラッシュ時もすでに書き込まれた行は失われない。
 
 ## 既知の制限 (今後の TODO)
 
 - Phase 2 リザルト集計 (`/api/results`, CSV ダウンロード) は未実装。
-- フロントエンド向けの短期トークン rotation は未実装。
+- `/api/messages` の認証・`/ws` の IP 制限は未実装（短期トークンは実装済み）。
 - 30 日以上経過した日次 DB の zip アーカイブ自動化は未実装。
 - 単体テスト (vitest) は未配備。`tsc --noEmit` のみで型安全を担保している段階。

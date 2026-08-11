@@ -1,6 +1,6 @@
 import http from "node:http";
 import express from "express";
-import { loadConfig } from "./config.js";
+import { loadConfig, requiresViewAuth } from "./config.js";
 import { Logger } from "./logger.js";
 import { TimingRepository } from "./db/repository.js";
 import { BroadcastHub } from "./broadcast/hub.js";
@@ -20,7 +20,11 @@ logger.info("starting MOLA_Timing cloud server", {
     dataDir: config.dataDir,
     recentBuffer: config.recentMessageBuffer,
     originPolicy: config.allowedOrigins ? config.allowedOrigins.join(",") : "(any)",
-    frontendAuth: config.frontendViewToken ? "required" : "off",
+    frontendAuth: requiresViewAuth(config)
+        ? config.wsViewSecret
+            ? "short-lived"
+            : "static"
+        : "off",
 });
 
 const repository = new TimingRepository(config.dataDir, logger);
@@ -36,7 +40,7 @@ hydrateLiveStateFromDb(repository, aggregator, liveState, logger);
 const app = express();
 app.disable("x-powered-by");
 app.use(express.json({ limit: "256kb" }));
-app.use("/api", createApiRouter(repository, hub));
+app.use("/api", createApiRouter(repository, hub, config));
 
 app.get("/", (_req, res) => {
     res.type("text/plain").send(
@@ -45,6 +49,7 @@ app.get("/", (_req, res) => {
             "",
             "Endpoints:",
             "  GET  /api/health",
+            "  GET  /api/ws-token",
             "  GET  /api/messages?circuit=okayama&limit=100",
             "  GET  /api/archive/days",
             "  GET  /api/archive/sessions?date=YYYY-MM-DD",

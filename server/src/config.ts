@@ -9,11 +9,24 @@ export interface AppConfig {
     port: number;
     host: string;
     ingestToken: string;
+    /** レガシー静的トークン。設定時は /ws で引き続き受理する。 */
     frontendViewToken: string | null;
+    /**
+     * 短期 /ws トークン署名鍵。非空なら /ws は有効な短期トークン
+     * （または frontendViewToken）必須。
+     */
+    wsViewSecret: string | null;
+    /** 短期トークン TTL（秒）。既定 300。 */
+    wsViewTokenTtlSec: number;
     allowedOrigins: string[] | null;
     dataDir: string;
     recentMessageBuffer: number;
     logLevel: LogLevel;
+}
+
+/** /ws 認証が有効か（短期秘密鍵 or 静的トークン）。 */
+export function requiresViewAuth(config: AppConfig): boolean {
+    return config.wsViewSecret !== null || config.frontendViewToken !== null;
 }
 
 export type LogLevel = "debug" | "info" | "warn" | "error";
@@ -53,12 +66,15 @@ export function loadConfig(): AppConfig {
     }
 
     const frontendToken = process.env.FRONTEND_VIEW_TOKEN?.trim() ?? "";
+    const wsViewSecret = process.env.WS_VIEW_SECRET?.trim() ?? "";
 
     return {
         port: parsePositiveInt(process.env.PORT, 4000),
         host: process.env.HOST?.trim() || "127.0.0.1",
         ingestToken,
         frontendViewToken: frontendToken.length > 0 ? frontendToken : null,
+        wsViewSecret: wsViewSecret.length >= 16 ? wsViewSecret : null,
+        wsViewTokenTtlSec: parsePositiveInt(process.env.WS_VIEW_TOKEN_TTL_SEC, 300),
         allowedOrigins: parseOrigins(process.env.ALLOWED_ORIGINS),
         dataDir: path.resolve(process.env.DATA_DIR ?? "./data"),
         recentMessageBuffer: parsePositiveInt(process.env.RECENT_MESSAGE_BUFFER, 2000),
