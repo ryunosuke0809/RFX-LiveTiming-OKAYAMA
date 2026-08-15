@@ -104,9 +104,9 @@ export default function TimingHeader({
           <Image
             src="/images/okayama-logo.png"
             alt="Okayama International Circuit"
-            width={120}
-            height={28}
-            className="hidden sm:block object-contain h-6 w-auto"
+            width={160}
+            height={30}
+            className="hidden sm:block object-contain h-6 w-auto opacity-95"
             priority
           />
           <Image
