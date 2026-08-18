@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { CarClass } from "@/types/smis";
@@ -17,8 +17,48 @@ export default function SideMenu({ isOpen, onClose, classes = [], activeClassFil
   const pathname = usePathname();
   const router = useRouter();
   const [timingExpanded, setTimingExpanded] = useState(false);
+  const [resultExpanded, setResultExpanded] = useState(false);
 
   const isTimingPage = pathname === "/";
+  const isResultPage = pathname === "/result";
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (isTimingPage) setTimingExpanded(true);
+    if (isResultPage) setResultExpanded(true);
+  }, [isOpen, isTimingPage, isResultPage]);
+
+  const classFilterList = isOpen && classes.length > 0 && (
+    <div className="ml-8 mt-1 mb-1 flex flex-col gap-0.5">
+      <button
+        onClick={() => onClassFilterChange(null)}
+        className={`text-left px-3 py-1.5 rounded text-xs font-medium transition-colors ${
+          activeClassFilter === null
+            ? "bg-zinc-700 text-white"
+            : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
+        }`}
+      >
+        All Classes
+      </button>
+      {classes.map((cls) => (
+        <button
+          key={cls.id}
+          onClick={() => onClassFilterChange(activeClassFilter === cls.nameE ? null : cls.nameE)}
+          className={`flex items-center gap-2 text-left px-3 py-1.5 rounded text-xs font-medium transition-colors ${
+            activeClassFilter === cls.nameE
+              ? "bg-zinc-700 text-white"
+              : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
+          }`}
+        >
+          <span
+            className="w-2 h-2 rounded-full flex-shrink-0"
+            style={{ backgroundColor: cls.color }}
+          />
+          {cls.nameE}
+        </button>
+      ))}
+    </div>
+  );
 
   return (
     <div
@@ -84,37 +124,7 @@ export default function SideMenu({ isOpen, onClose, classes = [], activeClassFil
           </button>
 
           {/* Class Filter サブメニュー */}
-          {isOpen && timingExpanded && classes.length > 0 && (
-            <div className="ml-8 mt-1 mb-1 flex flex-col gap-0.5">
-              <button
-                onClick={() => onClassFilterChange(null)}
-                className={`text-left px-3 py-1.5 rounded text-xs font-medium transition-colors ${
-                  activeClassFilter === null
-                    ? "bg-zinc-700 text-white"
-                    : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
-                }`}
-              >
-                All Classes
-              </button>
-              {classes.map((cls) => (
-                <button
-                  key={cls.id}
-                  onClick={() => onClassFilterChange(activeClassFilter === cls.nameE ? null : cls.nameE)}
-                  className={`flex items-center gap-2 text-left px-3 py-1.5 rounded text-xs font-medium transition-colors ${
-                    activeClassFilter === cls.nameE
-                      ? "bg-zinc-700 text-white"
-                      : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
-                  }`}
-                >
-                  <span
-                    className="w-2 h-2 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: cls.color }}
-                  />
-                  {cls.nameE}
-                </button>
-              ))}
-            </div>
-          )}
+          {timingExpanded && classFilterList}
         </div>
 
         {/* Tracking */}
@@ -143,28 +153,47 @@ export default function SideMenu({ isOpen, onClose, classes = [], activeClassFil
         </Link>
 
         {/* Result */}
-        <Link
-          href="/result"
-          className={`flex items-center gap-3 rounded-lg transition-colors h-10 flex-shrink-0 ${
-            isOpen ? "px-3" : "justify-center px-0"
-          } ${
-            pathname === "/result"
-              ? "bg-zinc-700 text-white"
-              : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
-          }`}
-          title={!isOpen ? "Result" : undefined}
-        >
-          <span className="flex-shrink-0">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-            </svg>
-          </span>
-          {isOpen && (
-            <span className="text-sm font-medium whitespace-nowrap overflow-hidden">
-              Result
+        <div>
+          <button
+            onClick={() => {
+              if (!isOpen) {
+                router.push("/result");
+              } else if (!isResultPage) {
+                router.push("/result");
+              } else {
+                setResultExpanded(!resultExpanded);
+              }
+            }}
+            className={`flex items-center gap-3 rounded-lg transition-colors h-10 flex-shrink-0 w-full ${
+              isOpen ? "px-3" : "justify-center px-0"
+            } ${
+              isResultPage
+                ? "bg-zinc-700 text-white"
+                : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
+            }`}
+            title={!isOpen ? "Result" : undefined}
+          >
+            <span className="flex-shrink-0">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              </svg>
             </span>
-          )}
-        </Link>
+            {isOpen && (
+              <>
+                <span className="text-sm font-medium whitespace-nowrap overflow-hidden flex-1 text-left">
+                  Result
+                </span>
+                <svg
+                  className={`w-4 h-4 transition-transform duration-200 flex-shrink-0 ${resultExpanded ? "rotate-180" : ""}`}
+                  fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </>
+            )}
+          </button>
+          {resultExpanded && classFilterList}
+        </div>
 
         {/* About */}
         <Link

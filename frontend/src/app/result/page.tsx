@@ -13,7 +13,7 @@ import {
   getDriverName,
   getMockPersonalData,
 } from "@/data/mock";
-import { formatTime } from "@/lib/format";
+import { formatTime, recomputeStandingsGaps } from "@/lib/format";
 import { TIME_COLORS } from "@/lib/colors";
 import { useLiveTiming } from "@/hooks/useLiveTiming";
 import { setLiveEntities } from "@/lib/entityRegistry";
@@ -499,12 +499,19 @@ export default function ResultPage() {
     session: sessionHeadline,
   };
 
+  const isRaceMode = isArchive
+    ? pastResult!.isRace
+    : isLive
+      ? live.isRace
+      : false;
+
   const sortedStandings = useMemo(() => {
     const base = classFilter
       ? baseStandings.filter((s) => getClassByStanding(s)?.nameE === classFilter)
       : baseStandings;
-    return sortStandingsForResult(base);
-  }, [classFilter, baseStandings]);
+    const sorted = sortStandingsForResult(base);
+    return classFilter ? recomputeStandingsGaps(sorted, isRaceMode) : sorted;
+  }, [classFilter, baseStandings, isRaceMode]);
 
   const handleDownloadClassification = () => {
     if (isArchive && pastResult) {
