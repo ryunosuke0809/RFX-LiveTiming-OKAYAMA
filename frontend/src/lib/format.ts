@@ -63,12 +63,13 @@ export function formatBestTimeGap(
 }
 
 /**
- * 表示中の並び（クラスフィルター後など）の先頭車をトップとして
- * Behind / Gap を付け直す。元の standing は変更しない。
+ * クラスフィルター後の表示用。先頭車をトップとして Behind / Gap を付け直し、
+ * POS もクラス内順位にする。元の standing は変更しない。
  */
 export function recomputeStandingsGaps<
   T extends {
     position: number;
+    classPosition: number;
     order: number;
     lap: number;
     lastPassingTime: number | null;
@@ -86,15 +87,19 @@ export function recomputeStandingsGaps<
   const top = ranked[0];
   return ranked.map((cur, i) => {
     const prev = i === 0 ? top : ranked[i - 1]!;
+    const classPos =
+      cur.classPosition > 0 ? cur.classPosition : cur.position > 0 ? i + 1 : 0;
     if (isRaceMode) {
       return {
         ...cur,
+        position: classPos,
         gap: formatRaceGap(cur.lap, cur.lastPassingTime, top.lap, top.lastPassingTime),
         interval: formatRaceGap(cur.lap, cur.lastPassingTime, prev.lap, prev.lastPassingTime),
       };
     }
     return {
       ...cur,
+      position: classPos,
       gap: formatBestTimeGap(cur.bestTime, top.bestTime),
       interval: formatBestTimeGap(cur.bestTime, prev.bestTime),
     };
