@@ -599,6 +599,8 @@ export class SessionStateAggregator {
             // (= LapTime - S1 - S2) を S3 として入れる。
             if (isPitLap && s1t !== null && s2t !== null && newLast > s1t + s2t) {
                 s3t = newLast - s1t - s2t;
+                // 個別ページだけでなくタイミング表の S3 にも出す（次周 S1 まで保持）。
+                accum.s3 = { time: s3t, type: "current" };
             }
             const lapData: LapDataVm = {
                 lap: lapNo,

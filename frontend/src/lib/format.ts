@@ -24,6 +24,83 @@ export function formatGap(gap: string): string {
   return gap;
 }
 
+function formatSecondsDiff(diff10000: number): string {
+  const seconds = diff10000 / 10000;
+  if (seconds >= 60) {
+    const m = Math.floor(seconds / 60);
+    const rem = seconds - m * 60;
+    return `+${m}:${rem.toFixed(3).padStart(6, "0")}`;
+  }
+  return `+${seconds.toFixed(3)}`;
+}
+
+/** 周回レース: トップ（または前車）との差。同一周回は通過時刻差、周回差は +NL。 */
+export function formatRaceGap(
+  selfLap: number,
+  selfLastPassing: number | null,
+  refLap: number,
+  refLastPassing: number | null,
+): string {
+  if (selfLap === refLap && selfLastPassing !== null && refLastPassing !== null) {
+    const diff10000 = selfLastPassing - refLastPassing;
+    if (diff10000 <= 0) return "—";
+    return formatSecondsDiff(diff10000);
+  }
+  const lapDiff = refLap - selfLap;
+  if (lapDiff <= 0) return "—";
+  return `+${lapDiff}L`;
+}
+
+/** ベストタイムモード: 基準ベストとの差。 */
+export function formatBestTimeGap(
+  selfBest: number | null,
+  refBest: number | null,
+): string {
+  if (selfBest == null || selfBest <= 0 || refBest == null || refBest <= 0) return "—";
+  const diff = selfBest - refBest;
+  if (diff <= 0) return "—";
+  return formatSecondsDiff(diff);
+}
+
+/**
+ * 表示中の並び（クラスフィルター後など）の先頭車をトップとして
+ * Behind / Gap を付け直す。元の standing は変更しない。
+ */
+export function recomputeStandingsGaps<
+  T extends {
+    position: number;
+    order: number;
+    lap: number;
+    lastPassingTime: number | null;
+    bestTime: number | null;
+    gap: string;
+    interval: string;
+  },
+>(standings: T[], isRaceMode: boolean): T[] {
+  if (standings.length === 0) return standings;
+  const ranked = [...standings].sort((a, b) => {
+    const pa = a.position > 0 ? a.position : Number.MAX_SAFE_INTEGER;
+    const pb = b.position > 0 ? b.position : Number.MAX_SAFE_INTEGER;
+    return pa - pb || a.order - b.order;
+  });
+  const top = ranked[0];
+  return ranked.map((cur, i) => {
+    const prev = i === 0 ? top : ranked[i - 1]!;
+    if (isRaceMode) {
+      return {
+        ...cur,
+        gap: formatRaceGap(cur.lap, cur.lastPassingTime, top.lap, top.lastPassingTime),
+        interval: formatRaceGap(cur.lap, cur.lastPassingTime, prev.lap, prev.lastPassingTime),
+      };
+    }
+    return {
+      ...cur,
+      gap: formatBestTimeGap(cur.bestTime, top.bestTime),
+      interval: formatBestTimeGap(cur.bestTime, prev.bestTime),
+    };
+  });
+}
+
 /**
  * 残り時間(秒)をカウントダウン表示に変換
  * 例: 5400 → "1:30:00"

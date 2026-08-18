@@ -537,6 +537,30 @@ export function useLiveTiming(url?: string): LiveTimingData {
 
 const rank = (pos: number) => (pos > 0 ? pos : Number.MAX_SAFE_INTEGER);
 
+/** FL 直後などで、表示中セクターが直前の完了周のコピーなら true。 */
+function isLeftoverCompletedSectors(
+  last: LapData,
+  standingLap: number,
+  s1: number | null,
+  s2: number | null,
+  s3: number | null,
+): boolean {
+  const allMatch =
+    s1 === last.s1 &&
+    s2 === last.s2 &&
+    s3 === last.s3 &&
+    (s1 != null || s2 != null || s3 != null);
+  if (allMatch) return true;
+  // ピット周: 完了ラップには算出 S3 があるが、表側 S3 がまだ空
+  return (
+    last.lap === standingLap &&
+    s1 === last.s1 &&
+    s2 === last.s2 &&
+    s3 == null &&
+    last.s3 != null
+  );
+}
+
 /** ライブの周回履歴 (LapData[]) から DriverPersonalData を構築する。
  * 現在の standing が渡された場合は、集計中の「現在ラップ」を末尾に追加し、
  * セクタータイムや In Pit をリアルタイムに反映する。 */
@@ -551,9 +575,22 @@ function buildPersonalData(
   // 進行中ラップ: 完了周回 (standing.lap) の次の周を集計中として表示。
   if (standing && standing.status !== "retired" && standing.status !== "finished") {
     const sec = standing.sectors ?? [];
-    const s1 = sec[0]?.time ?? null;
-    const s2 = sec[1]?.time ?? null;
-    const s3 = sec[2]?.time ?? null;
+    let s1 = sec[0]?.time ?? null;
+    let s2 = sec[1]?.time ?? null;
+    let s3 = sec[2]?.time ?? null;
+    let s1Type = sec[0]?.type ?? "none";
+    let s2Type = sec[1]?.type ?? "none";
+    let s3Type = sec[2]?.type ?? "none";
+    const lastCompleted = completed[completed.length - 1];
+    // FL 直後は standing.sectors が前周のまま残る。次周の行に流用しない。
+    if (lastCompleted && isLeftoverCompletedSectors(lastCompleted, standing.lap, s1, s2, s3)) {
+      s1 = null;
+      s2 = null;
+      s3 = null;
+      s1Type = "none";
+      s2Type = "none";
+      s3Type = "none";
+    }
     const inPit = standing.status === "in_pit";
     // 何かしら表示すべき情報 (セクター計測 or ピット中) がある時だけ現在ラップ行を出す。
     if (s1 !== null || s2 !== null || s3 !== null || inPit) {
@@ -563,9 +600,9 @@ function buildPersonalData(
         s1,
         s2,
         s3,
-        s1Type: sec[0]?.type ?? "none",
-        s2Type: sec[1]?.type ?? "none",
-        s3Type: sec[2]?.type ?? "none",
+        s1Type,
+        s2Type,
+        s3Type,
         lapTimeType: "none",
         isPit: inPit,
         position: standing.position,

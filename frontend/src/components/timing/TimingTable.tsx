@@ -6,6 +6,7 @@ import TimingRow from "./TimingRow";
 import ColumnToggle from "./ColumnToggle";
 import ScrollHintArea from "@/components/shared/ScrollHintArea";
 import { getTeamByStanding, getClassByStanding } from "@/data/mock";
+import { recomputeStandingsGaps } from "@/lib/format";
 import {
   colWidthStyle,
   getStickyColumnKeys,
@@ -105,12 +106,11 @@ export default function TimingTable({ standings, classFilter, flashKey = 0, isRa
   const firstStickyKey = stickyKeys[0];
   const lastStickyKey = stickyKeys[stickyKeys.length - 1];
 
-  const filtered = classFilter
-    ? standings.filter((s) => {
-        const cls = getClassByStanding(s);
-        return cls?.nameE === classFilter;
-      })
-    : standings;
+  const filtered = (() => {
+    if (!classFilter) return standings;
+    const rows = standings.filter((s) => getClassByStanding(s)?.nameE === classFilter);
+    return recomputeStandingsGaps(rows, isRaceMode);
+  })();
 
   const renderHeader = (col: typeof columns[number]) => {
     if (col.key === "car") {
