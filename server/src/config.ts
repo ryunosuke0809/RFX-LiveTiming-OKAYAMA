@@ -22,6 +22,10 @@ export interface AppConfig {
     dataDir: string;
     recentMessageBuffer: number;
     logLevel: LogLevel;
+    /** 管理画面ログインセッションの有効期間（秒）。操作ごとに延長される。 */
+    adminSessionTtlSec: number;
+    /** 管理セッション Cookie に Secure を付けるか。HTTPS 本番では必須。 */
+    adminCookieSecure: boolean;
 }
 
 /** /ws 認証が有効か（短期秘密鍵 or 静的トークン）。 */
@@ -46,6 +50,13 @@ function parseLogLevel(value: string | undefined): LogLevel {
 function parsePositiveInt(value: string | undefined, fallback: number): number {
     const n = Number.parseInt(value ?? "", 10);
     return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+
+function parseBool(value: string | undefined, fallback: boolean): boolean {
+    const v = value?.trim().toLowerCase();
+    if (v === "1" || v === "true" || v === "yes") return true;
+    if (v === "0" || v === "false" || v === "no") return false;
+    return fallback;
 }
 
 function parseOrigins(value: string | undefined): string[] | null {
@@ -79,5 +90,11 @@ export function loadConfig(): AppConfig {
         dataDir: path.resolve(process.env.DATA_DIR ?? "./data"),
         recentMessageBuffer: parsePositiveInt(process.env.RECENT_MESSAGE_BUFFER, 2000),
         logLevel: parseLogLevel(process.env.LOG_LEVEL),
+        adminSessionTtlSec: parsePositiveInt(process.env.ADMIN_SESSION_TTL_SEC, 12 * 3600),
+        // HTTP の localhost 開発では Cookie が保存されないため、本番だけ既定で有効にする
+        adminCookieSecure: parseBool(
+            process.env.ADMIN_COOKIE_SECURE,
+            process.env.NODE_ENV === "production",
+        ),
     };
 }

@@ -95,7 +95,7 @@ interface StateSnapshot {
 }
 
 type LiveStatePatch =
-  | { kind: "reset"; scope?: "all" | "timing" }
+  | { kind: "reset"; scope?: "all" | "timing" | "day" }
   | { kind: "session"; fields: Partial<SessionInfoVm> }
   | { kind: "flag"; flag: TrackFlag }
   | { kind: "class_upsert"; value: CarClassVm }
@@ -172,6 +172,12 @@ function emptyInternal(): InternalState {
     driverLaps: new Map(),
     bestSectors: [null, null, null],
   };
+}
+
+/** ローカル暦の日付キー。0 時をまたいだかどうかの判定に使う。 */
+function localDayKey(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
 }
 
 function resolveDefaultUrl(): string {
@@ -268,6 +274,7 @@ export function useLiveTiming(url?: string): LiveTimingData {
       switch (patch.kind) {
         case "reset":
           // Select は timing のみ。Category 切替等は all (Team/Class も破棄)。
+          // day は日付跨ぎで、セッション情報も捨てて未接続表示に戻す。
           s.standings.clear();
           s.driverLaps.clear();
           s.fastestLap = null;
@@ -277,6 +284,10 @@ export function useLiveTiming(url?: string): LiveTimingData {
           if (patch.scope !== "timing") {
             s.classes.clear();
             s.teams.clear();
+          }
+          if (patch.scope === "day") {
+            s.session = null;
+            s.dataTsMs = null;
           }
           clearAllSectorEnters();
           break;
@@ -433,6 +444,22 @@ export function useLiveTiming(url?: string): LiveTimingData {
       }
     };
   }, [url]);
+
+  // ローカル日付が変わったら表示を空に戻す保険。
+  // 通常はサーバーが reset(scope:"day") を配信するが、それを取りこぼしたタブや
+  // スリープから復帰したタブでも前日のデータが残らないようにする。
+  useEffect(() => {
+    let currentDay = localDayKey();
+    const timer = setInterval(() => {
+      const today = localDayKey();
+      if (today === currentDay) return;
+      currentDay = today;
+      stateRef.current = emptyInternal();
+      clearAllSectorEnters();
+      setVersion((v) => v + 1);
+    }, 30_000);
+    return () => clearInterval(timer);
+  }, []);
 
   // version が変わるたびに ref から表示型を作り直す。
   const data = useMemo<LiveTimingData>(() => {

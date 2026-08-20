@@ -175,8 +175,11 @@ export interface LiveStateSnapshot {
  * フロントエンドは `kind` で switch して該当部分だけ書き換える。
  */
 export type LiveStatePatch =
-    /** scope: "timing" = ラップ系のみクリア (Team/Class は保持)。省略時は全クリア。 */
-    | { kind: "reset"; scope?: "all" | "timing" }
+    /**
+     * scope: "timing" = ラップ系のみクリア (Team/Class は保持)。省略時は全クリア。
+     * "day" = 日付跨ぎの完全リセット。セッション情報も破棄して未接続表示に戻す。
+     */
+    | { kind: "reset"; scope?: "all" | "timing" | "day" }
     | { kind: "session"; fields: Partial<SessionInfoVm> }
     | { kind: "flag"; flag: TrackFlag }
     | { kind: "class_upsert"; value: CarClassVm }

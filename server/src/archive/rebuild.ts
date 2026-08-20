@@ -6,6 +6,12 @@ import type { LiveStateSnapshot, SessionInfoVm } from "../state/types.js";
 export interface ArchiveSessionSummary {
     /** 日付内のインデックス (0 始まり)。API の sessionIndex に使う。 */
     index: number;
+    /**
+     * 同一論理セッションを指す安定キー (`makeSessionKey` の値)。
+     * index は再生結果の並び順で決まるため、管理画面の表示可否・表示名上書きは
+     * この (date, sessionKey) を宛先にする。
+     */
+    sessionKey: string;
     date: string; // YYYY-MM-DD
     competitionName: string;
     categoryName: string;
@@ -60,6 +66,7 @@ export function rebuildSessionsFromMessages(
 
         const candidate: ArchiveSessionDetail = {
             index: 0, // 後で振り直す
+            sessionKey: key,
             date: dateIso,
             competitionName:
                 session?.competitionNameE || session?.competitionNameJ || "",

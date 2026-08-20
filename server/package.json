@@ -10,6 +10,8 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
+    "admin": "node dist/admin/cli.js",
+    "admin:dev": "tsx src/admin/cli.ts",
     "replay": "node scripts/replay-log.mjs",
     "clean": "rimraf dist"
   },

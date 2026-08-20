@@ -2,6 +2,8 @@
 
 export interface ArchiveSessionSummary {
   index: number;
+  /** 同一論理セッションを指す安定キー。管理画面の表示可否・表示名上書きの宛先。 */
+  sessionKey: string;
   date: string;
   competitionName: string;
   categoryName: string;
@@ -48,6 +50,7 @@ export interface ArchiveStanding {
 
 export interface ArchiveResultPayload {
   index: number;
+  sessionKey: string;
   date: string;
   competitionName: string;
   categoryName: string;

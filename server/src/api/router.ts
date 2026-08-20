@@ -1,7 +1,7 @@
 import { Router, type Request } from "express";
 import type { TimingRepository } from "../db/repository.js";
 import type { BroadcastHub } from "../broadcast/hub.js";
-import { ArchiveService } from "../archive/service.js";
+import type { ArchiveService } from "../archive/service.js";
 import { buildClassificationCsv, buildLapsCsv } from "../archive/csv.js";
 import type { AppConfig } from "../config.js";
 import { requiresViewAuth } from "../config.js";
@@ -18,9 +18,9 @@ export function createApiRouter(
     repository: TimingRepository,
     hub: BroadcastHub,
     config: AppConfig,
+    archive: ArchiveService,
 ): Router {
     const router = Router();
-    const archive = new ArchiveService(repository);
     const tokenHits = new Map<string, { count: number; resetAt: number }>();
 
     router.get("/health", (_req, res) => {
@@ -187,10 +187,7 @@ export function createApiRouter(
                 return;
             }
             res.setHeader("Content-Type", "text/csv; charset=utf-8");
-            res.setHeader(
-                "Content-Disposition",
-                `attachment; filename="${filename}"`,
-            );
+            res.setHeader("Content-Disposition", contentDisposition(filename));
             res.send("\uFEFF" + csv);
         } catch (err) {
             res.status(500).json({ error: (err as Error).message });
@@ -198,6 +195,22 @@ export function createApiRouter(
     });
 
     return router;
+}
+
+/**
+ * 非 ASCII を含むファイル名でも壊れない Content-Disposition を組む。
+ *
+ * safeName() は日本語を残すため、カテゴリ名によってはファイル名に CJK が入る。
+ * HTTP ヘッダーは latin1 しか通らず、そのまま渡すと Node が送信を拒否するので、
+ * ASCII 版と RFC 5987 版を併記する（対応ブラウザは filename* を優先する）。
+ */
+function contentDisposition(filename: string): string {
+    const ascii =
+        filename
+            .replace(/[^\x20-\x7e]/g, "_")
+            .replace(/["\\]/g, "")
+            .replace(/_+/g, "_") || "result.csv";
+    return `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(filename)}`;
 }
 
 function safeName(v: string): string {

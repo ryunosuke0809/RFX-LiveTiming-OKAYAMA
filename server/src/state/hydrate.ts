@@ -5,11 +5,14 @@ import type { LiveSessionState } from "./session-state.js";
 import type { Logger } from "../logger.js";
 
 /**
- * サーバー再起動後もライブ表示をすぐ戻すため、当日 (なければ直近) の
- * SQLite messages を aggregator に流してメモリ状態を復元する。
+ * サーバー再起動後もライブ表示をすぐ戻すため、当日の SQLite messages を
+ * aggregator に流してメモリ状態を復元する。
  *
  * Receiver はセッション途中では Team/Class マスターを再送しないことが多く、
  * 再起動直後は Standings/Passing だけが来て車番・チーム名が空になる。
+ *
+ * 当日のデータが無い場合は復元しない。以前は直近の日にフォールバックしていたが、
+ * それだと翌朝の起動時に前日のリザルトがライブ画面に出続けてしまう。
  */
 export function hydrateLiveStateFromDb(
     repository: TimingRepository,
@@ -18,12 +21,11 @@ export function hydrateLiveStateFromDb(
     logger: Logger,
 ): { day: string | null; messages: number } {
     const today = formatYyyymmdd(new Date());
-    const days = repository.listAvailableDays();
-    const day = days.includes(today) ? today : (days[days.length - 1] ?? null);
-    if (!day) {
-        logger.info("hydrate skipped (no sqlite days)");
+    if (!repository.listAvailableDays().includes(today)) {
+        logger.info("hydrate skipped (no data for today)", { today });
         return { day: null, messages: 0 };
     }
+    const day = today;
 
     const started = Date.now();
     const envelopes = repository.loadDayMessages(day);

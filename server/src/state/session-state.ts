@@ -119,6 +119,21 @@ export class LiveSessionState {
         this.teams.clear();
     }
 
+    /**
+     * 日付が変わったときの完全リセット。
+     *
+     * `resetForSessionSwitch()` に加えてセッション情報自体も破棄し、
+     * 「まだ何も来ていない」状態に戻す。SMIS の Select が来ないまま日を跨いだとき、
+     * 前日のリザルトがライブ画面に出続けるのを防ぐため。
+     */
+    resetForNewDay(): void {
+        this.resetForSessionSwitch();
+        this.session = null;
+        this.sessionSignature = null;
+        this.sessionMode = "time";
+        this.lastDataTs = null;
+    }
+
     pushRecentMessage(msg: RaceControlMessageVm): void {
         this.recentMessages.push(msg);
         if (this.recentMessages.length > this.recentMessageLimit) {

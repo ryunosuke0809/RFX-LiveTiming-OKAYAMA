@@ -7,9 +7,13 @@ import { BroadcastHub } from "./broadcast/hub.js";
 import { attachBroadcastServer } from "./broadcast/broadcast-server.js";
 import { attachIngestServer } from "./ingest/ingest-server.js";
 import { createApiRouter } from "./api/router.js";
+import { createAdminRouter } from "./api/admin-router.js";
+import { AdminStore } from "./admin/store.js";
+import { ArchiveService } from "./archive/service.js";
 import { LiveSessionState } from "./state/session-state.js";
 import { SessionStateAggregator } from "./state/aggregator.js";
 import { hydrateLiveStateFromDb } from "./state/hydrate.js";
+import { startDayRollover } from "./state/day-rollover.js";
 
 const config = loadConfig();
 const logger = new Logger(config.logLevel);
@@ -28,6 +32,8 @@ logger.info("starting MOLA_Timing cloud server", {
 });
 
 const repository = new TimingRepository(config.dataDir, logger);
+const adminStore = new AdminStore(config.dataDir, logger);
+const archive = new ArchiveService(repository, adminStore);
 const hub = new BroadcastHub(config.recentMessageBuffer, logger);
 
 const liveState = new LiveSessionState();
@@ -37,10 +43,14 @@ hub.setSnapshotProvider(() => liveState.snapshot(new Date().toISOString()));
 // 再起動してもセッション途中のチーム名が出るよう、当日 DB から状態を復元
 hydrateLiveStateFromDb(repository, aggregator, liveState, logger);
 
+// 日付が変わったらライブ表示を空に戻す (前日のリザルトが残り続けるのを防ぐ)
+const stopDayRollover = startDayRollover(liveState, hub, logger);
+
 const app = express();
 app.disable("x-powered-by");
 app.use(express.json({ limit: "256kb" }));
-app.use("/api", createApiRouter(repository, hub, config));
+app.use("/api/admin", createAdminRouter(adminStore, archive, config, logger));
+app.use("/api", createApiRouter(repository, hub, config, archive));
 
 app.get("/", (_req, res) => {
     res.type("text/plain").send(
@@ -55,6 +65,7 @@ app.get("/", (_req, res) => {
             "  GET  /api/archive/sessions?date=YYYY-MM-DD",
             "  GET  /api/archive/results?date=...&sessionIndex=0",
             "  GET  /api/archive/csv?date=...&sessionIndex=0&kind=classification",
+            "  POST /api/admin/login  (管理画面。以降は Cookie セッション)",
             "  WS   /ingest  (Receiver, Bearer token)",
             "  WS   /ws      (Frontend subscribers)",
         ].join("\n"),
@@ -75,8 +86,10 @@ httpServer.listen(config.port, config.host, () => {
 // ============================================================
 function shutdown(signal: string): void {
     logger.info("shutdown requested", { signal });
+    stopDayRollover();
     httpServer.close(() => {
         repository.close();
+        adminStore.close();
         logger.info("shutdown complete");
         process.exit(0);
     });

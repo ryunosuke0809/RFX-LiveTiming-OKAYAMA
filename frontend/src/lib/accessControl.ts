@@ -1,8 +1,9 @@
 /**
- * 一般向け / 関係者向けのアクセス制御ポリシー。
+ * 一般向け / 関係者向け / 管理者向けのアクセス制御ポリシー。
  *
  * - 一般向け (`mola-timing-okayama.com`): ブラウザ GPS による場内ジオフェンス（本実装）
  * - 関係者向け (`oic-private.…`): 制限なし
+ * - 管理者向け (`NEXT_PUBLIC_ADMIN_HOST`): GPS なし。ログイン必須（サーバー側 Cookie セッション）
  * - IP 制限: 承認後に nginx 側（一般向けホストのみ）で有効化する想定。
  *   設定例は `deploy/nginx/snippets/mola-public-ip-allowlist.conf.example`
  */
@@ -29,7 +30,25 @@ const PUBLIC_HOSTS = new Set([
 
 const PRIVATE_HOSTS = new Set(["oic-private.mola-timing-okayama.com"]);
 
-export type AccessAudience = "public" | "private" | "local";
+/**
+ * 管理画面を出すホスト（カンマ区切りで複数可）。
+ * サブドメインは後日確定するため、コードに焼かず環境変数で差し替える。
+ *   例: NEXT_PUBLIC_ADMIN_HOST=admin.mola-timing-okayama.com
+ *
+ * 未設定なら管理画面はローカル開発でのみ到達できる。本番の一般公開ドメインに
+ * `/admin` が誤って露出するのを防ぐための既定値。
+ */
+export function adminHosts(): Set<string> {
+  const raw = process.env.NEXT_PUBLIC_ADMIN_HOST ?? "";
+  return new Set(
+    raw
+      .split(",")
+      .map((s) => s.trim().toLowerCase())
+      .filter((s) => s.length > 0),
+  );
+}
+
+export type AccessAudience = "public" | "private" | "local" | "admin";
 
 export function resolveAccessAudience(hostname: string): AccessAudience {
   const host = hostname.toLowerCase();
@@ -41,6 +60,7 @@ export function resolveAccessAudience(hostname: string): AccessAudience {
   ) {
     return "local";
   }
+  if (adminHosts().has(host)) return "admin";
   if (PRIVATE_HOSTS.has(host)) return "private";
   if (PUBLIC_HOSTS.has(host)) return "public";
   // 未知ホストは本番誤設定を避けるため一般向け扱いで制限する
@@ -50,6 +70,12 @@ export function resolveAccessAudience(hostname: string): AccessAudience {
 /** 一般向けホストでのみ GPS ジオフェンスを要求する */
 export function requiresVenueGeofence(hostname: string): boolean {
   return resolveAccessAudience(hostname) === "public";
+}
+
+/** `/admin` 配下を配信して良いホストか。ローカル開発と管理ホストのみ。 */
+export function allowsAdminPages(hostname: string): boolean {
+  const audience = resolveAccessAudience(hostname);
+  return audience === "admin" || audience === "local";
 }
 
 /** 2点間の大円距離（メートル） */

@@ -105,6 +105,15 @@ export default function TimingPage() {
     if (isLive && live.sessionInfo) setSessionInfo(live.sessionInfo);
   }, [isLive, live.sessionInfo]);
 
+  // ライブデータが消えたら（日付跨ぎのリセット等）前セッションの表示を残さない。
+  // ここで戻さないと、順位表は空でもヘッダーに前日の大会名が出続ける。
+  useEffect(() => {
+    if (isLive) return;
+    setStandings(mockStandings);
+    setSessionInfo(mockSessionInfo);
+    setSelectedStanding(null);
+  }, [isLive]);
+
   useEffect(() => {
     const timer = setInterval(() => {
       setSessionInfo((prev) => ({

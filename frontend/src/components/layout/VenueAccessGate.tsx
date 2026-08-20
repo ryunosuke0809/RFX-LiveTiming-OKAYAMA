@@ -1,17 +1,22 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { usePathname } from "next/navigation";
 import { useVenueGeofence } from "@/hooks/useVenueGeofence";
 
 /**
  * 一般向けホストでは GPS 場内判定が通るまで子コンポーネント（LiveTiming / WS）をマウントしない。
  * 関係者サブドメイン・localhost ではそのまま通す。
+ *
+ * 管理画面は場外から運用するため GPS を要求しない（到達可否は middleware とログインで守る）。
  */
 export default function VenueAccessGate({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
   const { ready, required, allowed, checking, message, recheck } = useVenueGeofence();
+  const isAdminPage = pathname?.startsWith("/admin") ?? false;
 
   // ホスト判定前は一般向け扱い（誤って WS を先に繋がない）
-  if (ready && (!required || allowed)) {
+  if (isAdminPage || (ready && (!required || allowed))) {
     return <>{children}</>;
   }
 

@@ -24,6 +24,14 @@ npm run build
 echo "==> build frontend"
 cd "$REPO/frontend"
 npm ci
+# NEXT_PUBLIC_* はビルド時にバンドルへ埋め込まれるため、build より前に読み込む
+# （NEXT_PUBLIC_ADMIN_HOST を設定しないと /admin は 404 のまま）
+if [[ -f "$APP_ROOT/shared/frontend.env" ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  . "$APP_ROOT/shared/frontend.env"
+  set +a
+fi
 npm run build
 
 echo "==> sync nginx / logrotate (if present)"
@@ -31,6 +39,8 @@ if [[ -f /etc/nginx/sites-available/mola-timing-okayama ]]; then
   sudo mkdir -p /etc/nginx/snippets
   sudo install -m 644 "$REPO/deploy/nginx/snippets/mola-proxy-locations.conf" \
     /etc/nginx/snippets/mola-proxy-locations.conf
+  sudo install -m 644 "$REPO/deploy/nginx/snippets/mola-admin-deny.conf" \
+    /etc/nginx/snippets/mola-admin-deny.conf
   sudo install -m 644 "$REPO/deploy/nginx/mola-timing-okayama.conf" \
     /etc/nginx/sites-available/mola-timing-okayama
   sudo install -m 644 "$REPO/deploy/logrotate/mola-timing-nginx" \

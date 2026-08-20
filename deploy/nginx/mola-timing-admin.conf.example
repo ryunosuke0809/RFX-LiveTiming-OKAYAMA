@@ -1,0 +1,82 @@
+# MOLA Timing Okayama — 管理画面サブドメイン（雛形）
+#
+# サブドメインが確定したら ADMIN_HOST を実ホスト名に置換し、
+# /etc/nginx/sites-available/mola-timing-admin として配置する。
+#
+#   sudo sed 's/ADMIN_HOST/admin.mola-timing-okayama.com/g' \
+#     /opt/mola-timing-okayama/repo/deploy/nginx/mola-timing-admin.conf.example \
+#     | sudo tee /etc/nginx/sites-available/mola-timing-admin
+#   sudo ln -sf /etc/nginx/sites-available/mola-timing-admin /etc/nginx/sites-enabled/
+#
+# 先に済ませておくこと:
+#   1. DNS: ADMIN_HOST の A レコード → VPS IP
+#   2. 証明書 SAN に ADMIN_HOST を追加（deploy/scripts/issue-cert.sh の -d に追記して再発行）
+#   3. shared/server.env の ALLOWED_ORIGINS に https://ADMIN_HOST を追加
+#      （管理 API は更新系で Origin を照合するため、抜けるとログインが 403 になる）
+#   4. frontend の NEXT_PUBLIC_ADMIN_HOST に ADMIN_HOST を設定して再ビルド
+#      （設定しないと /admin は 404 のまま）
+#
+# 変数 mola_frontend / mola_backend / $connection_upgrade は
+# mola-timing-okayama.conf 側で定義済み。両方を有効にしておくこと。
+
+# HTTP → HTTPS
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ADMIN_HOST;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name ADMIN_HOST;
+
+    ssl_certificate     /etc/letsencrypt/live/mola-timing-okayama.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/mola-timing-okayama.com/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+
+    # --- 推奨: 管理画面は IP 許可リストも併用する ---
+    # allow 203.0.113.4;   # 事務所の固定 IP
+    # deny all;
+
+    add_header X-Content-Type-Options nosniff always;
+    add_header Referrer-Policy strict-origin-when-cross-origin always;
+    add_header X-Frame-Options DENY always;
+    # 管理画面は検索エンジンに載せない
+    add_header X-Robots-Tag "noindex, nofollow" always;
+
+    client_max_body_size 2m;
+
+    access_log /var/log/nginx/mola-timing-admin-access.log mola_access;
+    error_log  /var/log/nginx/mola-timing-admin-error.log warn;
+
+    # 管理ホストでは /ws /ingest を通す必要がない。/api/ と Next.js のみ。
+    location /api/ {
+        proxy_pass http://mola_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location / {
+        proxy_pass http://mola_frontend;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+    }
+}
