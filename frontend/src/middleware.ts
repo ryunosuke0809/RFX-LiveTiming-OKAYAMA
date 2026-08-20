@@ -6,7 +6,7 @@ import { allowsAdminPages } from "@/lib/accessControl";
  * ホスト単位でページを閉じる。
  *
  * - `/debug`: 本番ではデバッグ用ストリームビューアを閉じる（next dev では許可）。
- * - `/admin`: 管理ホスト（`NEXT_PUBLIC_ADMIN_HOST`）とローカル開発のみ。
+ * - `/admin`: 管理ホスト（`accessControl.ts` の `adminHosts()`）とローカル開発のみ。
  *   一般公開ドメインに管理画面が露出しないようにする。
  */
 export function middleware(request: NextRequest) {

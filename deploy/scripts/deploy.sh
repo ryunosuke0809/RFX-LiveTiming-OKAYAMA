@@ -25,7 +25,7 @@ echo "==> build frontend"
 cd "$REPO/frontend"
 npm ci
 # NEXT_PUBLIC_* はビルド時にバンドルへ埋め込まれるため、build より前に読み込む
-# （NEXT_PUBLIC_ADMIN_HOST を設定しないと /admin は 404 のまま）
+# （管理ホストは既定値をコードに持つので、frontend.env が無くても /admin は動く）
 if [[ -f "$APP_ROOT/shared/frontend.env" ]]; then
   set -a
   # shellcheck disable=SC1091

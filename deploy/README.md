@@ -6,9 +6,10 @@
 |--------|------|
 | `https://mola-timing-okayama.com` | 一般向け（**GPS 場内制限**。将来 IP 制限可） |
 | `https://oic-private.mola-timing-okayama.com` | 関係者向け（制限なし・同一画面） |
-| （サブドメイン未確定） | 管理画面（ログイン必須）。[管理画面](#管理画面) 参照 |
+| `https://oic-timing-admin.mola-timing-okayama.com` | 管理画面（ログイン必須）。[管理画面](#管理画面) 参照 |
 
-ムームー DNS: `oic-private` の A レコード → VPS IP（apex と同じ）。証明書は `issue-cert.sh` で両ホストを含む。
+ムームー DNS: `oic-private` と `oic-timing-admin` の A レコード → VPS IP（apex と同じ）。
+証明書は `issue-cert.sh` が 3 ホストすべてを 1 枚の SAN に含める。
 
 ### 閲覧制限
 
@@ -17,7 +18,7 @@
 | ブラウザ GPS（ジオフェンス） | **有効** | 一般向けのみ。半径約 3km・30秒ごと再確認。範囲外で画面停止・WS 切断 |
 | IP 許可リスト | **準備のみ** | 一般向け nginx server に include 枠あり。`deploy/nginx/snippets/mola-public-ip-allowlist.conf.example` |
 | 関係者 (`oic-private`) | 制限なし | GPS / IP とも適用しない |
-| 管理画面 | ログイン必須 | GPS は適用しない。専用サブドメイン以外では 404 |
+| 管理画面 | ログイン必須 | GPS は適用しない。`oic-timing-admin` 以外のホストでは 404 |
 
 localhost での開発時は GPS チェックをスキップする。
 
@@ -147,35 +148,44 @@ sudo nginx -t && sudo systemctl reload nginx
 管理データは `shared/data/admin.db`（管理者アカウント・表示可否・監査ログ）に入る。
 日次 DB とは別ファイルなので、**バックアップ対象に含めること**。
 
-### サブドメイン確定後の手順
+URL: `https://oic-timing-admin.mola-timing-okayama.com/admin`
+
+管理ホスト名は `frontend/src/lib/accessControl.ts` と `deploy/nginx/mola-timing-okayama.conf`
+に入っているので、通常のデプロイ手順以外に必要なのは DNS・証明書・`ALLOWED_ORIGINS` の 3 点だけ。
+
+### 有効化の手順（初回のみ）
 
 ```bash
-# 1. DNS: ADMIN_HOST の A レコード → VPS IP（apex と同じ）
+# 1. DNS: ムームー DNS で oic-timing-admin の A レコード → VPS IP（apex と同じ）
+#    証明書発行は名前解決できてから。先に dig で確認する
+dig +short oic-timing-admin.mola-timing-okayama.com
 
-# 2. 証明書 SAN に追加（issue-cert.sh の -d に ADMIN_HOST を追記してから）
+# 2. 証明書 SAN に追加（--expand で既存証明書に相乗り）＋ nginx 本設定を再配置
 sudo bash /opt/mola-timing-okayama/repo/deploy/scripts/issue-cert.sh
 
-# 3. nginx: 雛形の ADMIN_HOST を置換して配置
-sudo sed 's/ADMIN_HOST/admin.mola-timing-okayama.com/g' \
-  /opt/mola-timing-okayama/repo/deploy/nginx/mola-timing-admin.conf.example \
-  | sudo tee /etc/nginx/sites-available/mola-timing-admin >/dev/null
-sudo ln -sf /etc/nginx/sites-available/mola-timing-admin /etc/nginx/sites-enabled/
-sudo nginx -t && sudo systemctl reload nginx
-
-# 4. server.env: ALLOWED_ORIGINS に https://ADMIN_HOST を追加
-#    （管理 API は更新系で Origin を照合する。抜けるとログインが 403 になる）
+# 3. server.env: ALLOWED_ORIGINS に管理オリジンを追加
+#    管理 API は更新系で Origin を照合するため、抜けるとログインが 403 になる
+sudo -e /opt/mola-timing-okayama/shared/server.env
+#   ALLOWED_ORIGINS=https://mola-timing-okayama.com,https://oic-private.mola-timing-okayama.com,https://oic-timing-admin.mola-timing-okayama.com
 sudo systemctl restart mola-timing-server
 
-# 5. frontend: NEXT_PUBLIC_ADMIN_HOST を設定して再ビルド
-#    NEXT_PUBLIC_* はビルド時に埋め込まれるので、deploy.sh の build 前に読まれる
-#    shared/frontend.env に書く（未設定だと /admin は localhost 以外で 404 のまま）
-echo "NEXT_PUBLIC_ADMIN_HOST=admin.mola-timing-okayama.com" \
-  | sudo tee -a /opt/mola-timing-okayama/shared/frontend.env
+# 4. アプリを更新（フロントの管理ホスト判定はビルドに埋め込まれるため再ビルドが必要）
 sudo -u ubuntu bash /opt/mola-timing-okayama/repo/deploy/scripts/deploy.sh
+```
+
+確認（管理ホストで 200、公開ホストで 404 になること）:
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' https://oic-timing-admin.mola-timing-okayama.com/admin
+curl -s -o /dev/null -w '%{http_code}\n' https://mola-timing-okayama.com/admin
+curl -s -o /dev/null -w '%{http_code}\n' https://oic-private.mola-timing-okayama.com/api/admin/me
 ```
 
 一般向け・関係者向けホストでは `mola-admin-deny.conf` が `/admin` と `/api/admin/` を 404 にする。
 管理サブドメインの server ブロックではこのスニペットを include しない。
+
+別ホスト（ステージング等）で管理画面を開く場合のみ、`shared/frontend.env` に
+`NEXT_PUBLIC_ADMIN_HOST=host1,host2` を足して再ビルドすると許可ホストを追加できる。
 
 ### 管理者アカウント
 

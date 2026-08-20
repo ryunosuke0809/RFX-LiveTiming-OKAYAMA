@@ -3,7 +3,7 @@
  *
  * - 一般向け (`mola-timing-okayama.com`): ブラウザ GPS による場内ジオフェンス（本実装）
  * - 関係者向け (`oic-private.…`): 制限なし
- * - 管理者向け (`NEXT_PUBLIC_ADMIN_HOST`): GPS なし。ログイン必須（サーバー側 Cookie セッション）
+ * - 管理者向け (`oic-timing-admin.…`): GPS なし。ログイン必須（サーバー側 Cookie セッション）
  * - IP 制限: 承認後に nginx 側（一般向けホストのみ）で有効化する想定。
  *   設定例は `deploy/nginx/snippets/mola-public-ip-allowlist.conf.example`
  */
@@ -30,22 +30,21 @@ const PUBLIC_HOSTS = new Set([
 
 const PRIVATE_HOSTS = new Set(["oic-private.mola-timing-okayama.com"]);
 
+const ADMIN_HOSTS = new Set(["oic-timing-admin.mola-timing-okayama.com"]);
+
 /**
- * 管理画面を出すホスト（カンマ区切りで複数可）。
- * サブドメインは後日確定するため、コードに焼かず環境変数で差し替える。
- *   例: NEXT_PUBLIC_ADMIN_HOST=admin.mola-timing-okayama.com
+ * 管理画面を出すホスト。
  *
- * 未設定なら管理画面はローカル開発でのみ到達できる。本番の一般公開ドメインに
- * `/admin` が誤って露出するのを防ぐための既定値。
+ * NEXT_PUBLIC_ADMIN_HOST（カンマ区切り）で追加できる。ステージング等でホストが
+ * 変わる場合に使う想定で、本番ホストは既定に含めてある
+ * （NEXT_PUBLIC_* はビルド時に埋め込まれるため、env 頼みだと設定漏れで 404 になる）。
  */
 export function adminHosts(): Set<string> {
-  const raw = process.env.NEXT_PUBLIC_ADMIN_HOST ?? "";
-  return new Set(
-    raw
-      .split(",")
-      .map((s) => s.trim().toLowerCase())
-      .filter((s) => s.length > 0),
-  );
+  const extra = (process.env.NEXT_PUBLIC_ADMIN_HOST ?? "")
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter((s) => s.length > 0);
+  return new Set([...ADMIN_HOSTS, ...extra]);
 }
 
 export type AccessAudience = "public" | "private" | "local" | "admin";

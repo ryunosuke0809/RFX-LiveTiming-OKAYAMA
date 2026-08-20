@@ -5,6 +5,7 @@ set -euo pipefail
 APP_ROOT=/opt/mola-timing-okayama
 DOMAIN=mola-timing-okayama.com
 PRIVATE_DOMAIN=oic-private.mola-timing-okayama.com
+ADMIN_DOMAIN=oic-timing-admin.mola-timing-okayama.com
 
 if [[ "$(id -u)" -ne 0 ]]; then
   echo "root で実行してください: sudo bash $0" >&2
@@ -18,6 +19,7 @@ certbot certonly --webroot \
   -w /var/www/certbot \
   -d "$DOMAIN" \
   -d "$PRIVATE_DOMAIN" \
+  -d "$ADMIN_DOMAIN" \
   --email "admin@${DOMAIN}" \
   --agree-tos \
   --non-interactive \
@@ -44,10 +46,15 @@ install -m 644 "$APP_ROOT/repo/deploy/nginx/mola-timing-okayama.conf" \
 mkdir -p /etc/nginx/snippets
 install -m 644 "$APP_ROOT/repo/deploy/nginx/snippets/mola-proxy-locations.conf" \
   /etc/nginx/snippets/mola-proxy-locations.conf
+install -m 644 "$APP_ROOT/repo/deploy/nginx/snippets/mola-admin-deny.conf" \
+  /etc/nginx/snippets/mola-admin-deny.conf
 nginx -t
 systemctl reload nginx
 
 # 自動更新タイマーは Ubuntu の certbot パッケージで有効なことが多い
 systemctl enable --now certbot.timer 2>/dev/null || true
 
-echo "certificate issued for https://${DOMAIN}/ and https://${PRIVATE_DOMAIN}/"
+echo "certificate issued for:"
+echo "  https://${DOMAIN}/"
+echo "  https://${PRIVATE_DOMAIN}/"
+echo "  https://${ADMIN_DOMAIN}/"
