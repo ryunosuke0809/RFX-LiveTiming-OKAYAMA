@@ -20,6 +20,8 @@ import {
     verifyPassword,
 } from "../admin/password.js";
 import { isBrowserOriginAllowed } from "../auth.js";
+import { resolveLiveColumns, sanitizeLiveColumns } from "../display/live-columns.js";
+import type { BroadcastHub } from "../broadcast/hub.js";
 
 /**
  * 管理画面 API (`/api/admin/*`)。
@@ -33,6 +35,7 @@ export function createAdminRouter(
     archive: ArchiveService,
     config: AppConfig,
     logger: Logger,
+    hub: BroadcastHub,
 ): Router {
     const router = Router();
     const auth: AdminAuthOptions = {
@@ -297,7 +300,36 @@ export function createAdminRouter(
         res.json({ entries: store.recentAudit(limit) });
     });
 
+    // ---- Live 表示設定 ----
+
+    router.get("/display/live", guard, (_req, res) => {
+        res.setHeader("Cache-Control", "no-store");
+        res.json({ columns: liveColumnsFromStore(store) });
+    });
+
+    router.put("/display/live", guard, (req, res) => {
+        const actor = (req as AdminRequest).admin!;
+        const body = (req.body ?? {}) as { columns?: unknown };
+        try {
+            const columns = sanitizeLiveColumns(body.columns);
+            store.setDisplayConfig("live", "columns", columns);
+            store.appendAudit(actor.username, "display.live.update", "live:columns");
+            hub.broadcastPatches(null, [{ kind: "display_live", columns }]);
+            logger.info("live display columns updated", {
+                username: actor.username,
+                visible: columns.filter((c) => c.visible).map((c) => c.key),
+            });
+            res.json({ columns });
+        } catch (err) {
+            res.status(400).json({ error: (err as Error).message });
+        }
+    });
+
     return router;
+}
+
+function liveColumnsFromStore(store: AdminStore) {
+    return resolveLiveColumns(store.getDisplayConfig("live")["columns"]);
 }
 
 function publicUser(store: AdminStore, id: number) {

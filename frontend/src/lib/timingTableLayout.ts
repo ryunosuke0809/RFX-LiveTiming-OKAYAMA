@@ -7,11 +7,16 @@ export interface TableColumn {
   align: string;
 }
 
-/** STATUS + POS / PIC / No. / Class（レース時は順位変動 chg も含む） */
-export function getStickyColumnKeys(isRaceMode: boolean): string[] {
-  const keys = ["status", "pos"];
-  if (isRaceMode) keys.push("chg");
-  keys.push("pic", "nr", "class");
+/** STATUS + POS / PIC / No. / Class（レース時は順位変動 chg も含む）。
+ *  先頭から連続している sticky 列だけ固定する。途中で通常列が来たら打ち切る。 */
+export function getStickyColumnKeys(visibleKeys: string[], isRaceMode: boolean): string[] {
+  const sticky = new Set(["status", "pos", "pic", "nr", "class"]);
+  if (isRaceMode) sticky.add("chg");
+  const keys: string[] = [];
+  for (const key of visibleKeys) {
+    if (!sticky.has(key)) break;
+    keys.push(key);
+  }
   return keys;
 }
 

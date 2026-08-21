@@ -42,6 +42,7 @@ type Phase = "loading" | "anonymous" | "authenticated";
 
 const NAV_ITEMS = [
   { href: "/admin/archive", label: "履歴データ" },
+  { href: "/admin/live", label: "Live表示" },
   { href: "/admin/users", label: "ユーザー" },
 ];
 

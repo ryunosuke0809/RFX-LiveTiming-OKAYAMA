@@ -1,5 +1,6 @@
 "use client";
 
+import type { CSSProperties, ReactNode } from "react";
 import type { Standing, Team, CarClass } from "@/types/smis";
 import type { CarColMode, GapColMode, LapColMode, PitColMode, BestColMode } from "./TimingTable";
 import { TIME_COLORS } from "@/lib/colors";
@@ -7,13 +8,14 @@ import { formatTime, formatPitTime } from "@/lib/format";
 import ClassBadge from "./ClassBadge";
 import PitTimer from "./PitTimer";
 import { getDriverName } from "@/data/mock";
-import { stickyCellClass, stickyTdStyle } from "@/lib/timingTableLayout";
+import { stickyCellClass, stickyTdStyle, type TableColumn } from "@/lib/timingTableLayout";
 
 interface TimingRowProps {
   standing: Standing;
   team: Team | undefined;
   carClass: CarClass | undefined;
   isEven: boolean;
+  columns: TableColumn[];
   carCol: CarColMode;
   gapCol: GapColMode;
   lapCol: LapColMode;
@@ -37,7 +39,28 @@ const STATUS_INDICATOR: Record<string, { label: string; color: string }> = {
   in_pit: { label: "P", color: "text-red-500" },
 };
 
-export default function TimingRow({ standing, team, carClass, isEven, carCol, gapCol, lapCol, pitCol, bestCol, isRaceMode, sectorFlash, stickyOffsets, firstStickyKey, lastStickyKey, onClick }: TimingRowProps) {
+const CELL_CLASS: Record<string, string> = {
+  status: "py-px text-center font-bold",
+  pos: "py-px text-center font-bold text-white font-mono",
+  chg: "py-px text-center",
+  pic: "py-px text-center text-zinc-400 font-mono",
+  nr: "py-px text-center font-bold text-white font-mono",
+  class: "py-px text-center",
+  driver: "py-px pl-2 pr-1 text-zinc-200 truncate overflow-hidden whitespace-nowrap",
+  car: "py-px pl-2 pr-1 text-zinc-400 truncate overflow-hidden whitespace-nowrap",
+  laps: "py-px text-center font-mono whitespace-nowrap",
+  gap: "py-px px-2 sm:pr-3 text-right font-mono text-zinc-300 whitespace-nowrap",
+  best: "py-px px-2 sm:pr-3 text-right font-mono whitespace-nowrap",
+  s1: "py-px px-2 sm:pr-3 text-right font-mono whitespace-nowrap",
+  s2: "py-px px-2 sm:pr-3 text-right font-mono whitespace-nowrap",
+  s3: "py-px px-2 sm:pr-3 text-right font-mono whitespace-nowrap",
+  pit: "py-px px-2 sm:pr-3 text-right whitespace-nowrap",
+};
+
+export default function TimingRow({
+  standing, team, carClass, isEven, columns, carCol, gapCol, lapCol, pitCol, bestCol,
+  isRaceMode, sectorFlash, stickyOffsets, firstStickyKey, lastStickyKey, onClick,
+}: TimingRowProps) {
   const sticky = (colKey: string, className: string) =>
     `${stickyCellClass(colKey, stickyOffsets, firstStickyKey, lastStickyKey, isEven)} ${className}`.trim();
   const stickyStyle = (colKey: string) => stickyTdStyle(colKey, stickyOffsets);
@@ -100,59 +123,102 @@ export default function TimingRow({ standing, team, carClass, isEven, carCol, ga
     return <span className="text-red-400 font-bold">▼{Math.abs(change)}</span>;
   };
 
+  const cell = (key: string): { className: string; style?: CSSProperties; content: ReactNode } => {
+    switch (key) {
+      case "status":
+        return {
+          className: CELL_CLASS.status,
+          style: { fontSize: "0.85em" },
+          content: statusInfo ? <span className={statusInfo.color}>{statusInfo.label}</span> : null,
+        };
+      case "pos":
+        return {
+          className: CELL_CLASS.pos,
+          content: standing.position > 0 ? standing.position : "—",
+        };
+      case "chg":
+        return {
+          className: CELL_CLASS.chg,
+          style: { fontSize: "0.75em" },
+          content: renderPosChange(),
+        };
+      case "pic":
+        return {
+          className: CELL_CLASS.pic,
+          content: standing.classPosition > 0 ? standing.classPosition : "—",
+        };
+      case "nr":
+        return { className: CELL_CLASS.nr, content: team?.no };
+      case "class":
+        return {
+          className: CELL_CLASS.class,
+          content: <ClassBadge className={carClass?.nameE || "---"} />,
+        };
+      case "driver":
+        return { className: CELL_CLASS.driver, content: driverName };
+      case "car":
+        return { className: CELL_CLASS.car, content: carCellValue };
+      case "laps":
+        return {
+          className: `${CELL_CLASS.laps} ${lapCellColor}`,
+          style: lapCol !== "laps" ? { fontSize: "0.85em" } : undefined,
+          content: lapCellValue,
+        };
+      case "gap":
+        return { className: CELL_CLASS.gap, content: gapCellValue };
+      case "best":
+        return {
+          className: `${CELL_CLASS.best} ${bestCol === "bestlap" ? "text-zinc-300" : TIME_COLORS[standing.bestTimeType]}`,
+          content: bestCol === "bestlap"
+            ? (standing.bestTimeLap > 0 ? `L${standing.bestTimeLap}` : "—")
+            : formatTime(standing.bestTime),
+        };
+      case "s1":
+        return {
+          className: `${CELL_CLASS.s1} ${TIME_COLORS[standing.sectors[0]?.type || "none"]} ${s1Flash}`,
+          content: formatTime(standing.sectors[0]?.time),
+        };
+      case "s2":
+        return {
+          className: `${CELL_CLASS.s2} ${TIME_COLORS[standing.sectors[1]?.type || "none"]} ${s2Flash}`,
+          content: formatTime(standing.sectors[1]?.time),
+        };
+      case "s3":
+        return {
+          className: `${CELL_CLASS.s3} ${
+            standing.status === "in_pit" && !standing.sectors[2]?.time
+              ? "text-red-500 font-bold"
+              : TIME_COLORS[standing.sectors[2]?.type || "none"]
+          } ${s3Flash}`,
+          content:
+            standing.status === "in_pit" && !standing.sectors[2]?.time
+              ? "In Pit"
+              : formatTime(standing.sectors[2]?.time),
+        };
+      case "pit":
+        return { className: CELL_CLASS.pit, content: renderPitCell() };
+      default:
+        return { className: "py-px", content: null };
+    }
+  };
+
   return (
     <tr
       className={`group ${rowBg} ${posFlashClass} ${flFlashClass} hover:bg-zinc-700/40 transition-colors border-b border-zinc-800/30 ${onClick ? "cursor-pointer" : ""}`}
       onClick={onClick}
     >
-      {/* STATUS */}
-      <td className={sticky("status", "py-px text-center font-bold")} style={{ fontSize: "0.85em", ...stickyStyle("status") }}>
-        {statusInfo && (
-          <span className={statusInfo.color}>{statusInfo.label}</span>
-        )}
-      </td>
-      {/* P */}
-      <td className={sticky("pos", "py-px text-center font-bold text-white font-mono")} style={stickyStyle("pos")}>
-        {standing.position > 0 ? standing.position : "—"}
-      </td>
-      {isRaceMode && (
-        <td className={sticky("chg", "py-px text-center")} style={{ fontSize: "0.75em", ...stickyStyle("chg") }}>
-          {renderPosChange()}
-        </td>
-      )}
-      <td className={sticky("pic", "py-px text-center text-zinc-400 font-mono")} style={stickyStyle("pic")}>
-        {standing.classPosition > 0 ? standing.classPosition : "—"}
-      </td>
-      <td className={sticky("nr", "py-px text-center font-bold text-white font-mono")} style={stickyStyle("nr")}>
-        {team?.no}
-      </td>
-      <td className={sticky("class", "py-px text-center")} style={stickyStyle("class")}>
-        <ClassBadge className={carClass?.nameE || "---"} />
-      </td>
-      <td className="py-px pl-2 pr-1 text-zinc-200 truncate overflow-hidden whitespace-nowrap">{driverName}</td>
-      <td className="py-px pl-2 pr-1 text-zinc-400 truncate overflow-hidden whitespace-nowrap">{carCellValue}</td>
-      <td className={`py-px text-center font-mono whitespace-nowrap ${lapCellColor}`}
-        style={lapCol !== "laps" ? { fontSize: "0.85em" } : undefined}>
-        {lapCellValue}
-      </td>
-      <td className="py-px px-2 sm:pr-3 text-right font-mono text-zinc-300 whitespace-nowrap">{gapCellValue}</td>
-      <td className={`py-px px-2 sm:pr-3 text-right font-mono whitespace-nowrap ${bestCol === "bestlap" ? "text-zinc-300" : TIME_COLORS[standing.bestTimeType]}`}>
-        {bestCol === "bestlap"
-          ? (standing.bestTimeLap > 0 ? `L${standing.bestTimeLap}` : "—")
-          : formatTime(standing.bestTime)}
-      </td>
-      <td className={`py-px px-2 sm:pr-3 text-right font-mono whitespace-nowrap ${TIME_COLORS[standing.sectors[0]?.type || "none"]} ${s1Flash}`}>
-        {formatTime(standing.sectors[0]?.time)}
-      </td>
-      <td className={`py-px px-2 sm:pr-3 text-right font-mono whitespace-nowrap ${TIME_COLORS[standing.sectors[1]?.type || "none"]} ${s2Flash}`}>
-        {formatTime(standing.sectors[1]?.time)}
-      </td>
-      <td className={`py-px px-2 sm:pr-3 text-right font-mono whitespace-nowrap ${standing.status === "in_pit" && !standing.sectors[2]?.time ? "text-red-500 font-bold" : TIME_COLORS[standing.sectors[2]?.type || "none"]} ${s3Flash}`}>
-        {standing.status === "in_pit" && !standing.sectors[2]?.time
-          ? "In Pit"
-          : formatTime(standing.sectors[2]?.time)}
-      </td>
-      <td className="py-px px-2 sm:pr-3 text-right whitespace-nowrap">{renderPitCell()}</td>
+      {columns.map((col) => {
+        const rendered = cell(col.key);
+        return (
+          <td
+            key={col.key}
+            className={sticky(col.key, rendered.className)}
+            style={{ ...rendered.style, ...stickyStyle(col.key) }}
+          >
+            {rendered.content}
+          </td>
+        );
+      })}
     </tr>
   );
 }

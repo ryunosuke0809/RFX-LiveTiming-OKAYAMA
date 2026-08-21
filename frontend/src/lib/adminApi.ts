@@ -153,3 +153,32 @@ export function adminUpdateSession(payload: {
 export function adminListAudit(limit = 100): Promise<{ entries: AuditEntry[] }> {
   return request(`/audit?limit=${limit}`);
 }
+
+// ---- Live 表示設定 ----
+
+export interface AdminLiveColumnOption {
+  value: string;
+  label: string;
+  visible: boolean;
+}
+
+export interface AdminLiveColumn {
+  key: string;
+  label: string;
+  visible: boolean;
+  raceOnly: boolean;
+  toggle?: {
+    defaultValue: string;
+    options: AdminLiveColumnOption[];
+  };
+}
+
+export function adminGetLiveDisplay(): Promise<{ columns: AdminLiveColumn[] }> {
+  return request("/display/live");
+}
+
+export function adminSaveLiveDisplay(
+  columns: AdminLiveColumn[],
+): Promise<{ columns: AdminLiveColumn[] }> {
+  return request("/display/live", { method: "PUT", body: { columns } });
+}

@@ -19,6 +19,8 @@ import {
   clearSectorEnter,
   noteSectorEnter,
 } from "@/lib/sectorEnterClock";
+import { resolveLiveColumns } from "@/lib/liveColumns";
+import { fetchLiveDisplayColumns, setLiveDisplayColumns } from "@/lib/liveDisplaySync";
 
 // ============================================================
 // サーバー (/ws) が送る ViewModel 型 (server/src/state/types.ts と対応)
@@ -106,7 +108,8 @@ type LiveStatePatch =
   | { kind: "best_sectors"; value: Array<number | null> }
   | { kind: "track_count"; value: TrackCount }
   | { kind: "driver_lap"; teamId: string; value: LapData }
-  | { kind: "message"; value: unknown };
+  | { kind: "message"; value: unknown }
+  | { kind: "display_live"; columns: unknown };
 
 type ServerMessage =
   | { type: "hello" }
@@ -337,6 +340,9 @@ export function useLiveTiming(url?: string): LiveTimingData {
           }
           break;
         }
+        case "display_live":
+          setLiveDisplayColumns(resolveLiveColumns(patch.columns));
+          break;
         default:
           break;
       }
@@ -366,6 +372,9 @@ export function useLiveTiming(url?: string): LiveTimingData {
       ws.onopen = () => {
         retry = 0;
         setConnected(true);
+        void fetchLiveDisplayColumns().catch(() => {
+          /* 列設定は既定のまま */
+        });
       };
 
       ws.onmessage = (ev) => {

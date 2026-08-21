@@ -1,12 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Standing } from "@/types/smis";
 import TimingRow from "./TimingRow";
 import ColumnToggle from "./ColumnToggle";
 import ScrollHintArea from "@/components/shared/ScrollHintArea";
 import { getTeamByStanding, getClassByStanding } from "@/data/mock";
 import { recomputeStandingsGaps } from "@/lib/format";
+import { useLiveDisplayColumns, getLiveDisplayColumns } from "@/lib/liveDisplaySync";
+import {
+  resolvedToggleValue,
+  visibleLiveColumns,
+  visibleToggleOptions,
+  type LiveColumnDef,
+} from "@/lib/liveColumns";
 import {
   colWidthStyle,
   getStickyColumnKeys,
@@ -36,75 +43,50 @@ export type LapColMode = "laps" | "time" | "last";
 export type PitColMode = "count" | "time";
 export type BestColMode = "best" | "bestlap";
 
-const CAR_OPTIONS = [
-  { value: "car", label: "Car" },
-  { value: "team", label: "Team" },
-];
-
-const GAP_OPTIONS = [
-  { value: "gap", label: "Behind" },
-  { value: "int", label: "Gap" },
-];
-
-const LAP_OPTIONS = [
-  { value: "laps", label: "Laps" },
-  { value: "time", label: "Time" },
-  { value: "last", label: "Last" },
-];
-
-const PIT_OPTIONS = [
-  { value: "count", label: "PIT" },
-  { value: "time", label: "PIT Time" },
-];
-
-const BEST_OPTIONS = [
-  { value: "best", label: "Best" },
-  { value: "bestlap", label: "BestLap" },
-];
-
-function getColumns(isRaceMode: boolean): TableColumn[] {
-  const cols = [
-    { key: "status", minW: 20, pct: "1.8%", align: "text-center" },
-    { key: "pos", minW: 28, pct: isRaceMode ? "2.2%" : "2.5%", align: "text-center" },
-  ];
-  if (isRaceMode) {
-    cols.push({ key: "chg", minW: 28, pct: "2.2%", align: "text-center" });
-  }
-  cols.push(
-    { key: "pic", minW: 28, pct: "2.5%", align: "text-center" },
-    { key: "nr", minW: 30, pct: "3%", align: "text-center" },
-    { key: "class", minW: 48, pct: "5%", align: "text-center" },
-    { key: "driver", minW: 100, pct: isRaceMode ? "14.5%" : "16%", align: "text-left pl-2" },
-    { key: "car", minW: 120, pct: isRaceMode ? "24.5%" : "26%", align: "text-left pl-2" },
-    { key: "laps", minW: 40, pct: "4%", align: "text-center" },
-    { key: "gap", minW: 80, pct: "8%", align: "text-right pr-3" },
-    { key: "best", minW: 88, pct: "8%", align: "text-right pr-3" },
-    { key: "s1", minW: 72, pct: "6.5%", align: "text-right pr-3" },
-    { key: "s2", minW: 72, pct: "6.5%", align: "text-right pr-3" },
-    { key: "s3", minW: 64, pct: "6%", align: "text-right pr-3" },
-    { key: "pit", minW: 60, pct: "5.5%", align: "text-right pr-3" },
-  );
-  return cols;
+function toTableColumns(defs: LiveColumnDef[], isRaceMode: boolean): TableColumn[] {
+  return visibleLiveColumns(defs, isRaceMode).map((c) => ({
+    key: c.key,
+    minW: c.minW,
+    pct: isRaceMode ? c.pctRace : c.pct,
+    align: c.align,
+  }));
 }
 
-const FIXED_LABELS: Record<string, string> = {
-  status: "", pos: "P", chg: "", pic: "PIC", nr: "No.", class: "Class",
-  driver: "Name", best: "Best",
-  s1: "S1", s2: "S2", s3: "S3",
-};
+function defByKey(defs: LiveColumnDef[], key: string): LiveColumnDef | undefined {
+  return defs.find((c) => c.key === key);
+}
 
 export default function TimingTable({ standings, classFilter, flashKey = 0, isRaceMode = false, sectorFlashes = [], onRowClick }: TimingTableProps) {
-  const [carCol, setCarCol] = useState<CarColMode>("car");
-  const [gapCol, setGapCol] = useState<GapColMode>("gap");
-  const [lapCol, setLapCol] = useState<LapColMode>("laps");
-  const [pitCol, setPitCol] = useState<PitColMode>("count");
-  const [bestCol, setBestCol] = useState<BestColMode>("best");
+  const displayColumns = useLiveDisplayColumns();
+  const [carCol, setCarCol] = useState<CarColMode>(
+    () => resolvedToggleValue(defByKey(getLiveDisplayColumns(), "car"), undefined) as CarColMode,
+  );
+  const [gapCol, setGapCol] = useState<GapColMode>(
+    () => resolvedToggleValue(defByKey(getLiveDisplayColumns(), "gap"), undefined) as GapColMode,
+  );
+  const [lapCol, setLapCol] = useState<LapColMode>(
+    () => resolvedToggleValue(defByKey(getLiveDisplayColumns(), "laps"), undefined) as LapColMode,
+  );
+  const [pitCol, setPitCol] = useState<PitColMode>(
+    () => resolvedToggleValue(defByKey(getLiveDisplayColumns(), "pit"), undefined) as PitColMode,
+  );
+  const [bestCol, setBestCol] = useState<BestColMode>(
+    () => resolvedToggleValue(defByKey(getLiveDisplayColumns(), "best"), undefined) as BestColMode,
+  );
 
-  const columns = getColumns(isRaceMode);
-  const stickyKeys = getStickyColumnKeys(isRaceMode);
+  useEffect(() => {
+    setCarCol((cur) => resolvedToggleValue(defByKey(displayColumns, "car"), cur) as CarColMode);
+    setGapCol((cur) => resolvedToggleValue(defByKey(displayColumns, "gap"), cur) as GapColMode);
+    setLapCol((cur) => resolvedToggleValue(defByKey(displayColumns, "laps"), cur) as LapColMode);
+    setPitCol((cur) => resolvedToggleValue(defByKey(displayColumns, "pit"), cur) as PitColMode);
+    setBestCol((cur) => resolvedToggleValue(defByKey(displayColumns, "best"), cur) as BestColMode);
+  }, [displayColumns]);
+
+  const columns = toTableColumns(displayColumns, isRaceMode);
+  const stickyKeys = getStickyColumnKeys(columns.map((c) => c.key), isRaceMode);
   const stickyOffsets = getStickyLeftOffsets(columns, stickyKeys);
-  const firstStickyKey = stickyKeys[0];
-  const lastStickyKey = stickyKeys[stickyKeys.length - 1];
+  const firstStickyKey = stickyKeys[0] ?? "";
+  const lastStickyKey = stickyKeys[stickyKeys.length - 1] ?? "";
 
   const filtered = (() => {
     if (!classFilter) return standings;
@@ -112,23 +94,28 @@ export default function TimingTable({ standings, classFilter, flashKey = 0, isRa
     return recomputeStandingsGaps(rows, isRaceMode);
   })();
 
-  const renderHeader = (col: typeof columns[number]) => {
-    if (col.key === "car") {
-      return <ColumnToggle options={CAR_OPTIONS} current={carCol} onChange={(v) => setCarCol(v as CarColMode)} />;
+  const renderHeader = (col: TableColumn) => {
+    const def = defByKey(displayColumns, col.key);
+    const options = visibleToggleOptions(def);
+    if (options.length > 1) {
+      const current =
+        col.key === "car" ? carCol
+        : col.key === "gap" ? gapCol
+        : col.key === "laps" ? lapCol
+        : col.key === "pit" ? pitCol
+        : col.key === "best" ? bestCol
+        : options[0]!.value;
+      const onChange = (value: string) => {
+        if (col.key === "car") setCarCol(value as CarColMode);
+        else if (col.key === "gap") setGapCol(value as GapColMode);
+        else if (col.key === "laps") setLapCol(value as LapColMode);
+        else if (col.key === "pit") setPitCol(value as PitColMode);
+        else if (col.key === "best") setBestCol(value as BestColMode);
+      };
+      return <ColumnToggle options={options} current={current} onChange={onChange} />;
     }
-    if (col.key === "gap") {
-      return <ColumnToggle options={GAP_OPTIONS} current={gapCol} onChange={(v) => setGapCol(v as GapColMode)} />;
-    }
-    if (col.key === "laps") {
-      return <ColumnToggle options={LAP_OPTIONS} current={lapCol} onChange={(v) => setLapCol(v as LapColMode)} />;
-    }
-    if (col.key === "pit") {
-      return <ColumnToggle options={PIT_OPTIONS} current={pitCol} onChange={(v) => setPitCol(v as PitColMode)} />;
-    }
-    if (col.key === "best") {
-      return <ColumnToggle options={BEST_OPTIONS} current={bestCol} onChange={(v) => setBestCol(v as BestColMode)} />;
-    }
-    return FIXED_LABELS[col.key] ?? col.key;
+    if (options.length === 1) return options[0]!.label;
+    return def?.label ?? col.key;
   };
 
   const totalMinW = columns.reduce((sum, c) => sum + c.minW, 0);
@@ -188,6 +175,7 @@ export default function TimingTable({ standings, classFilter, flashKey = 0, isRa
                 team={getTeamByStanding(standing)}
                 carClass={getClassByStanding(standing)}
                 isEven={idx % 2 === 0}
+                columns={columns}
                 carCol={carCol}
                 gapCol={gapCol}
                 lapCol={lapCol}

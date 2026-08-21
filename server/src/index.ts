@@ -14,6 +14,7 @@ import { LiveSessionState } from "./state/session-state.js";
 import { SessionStateAggregator } from "./state/aggregator.js";
 import { hydrateLiveStateFromDb } from "./state/hydrate.js";
 import { startDayRollover } from "./state/day-rollover.js";
+import { resolveLiveColumns } from "./display/live-columns.js";
 
 const config = loadConfig();
 const logger = new Logger(config.logLevel);
@@ -49,8 +50,13 @@ const stopDayRollover = startDayRollover(liveState, hub, logger);
 const app = express();
 app.disable("x-powered-by");
 app.use(express.json({ limit: "256kb" }));
-app.use("/api/admin", createAdminRouter(adminStore, archive, config, logger));
-app.use("/api", createApiRouter(repository, hub, config, archive));
+app.use("/api/admin", createAdminRouter(adminStore, archive, config, logger, hub));
+app.use(
+    "/api",
+    createApiRouter(repository, hub, config, archive, () =>
+        resolveLiveColumns(adminStore.getDisplayConfig("live")["columns"]),
+    ),
+);
 
 app.get("/", (_req, res) => {
     res.type("text/plain").send(
@@ -65,6 +71,7 @@ app.get("/", (_req, res) => {
             "  GET  /api/archive/sessions?date=YYYY-MM-DD",
             "  GET  /api/archive/results?date=...&sessionIndex=0",
             "  GET  /api/archive/csv?date=...&sessionIndex=0&kind=classification",
+            "  GET  /api/display/live",
             "  POST /api/admin/login  (管理画面。以降は Cookie セッション)",
             "  WS   /ingest  (Receiver, Bearer token)",
             "  WS   /ws      (Frontend subscribers)",
