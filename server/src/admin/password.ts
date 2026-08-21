@@ -27,9 +27,6 @@ export interface PasswordHash {
 export function validatePasswordStrength(password: string): string | null {
     if (password.length < 10) return "パスワードは 10 文字以上にしてください";
     if (password.length > 200) return "パスワードが長すぎます";
-    if (!/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) {
-        return "パスワードには英字と数字をそれぞれ 1 文字以上含めてください";
-    }
     return null;
 }
 

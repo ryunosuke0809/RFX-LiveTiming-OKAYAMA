@@ -222,7 +222,7 @@ export default function AdminUsersPage() {
             </div>
           </div>
           <p className="mt-2 text-[11px] text-zinc-500">
-            パスワードは 10 文字以上で、英字と数字をそれぞれ 1 文字以上含めてください。
+            パスワードは 10 文字以上にしてください。
           </p>
           <div className="mt-3 flex justify-end">
             <button
