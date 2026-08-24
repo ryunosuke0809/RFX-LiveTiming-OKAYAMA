@@ -234,6 +234,14 @@ function offsetOutside(p: Vec2, lapCenter: Vec2, dist: number): Vec2 {
 }
 
 /**
+ * 親 <g> の地図回転を打ち消し、ラベルを画面に対して正立させる。
+ * 位置は親の rotate に追従し、文字だけ車番と同じく読みやすく保つ。
+ */
+function uprightAt(rotation: number, x: number, y: number): string | undefined {
+  return rotation % 360 !== 0 ? `rotate(${-rotation} ${x} ${y})` : undefined;
+}
+
+/**
  * 接線 `tangent` に直交する方向で `p` を通る横断ラインを路面の幅より広く引く。
  * S1/S2/Sec3(FL) の境界に共通スタイル（オレンジ点線）で使う。
  */
@@ -721,46 +729,51 @@ export default function OkayamaCircuitSvg({
                   ))}
                 </g>
                 {/* FL を視覚中心が labelPos に来るように左寄せ配置。
-                    stroke 付き text は iOS パン時に残像しやすいので、下敷き text で縁取りする。 */}
+                    stroke 付き text は iOS パン時に残像しやすいので、下敷き text で縁取りする。
+                    文字は車番と同じく地図回転を打ち消し、位置だけコースに追従して正立を保つ。 */}
                 <g transform={`translate(${labelPos.x} ${labelPos.y})`}>
-                  <text
-                    x={6}
-                    y={1}
-                    fill="none"
-                    fontSize={18}
-                    fontWeight={900}
-                    fontFamily="sans-serif"
-                    dominantBaseline="middle"
-                    textAnchor="middle"
-                    stroke="#0a0a0a"
-                    strokeWidth={4}
-                    strokeLinejoin="round"
-                  >
-                    FL
-                  </text>
-                  <text
-                    x={6}
-                    y={1}
-                    fill="#fafafa"
-                    fontSize={18}
-                    fontWeight={900}
-                    fontFamily="sans-serif"
-                    dominantBaseline="middle"
-                    textAnchor="middle"
-                  >
-                    FL
-                  </text>
+                  <g transform={uprightAt(rotation, 6, 1)}>
+                    <text
+                      x={6}
+                      y={1}
+                      fill="none"
+                      fontSize={18}
+                      fontWeight={900}
+                      fontFamily="sans-serif"
+                      dominantBaseline="middle"
+                      textAnchor="middle"
+                      stroke="#0a0a0a"
+                      strokeWidth={4}
+                      strokeLinejoin="round"
+                    >
+                      FL
+                    </text>
+                    <text
+                      x={6}
+                      y={1}
+                      fill="#fafafa"
+                      fontSize={18}
+                      fontWeight={900}
+                      fontFamily="sans-serif"
+                      dominantBaseline="middle"
+                      textAnchor="middle"
+                    >
+                      FL
+                    </text>
+                  </g>
                 </g>
               </g>
             );
           })()}
 
-          {/* セクターラベル（位置は SECTOR_LABEL_POSITIONS で上書き可） */}
+          {/* セクターラベル（位置は SECTOR_LABEL_POSITIONS で上書き可）。
+              地図回転時は車番と同じく位置は追従し、文字は正立のまま。 */}
           {labelPositions && (
             <>
               <text
                 x={labelPositions.s1.x}
                 y={labelPositions.s1.y}
+                transform={uprightAt(rotation, labelPositions.s1.x, labelPositions.s1.y)}
                 textAnchor="middle"
                 dominantBaseline="middle"
                 fill={SECTOR_COLORS.s1}
@@ -774,6 +787,7 @@ export default function OkayamaCircuitSvg({
               <text
                 x={labelPositions.s2.x}
                 y={labelPositions.s2.y}
+                transform={uprightAt(rotation, labelPositions.s2.x, labelPositions.s2.y)}
                 textAnchor="middle"
                 dominantBaseline="middle"
                 fill={SECTOR_COLORS.s2}
@@ -787,6 +801,7 @@ export default function OkayamaCircuitSvg({
               <text
                 x={labelPositions.s3.x}
                 y={labelPositions.s3.y}
+                transform={uprightAt(rotation, labelPositions.s3.x, labelPositions.s3.y)}
                 textAnchor="middle"
                 dominantBaseline="middle"
                 fill={SECTOR_COLORS.s3}
@@ -943,7 +958,7 @@ export default function OkayamaCircuitSvg({
               const dotR = DOT_R * markerScale * (isHi ? 1.25 : 1);
               const fontSize = LABEL_FONT * markerScale * (isHi ? 1.1 : 1);
               // ラベルは常に正立（親の回転を打ち消す）。ドット/リード線は地図と一緒に回る。
-              const counter = rotation % 360 !== 0 ? `rotate(${-rotation} ${lx} ${ly})` : undefined;
+              const counter = uprightAt(rotation, lx, ly);
               return (
                 <g
                   key={s.teamId}
