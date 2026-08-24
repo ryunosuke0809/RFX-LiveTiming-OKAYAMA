@@ -45,6 +45,7 @@ export default function TrackingPage() {
   const [classFilter, setClassFilter] = useState<string | null>(null);
   const [highlighted, setHighlighted] = useState<Set<string>>(new Set());
   const [entriesOpen, setEntriesOpen] = useState(false);
+  const [statusPanelOpen, setStatusPanelOpen] = useState(true);
 
   // ライブ接続 (/ws)。データ受信時は mock の代わりにライブ順位を使う。
   const live = useLiveTiming();
@@ -144,49 +145,79 @@ export default function TrackingPage() {
           />
 
           {/* コース状況パネル: On Track / Pit In を CARNO のみのバッジで一覧表示。
-              IN PIT 中の車両はマップから消え、Pit In エリアに入る。 */}
+              IN PIT 中の車両はマップから消え、Pit In エリアに入る。
+              スマホ・PC とも1ボタンで開閉し、閉じるとマップを広く使える。 */}
           <div className="absolute bottom-2 right-2 z-10 w-52 max-w-[74vw] bg-zinc-900/85 backdrop-blur-md border border-zinc-700 rounded-lg overflow-hidden shadow-2xl">
-            <div className="px-2.5 py-1.5 border-b border-zinc-700 bg-green-900/25 flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-green-500" />
-              <span className="text-[11px] text-green-300 uppercase tracking-wider font-bold">
-                On Track — {onTrackStandings.length}
+            <button
+              type="button"
+              onClick={() => setStatusPanelOpen((v) => !v)}
+              className={`w-full px-2.5 py-1.5 flex items-center gap-2 text-left hover:bg-zinc-800/40 transition-colors ${
+                statusPanelOpen ? "border-b border-zinc-700" : ""
+              }`}
+              aria-expanded={statusPanelOpen}
+              aria-controls="tracking-status-panel"
+              title={statusPanelOpen ? "コース状況を閉じる" : "コース状況を開く"}
+            >
+              <span className="flex items-center gap-1 min-w-0">
+                <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
+                <span className="text-[11px] text-green-300 uppercase tracking-wider font-bold truncate">
+                  On Track {onTrackStandings.length}
+                </span>
               </span>
-            </div>
-            <div className="max-h-32 overflow-y-auto p-1.5 flex flex-wrap gap-1">
-              {onTrackStandings.length === 0 ? (
-                <span className="text-[10px] text-zinc-600 px-1 py-0.5">—</span>
-              ) : (
-                onTrackStandings.map((s) => (
-                  <CarNoBadge
-                    key={s.teamId}
-                    standing={s}
-                    active={highlighted.has(s.teamId)}
-                    onClick={() => toggleHighlight(s.teamId)}
-                  />
-                ))
-              )}
-            </div>
+              <span className="flex items-center gap-1 min-w-0">
+                <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" />
+                <span className="text-[11px] text-red-300 uppercase tracking-wider font-bold truncate">
+                  Pit In {pitStandings.length}
+                </span>
+              </span>
+              <span
+                className={`ml-auto text-zinc-400 text-[10px] leading-none transition-transform ${
+                  statusPanelOpen ? "" : "rotate-180"
+                }`}
+                aria-hidden
+              >
+                ▾
+              </span>
+            </button>
 
-            <div className="px-2.5 py-1.5 border-y border-zinc-700 bg-red-900/30 flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-red-500" />
-              <span className="text-[11px] text-red-300 uppercase tracking-wider font-bold">
-                Pit In — {pitStandings.length}
-              </span>
-            </div>
-            <div className="max-h-24 overflow-y-auto p-1.5 flex flex-wrap gap-1">
-              {pitStandings.length === 0 ? (
-                <span className="text-[10px] text-zinc-600 px-1 py-0.5">—</span>
-              ) : (
-                pitStandings.map((s) => (
-                  <CarNoBadge
-                    key={s.teamId}
-                    standing={s}
-                    active={highlighted.has(s.teamId)}
-                    onClick={() => toggleHighlight(s.teamId)}
-                  />
-                ))
-              )}
-            </div>
+            {statusPanelOpen && (
+              <div id="tracking-status-panel">
+                <div className="max-h-32 overflow-y-auto p-1.5 flex flex-wrap gap-1 bg-green-950/20">
+                  {onTrackStandings.length === 0 ? (
+                    <span className="text-[10px] text-zinc-600 px-1 py-0.5">—</span>
+                  ) : (
+                    onTrackStandings.map((s) => (
+                      <CarNoBadge
+                        key={s.teamId}
+                        standing={s}
+                        active={highlighted.has(s.teamId)}
+                        onClick={() => toggleHighlight(s.teamId)}
+                      />
+                    ))
+                  )}
+                </div>
+
+                <div className="px-2.5 py-1 border-y border-zinc-700 bg-red-900/30">
+                  <span className="text-[10px] text-red-400/80 uppercase tracking-wider font-semibold">
+                    Pit In
+                  </span>
+                </div>
+                <div className="max-h-24 overflow-y-auto p-1.5 flex flex-wrap gap-1">
+                  {pitStandings.length === 0 ? (
+                    <span className="text-[10px] text-zinc-600 px-1 py-0.5">—</span>
+                  ) : (
+                    pitStandings.map((s) => (
+                      <CarNoBadge
+                        key={s.teamId}
+                        standing={s}
+                        active={highlighted.has(s.teamId)}
+                        onClick={() => toggleHighlight(s.teamId)}
+                      />
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
