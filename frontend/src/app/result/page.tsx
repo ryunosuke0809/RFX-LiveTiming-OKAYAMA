@@ -575,7 +575,7 @@ export default function ResultPage() {
         categoryName,
         competitionName,
       })
-    : [roundName, sessionName].filter(Boolean).join(" · ") || categoryName || "Session";
+    : categoryName || sessionName || "Session";
   const sessionDetail =
     categoryName && categoryName !== sessionHeadline && categoryName !== competitionName
       ? categoryName

@@ -29,7 +29,7 @@ export default function TimingHeader({
   isRace = false,
   isLive = false,
 }: TimingHeaderProps) {
-  const { competition, category, round, session, remainingTime, localTime, sessionStartedAt } =
+  const { competition, category, session, remainingTime, localTime, sessionStartedAt } =
     sessionInfo;
 
   const startedAtMs = (() => {
@@ -74,15 +74,12 @@ export default function TimingHeader({
         : `LAP ${leaderLap}`
       : null;
 
-  const roundLabel = round.nameE || round.nameJ || "";
   const sessionLabel =
     category.nameE ||
     category.nameJ ||
     session.nameE ||
     session.nameJ ||
     "";
-  // スマホ1行用: ラウンド + 短いセッション識別（全文は title で確認）
-  const mobileSessionLine = [roundLabel, sessionLabel].filter(Boolean).join(" · ");
 
   return (
     <header className="bg-zinc-900 border-b border-zinc-700">
@@ -97,7 +94,7 @@ export default function TimingHeader({
           </span>
           <span className="text-zinc-600 hidden sm:inline flex-shrink-0">|</span>
           <span className="text-zinc-400 uppercase tracking-wider hidden sm:inline truncate whitespace-nowrap">
-            {roundLabel} {sessionLabel}
+            {sessionLabel}
           </span>
         </div>
         <div className="flex items-center gap-3 sm:gap-4 flex-shrink-0">
@@ -125,9 +122,9 @@ export default function TimingHeader({
         <p
           className="text-zinc-400 uppercase tracking-wider truncate whitespace-nowrap leading-tight"
           style={{ fontSize: "var(--timing-fs-sm)" }}
-          title={mobileSessionLine}
+          title={sessionLabel}
         >
-          {mobileSessionLine}
+          {sessionLabel}
         </p>
       </div>
 
