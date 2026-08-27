@@ -21,7 +21,7 @@ export interface ArchiveStanding {
   classPosition: number;
   classId: string;
   teamId: string;
-  teamNo: number;
+  teamNo: string | number;
   teamNameJ: string;
   teamNameE: string;
   driverNo: number;
@@ -78,7 +78,7 @@ export interface ArchiveResultPayload {
     teams: Array<{
       id: string;
       classId: string;
-      no: number;
+      no: string | number;
       nameJ: string;
       nameE: string;
       drivers: Array<{ no: number; nameJ: string; nameE: string }>;
@@ -100,7 +100,7 @@ export interface ArchiveResultPayload {
       }>
     >;
     fastestLap: {
-      teamNo: number;
+      teamNo: string | number;
       driverNameJ: string;
       lapTime: number;
       lap: number;

@@ -1,4 +1,5 @@
 import type { IngestEnvelope } from "../types/ingest.js";
+import { carNoSortValue, parseCarNo } from "./carNo.js";
 import {
     classifyTimeType,
     deriveStatusFromLoop,
@@ -221,7 +222,7 @@ export class SessionStateAggregator {
 
     private applyTeam(p: Record<string, unknown>): LiveStatePatch[] {
         const id = str(p, "id") ?? "";
-        const no = int(p, "no") ?? 0;
+        const no = parseCarNo(p["no"] ?? p["No"]);
         const existing = id ? this.state.teams.get(id) : undefined;
 
         // MOLA はセッションが変わっても TeamId (1:1:N) を使い回す。
@@ -290,7 +291,7 @@ export class SessionStateAggregator {
             lastPassingTime: null,
             sectorNo: 0,
             sectorTime: null,
-            order: team.no, // 走行前は車番順で並べる
+            order: carNoSortValue(team.no), // 走行前は車番順で並べる
             refSectors: [null, null, null],
             gap: "—",
             interval: "—",
@@ -635,7 +636,7 @@ export class SessionStateAggregator {
             classPosition: newClassPos,
             classId: team?.classId ?? existing?.classId ?? "",
             teamId,
-            teamNo: team?.no ?? 0,
+            teamNo: team?.no ?? existing?.teamNo ?? "",
             teamNameJ: team?.nameJ ?? "",
             teamNameE: team?.nameE ?? "",
             driverNo,
@@ -667,7 +668,7 @@ export class SessionStateAggregator {
         if (newBest !== null && newBest > 0 && newBest === this.state.overallBest) {
             this.state.fastestLap = {
                 teamId,
-                teamNo: team?.no ?? 0,
+                teamNo: team?.no ?? "",
                 driverNo,
                 driverNameJ: driver?.nameJ ?? "",
                 lapTime: newBest,

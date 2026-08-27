@@ -27,7 +27,9 @@ function CarNoBadge({
       type="button"
       onClick={onClick}
       title={team.nameE}
-      className={`w-7 h-7 rounded-lg flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0 transition-all ${
+      className={`min-w-7 h-7 px-0.5 rounded-lg flex items-center justify-center text-white font-bold flex-shrink-0 transition-all ${
+        String(team.no).length > 3 ? "text-[9px]" : "text-[11px]"
+      } ${
         active ? "ring-2 ring-white ring-offset-1 ring-offset-zinc-900" : "hover:brightness-110"
       }`}
       style={{
@@ -259,7 +261,9 @@ export default function TrackingPage() {
                   }`}
                 >
                   <span
-                    className={`w-6 h-6 rounded flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0 transition-all ${
+                    className={`min-w-6 h-6 px-0.5 rounded flex items-center justify-center text-white font-bold flex-shrink-0 transition-all ${
+                      String(team.no).length > 3 ? "text-[8px]" : "text-[10px]"
+                    } ${
                       isActive ? "ring-2 ring-white ring-offset-1 ring-offset-zinc-900" : ""
                     }`}
                     style={{ backgroundColor: cls?.color || "#71717a" }}

@@ -57,7 +57,7 @@ export const mockSessionInfo: SessionInfo = {
 };
 
 export const mockFastestLap: FastestLap = {
-  teamNo: 0,
+  teamNo: "",
   driverName: "",
   lapTime: 0,
   lap: 0,

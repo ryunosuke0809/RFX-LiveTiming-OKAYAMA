@@ -15,6 +15,7 @@ import {
 } from "@/data/mock";
 import { formatTime, recomputeStandingsGaps } from "@/lib/format";
 import { TIME_COLORS } from "@/lib/colors";
+import { asCarNo } from "@/lib/carNo";
 import { useLiveTiming } from "@/hooks/useLiveTiming";
 import {
   pauseLiveEntityWrites,
@@ -43,7 +44,7 @@ import type { CarClass, DriverPersonalData, Standing, Team, TimeType } from "@/t
 const CLASSIFICATION_COLUMNS: TableColumn[] = [
   { key: "p", minW: 36, pct: "3.5%", align: "text-center" },
   { key: "pic", minW: 36, pct: "3.5%", align: "text-center" },
-  { key: "no", minW: 44, pct: "4%", align: "text-center" },
+  { key: "no", minW: 52, pct: "4.5%", align: "text-center" },
   { key: "class", minW: 52, pct: "5%", align: "text-center" },
   { key: "name", minW: 100, pct: "12%", align: "text-left pl-2" },
   { key: "team", minW: 120, pct: "14%", align: "text-left pl-2" },
@@ -212,14 +213,14 @@ function buildResultCsvFilename(opts: {
   categoryName?: string | null;
   sessionName?: string | null;
   roundName?: string | null;
-  carNo?: number | null;
+  carNo?: string | null;
 }): string {
   const session = shortSessionLabel(opts.categoryName, opts.sessionName);
   const round = fileSafe(opts.roundName || "Session").slice(0, 24);
   const parts: string[] = [opts.kind];
   if (session && session !== round) parts.push(session);
   parts.push(round);
-  if (opts.carNo != null) parts.push(`No${opts.carNo}`);
+  if (opts.carNo) parts.push(`No${fileSafe(opts.carNo)}`);
   return `${parts.join("_")}.csv`;
 }
 
@@ -328,7 +329,7 @@ function buildArchiveEntities(payload: ArchiveResultPayload): {
     teams.set(t.id, {
       id: t.id,
       classId: t.classId,
-      no: t.no,
+      no: asCarNo(t.no),
       nameJ: t.nameJ,
       nameE: t.nameE || t.nameJ,
       engine: "",
@@ -349,7 +350,7 @@ function buildArchiveEntities(payload: ArchiveResultPayload): {
       teams.set(s.teamId, {
         id: s.teamId,
         classId: s.classId,
-        no: s.teamNo,
+        no: asCarNo(s.teamNo),
         nameJ: s.teamNameJ,
         nameE: s.teamNameE || s.teamNameJ,
         engine: "",
@@ -382,7 +383,7 @@ function buildArchiveEntities(payload: ArchiveResultPayload): {
         existing.nameJ = s.teamNameJ;
         existing.nameE = s.teamNameE || s.teamNameJ;
       }
-      if (!existing.no && s.teamNo) existing.no = s.teamNo;
+      if (!existing.no && s.teamNo) existing.no = asCarNo(s.teamNo);
     }
   }
   const classes = new Map<string, CarClass>();
@@ -961,7 +962,7 @@ function ClassificationView({
                     {s.classPosition}
                   </td>
                   <td className={sticky("no", "py-1.5 px-2 text-center")} style={stickyStyle("no")}>
-                    <span className="inline-block w-8 h-6 rounded text-white text-xs font-bold leading-6 text-center" style={{ backgroundColor: cls?.color || "#71717a" }}>{team.no}</span>
+                    <span className="inline-block min-w-8 h-6 px-1 rounded text-white text-[11px] font-bold leading-6 text-center" style={{ backgroundColor: cls?.color || "#71717a" }}>{team.no}</span>
                   </td>
                   <td className={sticky("class", "py-1.5 px-2 text-center text-xs text-zinc-400")} style={stickyStyle("class")}>
                     {cls?.nameE}
@@ -1041,7 +1042,7 @@ function IndividualView({
                 }`}
               >
                 <span
-                  className="w-7 h-7 rounded flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0"
+                  className="min-w-7 h-7 px-1 rounded flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0"
                   style={{ backgroundColor: c?.color || "#71717a" }}
                 >
                   {t.no}
@@ -1086,7 +1087,7 @@ function IndividualView({
                 }`}
               >
                 <span
-                  className="w-6 h-6 rounded flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0"
+                  className="min-w-6 h-6 px-1 rounded flex items-center justify-center text-white text-[9px] font-bold flex-shrink-0"
                   style={{ backgroundColor: c?.color || "#71717a" }}
                 >
                   {t.no}
@@ -1125,7 +1126,7 @@ function IndividualView({
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-3 sm:px-4 py-2.5 sm:py-3 border border-zinc-700 rounded-xl bg-zinc-900/80 mb-3 sm:mb-4 flex-shrink-0">
               <div className="flex items-start sm:items-center gap-3 min-w-0">
                 <span
-                  className="w-10 h-10 sm:w-11 sm:h-11 rounded-lg flex items-center justify-center text-white text-base sm:text-lg font-bold flex-shrink-0"
+                  className="min-w-10 h-10 sm:min-w-11 sm:h-11 px-1 rounded-lg flex items-center justify-center text-white text-sm sm:text-base font-bold flex-shrink-0"
                   style={{ backgroundColor: cls?.color || "#71717a" }}
                 >
                   {team.no}

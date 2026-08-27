@@ -1,4 +1,5 @@
 import type { IngestEnvelope } from "../types/ingest.js";
+import { isCourseCarNo, parseCarNo } from "../state/carNo.js";
 import { LiveSessionState } from "../state/session-state.js";
 import { SessionStateAggregator } from "../state/aggregator.js";
 import type { LiveStateSnapshot, SessionInfoVm } from "../state/types.js";
@@ -173,7 +174,7 @@ function trimArchiveSnapshot(snap: LiveStateSnapshot): LiveStateSnapshot {
         const cls = snap.classes.find((c) => c.id === s.classId);
         const className = (cls?.nameE || cls?.nameJ || "").trim().toUpperCase();
         // コース車・オフィシャルはリザルトから除外
-        if (className === "OIC" || s.teamNo === 999) return false;
+        if (className === "OIC" || isCourseCarNo(s.teamNo)) return false;
         return s.position > 0 || s.lap > 0 || (s.bestTime ?? 0) > 0 || (s.lastLapTime ?? 0) > 0;
     });
     if (keep.length === 0 || keep.length === snap.standings.length) return snap;
@@ -216,9 +217,8 @@ function willResetSession(state: LiveSessionState, env: IngestEnvelope): boolean
         // Category より先に次セッションの Team が来て TeamId の車番が差し替わる直前に保存する
         const p = (env.payload ?? {}) as Record<string, unknown>;
         const id = pickStr(p, "id", "Id");
-        const noRaw = p["no"] ?? p["No"];
-        const no = typeof noRaw === "number" ? noRaw : typeof noRaw === "string" ? Number(noRaw) : NaN;
-        if (!id || !Number.isFinite(no)) return false;
+        const no = parseCarNo(p["no"] ?? p["No"]);
+        if (!id || !no) return false;
         const existing = state.teams.get(id);
         return Boolean(existing && existing.no !== no);
     }

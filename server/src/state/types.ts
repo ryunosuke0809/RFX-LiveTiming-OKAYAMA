@@ -37,7 +37,7 @@ export interface StandingVm {
     classPosition: number;
     classId: string;
     teamId: string;
-    teamNo: number;
+    teamNo: string;
     teamNameJ: string;
     teamNameE: string;
     driverNo: number;
@@ -93,7 +93,7 @@ export interface SessionInfoVm {
 
 export interface FastestLapVm {
     teamId: string;
-    teamNo: number;
+    teamNo: string;
     driverNo: number;
     driverNameJ: string;
     lapTime: number;
@@ -118,7 +118,7 @@ export interface CarClassVm {
 export interface TeamSummaryVm {
     id: string;
     classId: string;
-    no: number;
+    no: string;
     nameJ: string;
     nameE: string;
     drivers: Array<{ no: number; nameJ: string; nameE: string }>;

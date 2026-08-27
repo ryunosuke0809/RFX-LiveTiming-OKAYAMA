@@ -185,7 +185,7 @@ export function createApiRouter(
                 }
                 csv = buildLapsCsv(session.snapshot, teamId);
                 const team = session.snapshot.teams.find((t) => t.id === teamId);
-                const no = team?.no != null ? `_No${team.no}` : "";
+                const no = team?.no ? `_No${team.no}` : "";
                 filename = `Laps_${base}${no}.csv`;
             } else {
                 csv = buildClassificationCsv(session.snapshot);

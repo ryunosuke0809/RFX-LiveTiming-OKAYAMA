@@ -85,7 +85,7 @@ export const DEFAULT_LIVE_COLUMNS: LiveColumnDef[] = [
     raceOnly: true,
   }),
   col("pic", "PIC", { minW: 28, pct: "2.5%", pctRace: "2.5%", align: "text-center" }),
-  col("nr", "No.", { minW: 30, pct: "3%", pctRace: "3%", align: "text-center" }),
+  col("nr", "No.", { minW: 42, pct: "3.4%", pctRace: "3.4%", align: "text-center" }),
   col("class", "Class", { minW: 48, pct: "5%", pctRace: "5%", align: "text-center" }),
   col("driver", "Name", {
     minW: 100,

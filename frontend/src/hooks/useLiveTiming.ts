@@ -13,6 +13,7 @@ import type {
   TrackFlag,
 } from "@/types/smis";
 import { formatLocalTime } from "@/lib/format";
+import { asCarNo } from "@/lib/carNo";
 import { setLiveEntities } from "@/lib/entityRegistry";
 import {
   clearAllSectorEnters,
@@ -27,7 +28,7 @@ import { fetchLiveDisplayColumns, setLiveDisplayColumns } from "@/lib/liveDispla
 // ============================================================
 
 interface StandingVm extends Omit<Standing, "sectors"> {
-  teamNo: number;
+  teamNo: string | number;
   teamNameJ: string;
   teamNameE: string;
   driverNameJ: string;
@@ -58,7 +59,7 @@ interface SessionInfoVm {
 
 interface FastestLapVm {
   teamId: string;
-  teamNo: number;
+  teamNo: string | number;
   driverNo: number;
   driverNameJ: string;
   lapTime: number;
@@ -76,7 +77,7 @@ interface CarClassVm {
 interface TeamSummaryVm {
   id: string;
   classId: string;
-  no: number;
+  no: string | number;
   nameJ: string;
   nameE: string;
   drivers: Array<{ no: number; nameJ: string; nameE: string }>;
@@ -479,7 +480,7 @@ export function useLiveTiming(url?: string): LiveTimingData {
     const teams: Team[] = Array.from(s.teams.values()).map((t) => ({
       id: t.id,
       classId: t.classId,
-      no: t.no,
+      no: asCarNo(t.no),
       nameJ: t.nameJ,
       nameE: t.nameE || t.nameJ,
       engine: "",
@@ -513,7 +514,7 @@ export function useLiveTiming(url?: string): LiveTimingData {
     const bestSectorArr = (s.bestSectors ?? [null, null, null]).map((v) => v ?? 0);
     const fastestLap: FastestLap | null = s.fastestLap
       ? {
-          teamNo: s.fastestLap.teamNo,
+          teamNo: asCarNo(s.fastestLap.teamNo),
           driverName: s.fastestLap.driverNameJ,
           lapTime: s.fastestLap.lapTime,
           lap: s.fastestLap.lap,

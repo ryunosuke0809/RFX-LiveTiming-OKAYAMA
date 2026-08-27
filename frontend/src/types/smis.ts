@@ -47,7 +47,7 @@ export interface Driver {
 export interface Team {
   id: string;
   classId: string;
-  no: number; // ゼッケン
+  no: string; // ゼッケン。"001" や "100A" あり
   nameJ: string;
   nameE: string;
   engine: string;
@@ -119,7 +119,7 @@ export interface SessionInfo {
 }
 
 export interface FastestLap {
-  teamNo: number;
+  teamNo: string;
   driverName: string;
   lapTime: number; // 1/10000秒
   lap: number;

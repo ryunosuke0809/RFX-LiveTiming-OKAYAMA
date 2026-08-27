@@ -35,7 +35,7 @@ export default function DriverDetailPanel({
         <div className="flex items-center justify-between px-5 py-3 border-b border-zinc-700 bg-zinc-800/80 flex-shrink-0">
           <div className="flex items-center gap-3">
             <span
-              className="w-10 h-10 rounded-lg flex items-center justify-center text-white text-lg font-bold"
+              className="min-w-10 h-10 px-1 rounded-lg flex items-center justify-center text-white text-base font-bold"
               style={{ backgroundColor: carClass?.color || "#71717a" }}
             >
               {team.no}
