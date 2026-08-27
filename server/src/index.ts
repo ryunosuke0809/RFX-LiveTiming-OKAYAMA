@@ -15,6 +15,7 @@ import { SessionStateAggregator } from "./state/aggregator.js";
 import { hydrateLiveStateFromDb } from "./state/hydrate.js";
 import { startDayRollover } from "./state/day-rollover.js";
 import { resolveLiveColumns } from "./display/live-columns.js";
+import { sanitizeElapsedIdle } from "./display/elapsed-idle.js";
 
 const config = loadConfig();
 const logger = new Logger(config.logLevel);
@@ -53,9 +54,13 @@ app.use(express.json({ limit: "256kb" }));
 app.use("/api/admin", createAdminRouter(adminStore, archive, config, logger, hub));
 app.use(
     "/api",
-    createApiRouter(repository, hub, config, archive, () =>
-        resolveLiveColumns(adminStore.getDisplayConfig("live")["columns"]),
-    ),
+    createApiRouter(repository, hub, config, archive, () => {
+        const cfg = adminStore.getDisplayConfig("live");
+        return {
+            columns: resolveLiveColumns(cfg["columns"]),
+            elapsed: sanitizeElapsedIdle(cfg["elapsed"]),
+        };
+    }),
 );
 
 app.get("/", (_req, res) => {

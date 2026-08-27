@@ -156,6 +156,8 @@ export interface LiveStateSnapshot {
     serverTs: string;
     /** 直近データのタイムスタンプ (ISO)。経過時間計算用。 */
     dataTs: string | null;
+    /** 最後の Passing の時刻 (ISO)。Passing 停止判定用。 */
+    lastPassingAt: string | null;
     circuitId: string | null;
     session: SessionInfoVm | null;
     standings: StandingVm[];
@@ -192,4 +194,4 @@ export type LiveStatePatch =
     | { kind: "driver_lap"; teamId: string; value: LapDataVm }
     | { kind: "message"; value: RaceControlMessageVm }
     /** 管理画面で Live 表の列定義が変わったとき。セッション状態とは独立。 */
-    | { kind: "display_live"; columns: unknown };
+    | { kind: "display_live"; columns?: unknown; elapsed?: unknown };

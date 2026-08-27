@@ -21,7 +21,12 @@ import {
   noteSectorEnter,
 } from "@/lib/sectorEnterClock";
 import { resolveLiveColumns } from "@/lib/liveColumns";
-import { fetchLiveDisplayColumns, setLiveDisplayColumns } from "@/lib/liveDisplaySync";
+import { sanitizeElapsedIdle } from "@/lib/elapsedIdle";
+import {
+  fetchLiveDisplayColumns,
+  setElapsedIdleConfig,
+  setLiveDisplayColumns,
+} from "@/lib/liveDisplaySync";
 
 // ============================================================
 // サーバー (/ws) が送る ViewModel 型 (server/src/state/types.ts と対応)
@@ -86,6 +91,7 @@ interface TeamSummaryVm {
 interface StateSnapshot {
   serverTs: string;
   dataTs: string | null;
+  lastPassingAt?: string | null;
   circuitId: string | null;
   session: SessionInfoVm | null;
   standings: StandingVm[];
@@ -110,12 +116,12 @@ type LiveStatePatch =
   | { kind: "track_count"; value: TrackCount }
   | { kind: "driver_lap"; teamId: string; value: LapData }
   | { kind: "message"; value: unknown }
-  | { kind: "display_live"; columns: unknown };
+  | { kind: "display_live"; columns?: unknown; elapsed?: unknown };
 
 type ServerMessage =
   | { type: "hello" }
   | { type: "state"; state: StateSnapshot }
-  | { type: "patch"; patches: LiveStatePatch[]; dataTs: string | null }
+  | { type: "patch"; patches: LiveStatePatch[]; dataTs: string | null; lastPassingAt?: string | null }
   | { type: "smis" };
 
 // ============================================================
@@ -136,6 +142,8 @@ export interface LiveTimingData {
   isRace: boolean;
   /** セッション開始からの経過秒 (データ時刻基準。再生でも正しい)。未確定時は null。 */
   sessionElapsedSec: number | null;
+  /** 最後に Passing を受けた時刻 (ms)。ELAPSED 停止判定用。 */
+  lastPassingAtMs: number | null;
   /** 総周回数 (MOLA が送れば >0)。 */
   sessionLaps: number;
   /** リーダー(P1)の周回数。 */
@@ -159,6 +167,7 @@ interface InternalState {
   trackCount: TrackCount;
   flag: TrackFlag;
   dataTsMs: number | null;
+  lastPassingAtMs: number | null;
   driverLaps: Map<string, LapData[]>;
   bestSectors: Array<number | null>;
 }
@@ -173,6 +182,7 @@ function emptyInternal(): InternalState {
     trackCount: { onTrack: 0, inPit: 0, stopped: 0, retired: 0 },
     flag: "green",
     dataTsMs: null,
+    lastPassingAtMs: null,
     driverLaps: new Map(),
     bestSectors: [null, null, null],
   };
@@ -293,6 +303,7 @@ export function useLiveTiming(url?: string): LiveTimingData {
             s.session = null;
             s.dataTsMs = null;
           }
+          s.lastPassingAtMs = null;
           clearAllSectorEnters();
           break;
         case "session":
@@ -342,7 +353,12 @@ export function useLiveTiming(url?: string): LiveTimingData {
           break;
         }
         case "display_live":
-          setLiveDisplayColumns(resolveLiveColumns(patch.columns));
+          if (patch.columns !== undefined) {
+            setLiveDisplayColumns(resolveLiveColumns(patch.columns));
+          }
+          if (patch.elapsed !== undefined) {
+            setElapsedIdleConfig(sanitizeElapsedIdle(patch.elapsed));
+          }
           break;
         default:
           break;
@@ -398,6 +414,9 @@ export function useLiveTiming(url?: string): LiveTimingData {
           s.driverLaps = new Map(Object.entries(msg.state.driverLaps ?? {}));
           s.bestSectors = msg.state.bestSectors ?? [null, null, null];
           s.dataTsMs = msg.state.dataTs ? Date.parse(msg.state.dataTs) || null : s.dataTsMs;
+          s.lastPassingAtMs = msg.state.lastPassingAt
+            ? Date.parse(msg.state.lastPassingAt) || null
+            : null;
           // フル state では全車の進入時刻を now にしない（一斉ダッシュ防止）。
           // 既に持っている区間時計は維持し、接続中に周/区間が変わった分だけ更新する。
           for (const x of msg.state.standings) {
@@ -412,6 +431,11 @@ export function useLiveTiming(url?: string): LiveTimingData {
           if (msg.dataTs) {
             const t = Date.parse(msg.dataTs);
             if (!Number.isNaN(t)) stateRef.current.dataTsMs = t;
+          }
+          if (msg.lastPassingAt !== undefined) {
+            stateRef.current.lastPassingAtMs = msg.lastPassingAt
+              ? Date.parse(msg.lastPassingAt) || null
+              : null;
           }
           scheduleFlush();
         }
@@ -560,6 +584,7 @@ export function useLiveTiming(url?: string): LiveTimingData {
       flag: s.flag,
       isRace,
       sessionElapsedSec,
+      lastPassingAtMs: s.lastPassingAtMs,
       sessionLaps: s.session?.sessionLaps ?? 0,
       leaderLap,
       getTeamById: (id) => teamMap.get(id),

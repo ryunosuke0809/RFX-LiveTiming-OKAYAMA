@@ -43,6 +43,8 @@ export class LiveSessionState {
 
     /** 直近に受信したデータのタイムスタンプ (ISO)。経過時間はこれ基準で出す (再生でも正しい)。 */
     lastDataTs: string | null = null;
+    /** 最後に Passing を受けた時刻 (ISO)。ELAPSED の停止判定用。 */
+    lastPassingAt: string | null = null;
 
     /**
      * 現在のセッションを識別する署名 (competitionNameJ|categoryNameJ|roundNameJ)。
@@ -105,6 +107,7 @@ export class LiveSessionState {
         this.fastestLap = null;
         this.flag = "green";
         this.sessionStartedAtMs = null;
+        this.lastPassingAt = null;
         this.recentMessages.length = 0;
     }
 
@@ -132,6 +135,7 @@ export class LiveSessionState {
         this.sessionSignature = null;
         this.sessionMode = "time";
         this.lastDataTs = null;
+        this.lastPassingAt = null;
     }
 
     pushRecentMessage(msg: RaceControlMessageVm): void {
@@ -256,6 +260,7 @@ export class LiveSessionState {
         return {
             serverTs,
             dataTs: this.lastDataTs,
+            lastPassingAt: this.lastPassingAt,
             circuitId: this.circuitId,
             session: this.session ? { ...this.session, flag: this.flag } : null,
             standings: this.standingsArray(),

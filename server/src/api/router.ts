@@ -8,20 +8,21 @@ import { requiresViewAuth } from "../config.js";
 import { isBrowserOriginAllowed } from "../auth.js";
 import { issueViewToken } from "../view-token.js";
 import type { LiveColumnDef } from "../display/live-columns.js";
+import type { ElapsedIdleConfig } from "../display/elapsed-idle.js";
 
 /**
  * REST API。
  * - health / messages: 運用・デバッグ
  * - ws-token: /ws 用短期トークン発行
  * - archive/*: 過去セッション一覧・リザルト JSON / CSV
- * - display/live: Live 表の列定義（認証不要。管理画面の保存結果）
+ * - display/live: Live 表の列定義と経過時間の停止設定（認証不要。管理画面の保存結果）
  */
 export function createApiRouter(
     repository: TimingRepository,
     hub: BroadcastHub,
     config: AppConfig,
     archive: ArchiveService,
-    getLiveDisplay: () => LiveColumnDef[],
+    getLiveDisplay: () => { columns: LiveColumnDef[]; elapsed: ElapsedIdleConfig },
 ): Router {
     const router = Router();
     const tokenHits = new Map<string, { count: number; resetAt: number }>();
@@ -75,10 +76,10 @@ export function createApiRouter(
         });
     });
 
-    /** Live 表の列（並び・名称・表示・プルダウン）。Cookie 不要。 */
+    /** Live 表の列と ELAPSED 停止設定。Cookie 不要。 */
     router.get("/display/live", (_req, res) => {
         res.setHeader("Cache-Control", "no-store");
-        res.json({ columns: getLiveDisplay() });
+        res.json(getLiveDisplay());
     });
 
     /**

@@ -240,6 +240,7 @@ export default function TimingPage() {
           sessionInfo={sessionInfo}
           isLive={isLive}
           elapsedSec={live.sessionElapsedSec}
+          lastPassingAtMs={live.lastPassingAtMs}
           durationSec={0}
           leaderLap={live.leaderLap}
           maxLaps={live.sessionLaps}

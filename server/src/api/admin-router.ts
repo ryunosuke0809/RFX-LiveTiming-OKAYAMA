@@ -21,6 +21,7 @@ import {
 } from "../admin/password.js";
 import { isBrowserOriginAllowed } from "../auth.js";
 import { resolveLiveColumns, sanitizeLiveColumns } from "../display/live-columns.js";
+import { sanitizeElapsedIdle } from "../display/elapsed-idle.js";
 import type { BroadcastHub } from "../broadcast/hub.js";
 
 /**
@@ -304,22 +305,37 @@ export function createAdminRouter(
 
     router.get("/display/live", guard, (_req, res) => {
         res.setHeader("Cache-Control", "no-store");
-        res.json({ columns: liveColumnsFromStore(store) });
+        res.json(liveDisplayFromStore(store));
     });
 
     router.put("/display/live", guard, (req, res) => {
         const actor = (req as AdminRequest).admin!;
-        const body = (req.body ?? {}) as { columns?: unknown };
+        const body = (req.body ?? {}) as { columns?: unknown; elapsed?: unknown };
+        if (body.columns === undefined && body.elapsed === undefined) {
+            res.status(400).json({ error: "columns or elapsed required" });
+            return;
+        }
         try {
-            const columns = sanitizeLiveColumns(body.columns);
-            store.setDisplayConfig("live", "columns", columns);
-            store.appendAudit(actor.username, "display.live.update", "live:columns");
-            hub.broadcastPatches(null, [{ kind: "display_live", columns }]);
-            logger.info("live display columns updated", {
+            const current = liveDisplayFromStore(store);
+            const columns =
+                body.columns !== undefined ? sanitizeLiveColumns(body.columns) : current.columns;
+            const elapsed =
+                body.elapsed !== undefined ? sanitizeElapsedIdle(body.elapsed) : current.elapsed;
+            if (body.columns !== undefined) {
+                store.setDisplayConfig("live", "columns", columns);
+                store.appendAudit(actor.username, "display.live.update", "live:columns");
+            }
+            if (body.elapsed !== undefined) {
+                store.setDisplayConfig("live", "elapsed", elapsed);
+                store.appendAudit(actor.username, "display.live.elapsed", "live:elapsed");
+            }
+            hub.broadcastPatches(null, [{ kind: "display_live", columns, elapsed }]);
+            logger.info("live display updated", {
                 username: actor.username,
-                visible: columns.filter((c) => c.visible).map((c) => c.key),
+                columns: body.columns !== undefined,
+                elapsed: body.elapsed !== undefined,
             });
-            res.json({ columns });
+            res.json({ columns, elapsed });
         } catch (err) {
             res.status(400).json({ error: (err as Error).message });
         }
@@ -328,8 +344,12 @@ export function createAdminRouter(
     return router;
 }
 
-function liveColumnsFromStore(store: AdminStore) {
-    return resolveLiveColumns(store.getDisplayConfig("live")["columns"]);
+function liveDisplayFromStore(store: AdminStore) {
+    const cfg = store.getDisplayConfig("live");
+    return {
+        columns: resolveLiveColumns(cfg["columns"]),
+        elapsed: sanitizeElapsedIdle(cfg["elapsed"]),
+    };
 }
 
 function publicUser(store: AdminStore, id: number) {

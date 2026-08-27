@@ -70,13 +70,23 @@ export class BroadcastHub {
         this.broadcastMessage({ type: "smis", envelope });
     }
 
-    /** Aggregator が計算した patch をフロントエンドへ送る。 */
-    broadcastPatches(circuitId: string | null, patches: LiveStatePatch[], dataTs: string | null = null): void {
+    /**
+     * Aggregator が計算した patch をフロントエンドへ送る。
+     * lastPassingAt は ingest 時のみ付ける。省略するとクライアントは前回値を保持する
+     * （列設定の配信で経過時間の停止判定が消えないようにするため）。
+     */
+    broadcastPatches(
+        circuitId: string | null,
+        patches: LiveStatePatch[],
+        dataTs: string | null = null,
+        lastPassingAt?: string | null,
+    ): void {
         if (patches.length === 0) return;
         this.broadcastMessage({
             type: "patch",
             serverTs: new Date().toISOString(),
             dataTs,
+            ...(lastPassingAt !== undefined ? { lastPassingAt } : {}),
             circuitId,
             patches,
         });

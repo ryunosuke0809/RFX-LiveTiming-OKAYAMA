@@ -157,7 +157,12 @@ function handleTextFrame(
     }
 
     hub.broadcastRaw(envelope.value);
-    hub.broadcastPatches(envelope.value.circuitId, patches, envelope.value.ts);
+    hub.broadcastPatches(
+        envelope.value.circuitId,
+        patches,
+        envelope.value.ts,
+        aggregator.lastPassingAt,
+    );
 
     send(ws, { type: "ack", seq: envelope.value.seq });
 }

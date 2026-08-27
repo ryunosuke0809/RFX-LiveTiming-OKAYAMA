@@ -6,39 +6,66 @@ import {
   resolveLiveColumns,
   type LiveColumnDef,
 } from "./liveColumns";
+import {
+  DEFAULT_ELAPSED_IDLE,
+  sanitizeElapsedIdle,
+  type ElapsedIdleConfig,
+} from "./elapsedIdle";
 
-type Listener = (columns: LiveColumnDef[]) => void;
+type ColumnListener = (columns: LiveColumnDef[]) => void;
+type ElapsedListener = (elapsed: ElapsedIdleConfig) => void;
 
-const listeners = new Set<Listener>();
-let current: LiveColumnDef[] = DEFAULT_LIVE_COLUMNS.map((c) => ({
+const columnListeners = new Set<ColumnListener>();
+const elapsedListeners = new Set<ElapsedListener>();
+
+let currentColumns: LiveColumnDef[] = DEFAULT_LIVE_COLUMNS.map((c) => ({
   ...c,
   toggle: c.toggle
     ? { defaultValue: c.toggle.defaultValue, options: c.toggle.options.map((o) => ({ ...o })) }
     : undefined,
 }));
 
+let currentElapsed: ElapsedIdleConfig = { ...DEFAULT_ELAPSED_IDLE };
+
 export function getLiveDisplayColumns(): LiveColumnDef[] {
-  return current;
+  return currentColumns;
 }
 
 export function setLiveDisplayColumns(columns: LiveColumnDef[]): void {
-  current = columns;
-  for (const fn of listeners) fn(columns);
+  currentColumns = columns;
+  for (const fn of columnListeners) fn(columns);
 }
 
-export function subscribeLiveDisplayColumns(fn: Listener): () => void {
-  listeners.add(fn);
+export function subscribeLiveDisplayColumns(fn: ColumnListener): () => void {
+  columnListeners.add(fn);
   return () => {
-    listeners.delete(fn);
+    columnListeners.delete(fn);
+  };
+}
+
+export function getElapsedIdleConfig(): ElapsedIdleConfig {
+  return currentElapsed;
+}
+
+export function setElapsedIdleConfig(elapsed: ElapsedIdleConfig): void {
+  currentElapsed = elapsed;
+  for (const fn of elapsedListeners) fn(elapsed);
+}
+
+export function subscribeElapsedIdleConfig(fn: ElapsedListener): () => void {
+  elapsedListeners.add(fn);
+  return () => {
+    elapsedListeners.delete(fn);
   };
 }
 
 export async function fetchLiveDisplayColumns(signal?: AbortSignal): Promise<LiveColumnDef[]> {
   const res = await fetch("/api/display/live", { cache: "no-store", signal });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const body = (await res.json()) as { columns?: unknown };
+  const body = (await res.json()) as { columns?: unknown; elapsed?: unknown };
   const columns = resolveLiveColumns(body.columns);
   setLiveDisplayColumns(columns);
+  setElapsedIdleConfig(sanitizeElapsedIdle(body.elapsed));
   return columns;
 }
 
@@ -59,4 +86,23 @@ export function useLiveDisplayColumns(): LiveColumnDef[] {
   }, []);
 
   return columns;
+}
+
+/** ELAPSED の Passing 停止設定。未取得時は既定（90秒でフリーズ）。 */
+export function useElapsedIdleConfig(): ElapsedIdleConfig {
+  const [elapsed, setElapsed] = useState<ElapsedIdleConfig>(getElapsedIdleConfig);
+
+  useEffect(() => {
+    const unsub = subscribeElapsedIdleConfig(setElapsed);
+    const ac = new AbortController();
+    void fetchLiveDisplayColumns(ac.signal).catch(() => {
+      /* 既定のまま */
+    });
+    return () => {
+      unsub();
+      ac.abort();
+    };
+  }, []);
+
+  return elapsed;
 }

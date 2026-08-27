@@ -34,6 +34,10 @@ const STOP_MS = 90_000;
 export class SessionStateAggregator {
     constructor(private readonly state: LiveSessionState) {}
 
+    get lastPassingAt(): string | null {
+        return this.state.lastPassingAt;
+    }
+
     apply(envelope: IngestEnvelope): LiveStatePatch[] {
         this.state.circuitId = envelope.circuitId;
         if (envelope.ts) this.state.lastDataTs = envelope.ts;
@@ -66,6 +70,8 @@ export class SessionStateAggregator {
                 patches = this.applyStart(p);
                 break;
             case "Passing":
+                // ingest の ts（hydrate 時は DB 上の受信時刻）。無いときだけ壁時計。
+                this.state.lastPassingAt = envelope.ts || new Date().toISOString();
                 patches = this.applyPassing(p);
                 break;
             case "Standings":

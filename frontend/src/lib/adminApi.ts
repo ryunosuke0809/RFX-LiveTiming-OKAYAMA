@@ -173,12 +173,21 @@ export interface AdminLiveColumn {
   };
 }
 
-export function adminGetLiveDisplay(): Promise<{ columns: AdminLiveColumn[] }> {
+export interface AdminElapsedIdle {
+  idleThresholdSec: number;
+  idleDisplay: "freeze" | "blank";
+}
+
+export function adminGetLiveDisplay(): Promise<{
+  columns: AdminLiveColumn[];
+  elapsed: AdminElapsedIdle;
+}> {
   return request("/display/live");
 }
 
 export function adminSaveLiveDisplay(
   columns: AdminLiveColumn[],
-): Promise<{ columns: AdminLiveColumn[] }> {
-  return request("/display/live", { method: "PUT", body: { columns } });
+  elapsed: AdminElapsedIdle,
+): Promise<{ columns: AdminLiveColumn[]; elapsed: AdminElapsedIdle }> {
+  return request("/display/live", { method: "PUT", body: { columns, elapsed } });
 }

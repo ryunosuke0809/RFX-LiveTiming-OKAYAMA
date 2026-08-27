@@ -5,6 +5,7 @@ import {
   AdminApiError,
   adminGetLiveDisplay,
   adminSaveLiveDisplay,
+  type AdminElapsedIdle,
   type AdminLiveColumn,
   type AdminLiveColumnOption,
 } from "@/lib/adminApi";
@@ -15,6 +16,7 @@ import {
   resolveLiveColumns,
   type LiveColumnDef,
 } from "@/lib/liveColumns";
+import { DEFAULT_ELAPSED_IDLE, sanitizeElapsedIdle } from "@/lib/elapsedIdle";
 
 /**
  * Live Timing 表の列を、並び・名称・表示/非表示・プルダウン内容まで編集する。
@@ -25,6 +27,7 @@ type Draft = AdminLiveColumn;
 
 export default function AdminLiveDisplayPage() {
   const [draft, setDraft] = useState<Draft[]>([]);
+  const [elapsed, setElapsed] = useState<AdminElapsedIdle>(DEFAULT_ELAPSED_IDLE);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -32,8 +35,9 @@ export default function AdminLiveDisplayPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [openKey, setOpenKey] = useState<string | null>(null);
 
-  const applyLoaded = (columns: AdminLiveColumn[]) => {
+  const applyLoaded = (columns: AdminLiveColumn[], nextElapsed: AdminElapsedIdle) => {
     setDraft(clone(resolveLiveColumns(columns)));
+    setElapsed(sanitizeElapsedIdle(nextElapsed));
     setDirty(false);
   };
 
@@ -41,14 +45,14 @@ export default function AdminLiveDisplayPage() {
     let cancelled = false;
     void (async () => {
       try {
-        const { columns } = await adminGetLiveDisplay();
+        const { columns, elapsed: loadedElapsed } = await adminGetLiveDisplay();
         if (cancelled) return;
-        setDraft(clone(resolveLiveColumns(columns)));
-        setDirty(false);
+        applyLoaded(columns, sanitizeElapsedIdle(loadedElapsed));
       } catch (err) {
         if (cancelled) return;
         setError(describe(err));
         setDraft(clone(DEFAULT_LIVE_COLUMNS));
+        setElapsed(DEFAULT_ELAPSED_IDLE);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -102,13 +106,19 @@ export default function AdminLiveDisplayPage() {
     update(next);
   };
 
+  const patchElapsed = (patch: Partial<AdminElapsedIdle>) => {
+    setElapsed((prev) => sanitizeElapsedIdle({ ...prev, ...patch }));
+    setDirty(true);
+    setNotice(null);
+  };
+
   const save = async () => {
     if (saving) return;
     setSaving(true);
     setError(null);
     try {
-      const { columns } = await adminSaveLiveDisplay(draft);
-      applyLoaded(columns);
+      const { columns, elapsed: savedElapsed } = await adminSaveLiveDisplay(draft, elapsed);
+      applyLoaded(columns, savedElapsed);
       setNotice("保存しました。接続中の Live 画面に反映されます。");
     } catch (err) {
       setError(describe(err));
@@ -119,6 +129,7 @@ export default function AdminLiveDisplayPage() {
 
   const resetDefaults = () => {
     update(clone(DEFAULT_LIVE_COLUMNS));
+    setElapsed(DEFAULT_ELAPSED_IDLE);
     setNotice("既定値に戻しました。保存するまで Live には反映されません。");
   };
 
@@ -130,6 +141,7 @@ export default function AdminLiveDisplayPage() {
         <h2 className="text-sm font-bold tracking-wider text-white uppercase">Live 表示</h2>
         <p className="mt-1 text-xs leading-relaxed text-zinc-400">
           タイミング表の列の並び・名称・表示／非表示と、ヘッダーのプルダウン（Car / Behind など）を編集します。
+          経過時間は Passing が止まったあとの扱いもここで変えます（赤旗中断でも Passing は止まるので、セッション終了そのものではありません）。
           保存すると、開いている Live ページへすぐに配信されます。
         </p>
       </div>
@@ -144,6 +156,8 @@ export default function AdminLiveDisplayPage() {
           {notice}
         </div>
       )}
+
+      <ElapsedIdleEditor elapsed={elapsed} disabled={loading} onChange={patchElapsed} />
 
       <HeaderPreview columns={draft} />
 
@@ -190,6 +204,66 @@ export default function AdminLiveDisplayPage() {
             />
           ))
         )}
+      </div>
+    </div>
+  );
+}
+
+function ElapsedIdleEditor({
+  elapsed,
+  disabled,
+  onChange,
+}: {
+  elapsed: AdminElapsedIdle;
+  disabled: boolean;
+  onChange: (patch: Partial<AdminElapsedIdle>) => void;
+}) {
+  return (
+    <div className="mb-4 rounded-xl border border-zinc-700 bg-zinc-900/80 p-3 sm:p-4">
+      <h3 className="text-[11px] font-bold tracking-wider text-zinc-300 uppercase">
+        経過時間（ELAPSED）
+      </h3>
+      <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">
+        Passing が途絶えてから止めるまでの秒数です。0 にすると従来どおり動き続けます。
+        赤旗やセッション終了でも Passing は止まるので、終わったかどうかの判定には使いません。
+      </p>
+      <div className="mt-3 flex flex-wrap items-end gap-4">
+        <label className="flex flex-col gap-1">
+          <span className="text-[10px] tracking-wider text-zinc-500 uppercase">停止までの秒</span>
+          <input
+            type="number"
+            min={0}
+            max={3600}
+            step={1}
+            disabled={disabled}
+            value={elapsed.idleThresholdSec}
+            onChange={(e) => onChange({ idleThresholdSec: Number(e.target.value) })}
+            className="w-28 rounded-md border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-sm text-zinc-100 outline-none focus:border-amber-500 disabled:opacity-50"
+          />
+        </label>
+        <fieldset className="flex flex-col gap-1.5" disabled={disabled}>
+          <legend className="text-[10px] tracking-wider text-zinc-500 uppercase">止めたあとの表示</legend>
+          <label className="flex items-center gap-1.5 text-[11px] text-zinc-300">
+            <input
+              type="radio"
+              name="elapsed-idle-display"
+              checked={elapsed.idleDisplay === "freeze"}
+              onChange={() => onChange({ idleDisplay: "freeze" })}
+              className="accent-amber-500"
+            />
+            最後の経過時間のまま止める
+          </label>
+          <label className="flex items-center gap-1.5 text-[11px] text-zinc-300">
+            <input
+              type="radio"
+              name="elapsed-idle-display"
+              checked={elapsed.idleDisplay === "blank"}
+              onChange={() => onChange({ idleDisplay: "blank" })}
+              className="accent-amber-500"
+            />
+            ---- にする
+          </label>
+        </fieldset>
       </div>
     </div>
   );

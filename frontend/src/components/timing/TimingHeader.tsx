@@ -4,6 +4,8 @@ import Image from "next/image";
 import { useEffect, useState } from "react";
 import type { SessionInfo } from "@/types/smis";
 import { formatRemainingTime } from "@/lib/format";
+import { resolveElapsedSeconds } from "@/lib/elapsedIdle";
+import { useElapsedIdleConfig } from "@/lib/liveDisplaySync";
 
 interface TimingHeaderProps {
   sessionInfo: SessionInfo;
@@ -19,6 +21,8 @@ interface TimingHeaderProps {
   isRace?: boolean;
   /** ライブデータ受信中か。 */
   isLive?: boolean;
+  /** 最後の Passing の時刻。Passing 停止後の ELAPSED 判定に使う。 */
+  lastPassingAtMs?: number | null;
 }
 
 export default function TimingHeader({
@@ -28,9 +32,11 @@ export default function TimingHeader({
   maxLaps = 0,
   isRace = false,
   isLive = false,
+  lastPassingAtMs = null,
 }: TimingHeaderProps) {
   const { competition, category, session, remainingTime, localTime, sessionStartedAt } =
     sessionInfo;
+  const idleCfg = useElapsedIdleConfig();
 
   const startedAtMs = (() => {
     if (!sessionStartedAt) return null;
@@ -39,7 +45,7 @@ export default function TimingHeader({
   })();
   const hasStart = startedAtMs !== null;
 
-  // Start があるときだけ壁時計で秒を進める（途中参加・再表示・終了後も同じ）。
+  // Start があるときだけ壁時計で秒を進める。Passing 停止後は閾値を超えた時点で止める。
   const [tick, setTick] = useState(0);
   useEffect(() => {
     if (!isLive || !hasStart) return;
@@ -51,13 +57,20 @@ export default function TimingHeader({
   let timeLabel = "";
   if (isLive && hasStart && startedAtMs !== null) {
     void tick;
-    const elapsed = Math.max(0, Math.floor((Date.now() - startedAtMs) / 1000));
-    if (durationSec > 0) {
-      bigTime = formatRemainingTime(Math.max(0, durationSec - elapsed));
-      timeLabel = "REMAINING";
+    const resolved = resolveElapsedSeconds({
+      nowMs: Date.now(),
+      startedAtMs,
+      lastPassingAtMs,
+      idleThresholdSec: idleCfg.idleThresholdSec,
+      idleDisplay: idleCfg.idleDisplay,
+    });
+    timeLabel = durationSec > 0 ? "REMAINING" : "ELAPSED";
+    if (resolved.seconds == null) {
+      bigTime = "----";
+    } else if (durationSec > 0) {
+      bigTime = formatRemainingTime(Math.max(0, durationSec - resolved.seconds));
     } else {
-      bigTime = formatRemainingTime(elapsed);
-      timeLabel = "ELAPSED";
+      bigTime = formatRemainingTime(resolved.seconds);
     }
   } else if (isLive) {
     // Start 前: 0:00 のまま止め、Select 直後などに動かない
