@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import {
   AdminApiError,
   adminGetLiveDisplay,
+  adminResetLiveDisplay,
   adminSaveLiveDisplay,
   type AdminElapsedIdle,
   type AdminLiveColumn,
@@ -34,6 +35,7 @@ export default function AdminLiveDisplayPage() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [openKey, setOpenKey] = useState<string | null>(null);
+  const [resetting, setResetting] = useState(false);
 
   const applyLoaded = (columns: AdminLiveColumn[], nextElapsed: AdminElapsedIdle) => {
     setDraft(clone(resolveLiveColumns(columns)));
@@ -133,6 +135,27 @@ export default function AdminLiveDisplayPage() {
     setNotice("既定値に戻しました。保存するまで Live には反映されません。");
   };
 
+  const resetLive = async () => {
+    if (resetting) return;
+    if (
+      !window.confirm(
+        "公開中の Live / Tracking に出ているタイムと経過時間を消します。履歴データは消えません。実行しますか？",
+      )
+    ) {
+      return;
+    }
+    setResetting(true);
+    setError(null);
+    try {
+      await adminResetLiveDisplay();
+      setNotice("Live 画面をリセットしました。次の Select が来れば通常どおり始まります。");
+    } catch (err) {
+      setError(describe(err));
+    } finally {
+      setResetting(false);
+    }
+  };
+
   const visibleCount = draft.filter((c) => c.visible).length;
 
   return (
@@ -156,6 +179,8 @@ export default function AdminLiveDisplayPage() {
           {notice}
         </div>
       )}
+
+      <LiveResetCard resetting={resetting} onReset={() => void resetLive()} />
 
       <ElapsedIdleEditor elapsed={elapsed} disabled={loading} onChange={patchElapsed} />
 
@@ -204,6 +229,38 @@ export default function AdminLiveDisplayPage() {
             />
           ))
         )}
+      </div>
+    </div>
+  );
+}
+
+function LiveResetCard({
+  resetting,
+  onReset,
+}: {
+  resetting: boolean;
+  onReset: () => void;
+}) {
+  return (
+    <div className="mb-4 rounded-xl border border-zinc-700 bg-zinc-900/80 p-3 sm:p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <h3 className="text-[11px] font-bold tracking-wider text-zinc-300 uppercase">
+            Live 画面のリセット
+          </h3>
+          <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">
+            いま出ているタイム・経過時間を消します。車番などのエントリーは残ります。
+            計測の履歴は消えません。次に Select が来れば、通常どおり始まります。
+          </p>
+        </div>
+        <button
+          type="button"
+          disabled={resetting}
+          onClick={onReset}
+          className="flex-shrink-0 rounded-md border border-red-800 bg-red-950/40 px-3 py-1.5 text-[11px] font-bold text-red-200 transition-colors hover:border-red-600 hover:bg-red-900/50 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {resetting ? "リセット中…" : "Reset"}
+        </button>
       </div>
     </div>
   );

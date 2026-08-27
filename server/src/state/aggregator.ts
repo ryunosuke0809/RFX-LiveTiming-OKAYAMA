@@ -38,6 +38,24 @@ export class SessionStateAggregator {
         return this.state.lastPassingAt;
     }
 
+    /**
+     * 画面上のライブ結果だけ消す（Select と同じ timing reset）。
+     * SQLite の履歴は触らない。エントリー（Team）は残し、タイムだけ空にする。
+     */
+    resetDisplay(): LiveStatePatch[] {
+        this.state.resetForNewSession();
+        const patches: LiveStatePatch[] = [{ kind: "reset", scope: "timing" }];
+        for (const team of this.state.teams.values()) {
+            const placeholder = this.ensurePlaceholderStanding(team);
+            if (placeholder) patches.push(placeholder);
+        }
+        if (this.state.teams.size > 0) {
+            patches.push({ kind: "track_count", value: this.state.trackCount() });
+        }
+        patches.push(...this.mergeSessionInfo({ sessionStartedAt: null }));
+        return patches;
+    }
+
     apply(envelope: IngestEnvelope): LiveStatePatch[] {
         this.state.circuitId = envelope.circuitId;
         if (envelope.ts) this.state.lastDataTs = envelope.ts;
@@ -322,25 +340,9 @@ export class SessionStateAggregator {
     private applySelect(p: Record<string, unknown>): LiveStatePatch[] {
         // MOLA の SessionId は "1:1:1:1:1" 等で固定されることが多く、
         // Id 比較では Select を検知できない。Select 自体をセッション開始境界とする。
-        // → ラップ状態をクリアし、ELAPSED の基点 (sessionStartedAt) も必ず落とす。
         const sessionId = str(p, "sessionId");
-        this.state.resetForNewSession();
-        const patches: LiveStatePatch[] = [{ kind: "reset", scope: "timing" }];
-
-        // マスター (Team) は残るので、表が空にならないようプレースホルダーを再構築する。
-        for (const team of this.state.teams.values()) {
-            const placeholder = this.ensurePlaceholderStanding(team);
-            if (placeholder) patches.push(placeholder);
-        }
-        if (this.state.teams.size > 0) {
-            patches.push({ kind: "track_count", value: this.state.trackCount() });
-        }
-
-        const fields: Partial<NonNullable<LiveSessionState["session"]>> = {
-            sessionStartedAt: null,
-        };
-        if (sessionId) fields.sessionId = sessionId;
-        patches.push(...this.mergeSessionInfo(fields));
+        const patches = this.resetDisplay();
+        if (sessionId) patches.push(...this.mergeSessionInfo({ sessionId }));
         return patches;
     }
 

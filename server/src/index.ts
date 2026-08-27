@@ -51,7 +51,7 @@ const stopDayRollover = startDayRollover(liveState, hub, logger);
 const app = express();
 app.disable("x-powered-by");
 app.use(express.json({ limit: "256kb" }));
-app.use("/api/admin", createAdminRouter(adminStore, archive, config, logger, hub));
+app.use("/api/admin", createAdminRouter(adminStore, archive, config, logger, hub, aggregator));
 app.use(
     "/api",
     createApiRouter(repository, hub, config, archive, () => {

@@ -191,3 +191,7 @@ export function adminSaveLiveDisplay(
 ): Promise<{ columns: AdminLiveColumn[]; elapsed: AdminElapsedIdle }> {
   return request("/display/live", { method: "PUT", body: { columns, elapsed } });
 }
+
+export function adminResetLiveDisplay(): Promise<{ ok: true }> {
+  return request("/display/live/reset", { method: "POST" });
+}

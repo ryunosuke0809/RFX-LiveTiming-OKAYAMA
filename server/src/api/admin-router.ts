@@ -23,6 +23,7 @@ import { isBrowserOriginAllowed } from "../auth.js";
 import { resolveLiveColumns, sanitizeLiveColumns } from "../display/live-columns.js";
 import { sanitizeElapsedIdle } from "../display/elapsed-idle.js";
 import type { BroadcastHub } from "../broadcast/hub.js";
+import type { SessionStateAggregator } from "../state/aggregator.js";
 
 /**
  * 管理画面 API (`/api/admin/*`)。
@@ -37,6 +38,7 @@ export function createAdminRouter(
     config: AppConfig,
     logger: Logger,
     hub: BroadcastHub,
+    aggregator: SessionStateAggregator,
 ): Router {
     const router = Router();
     const auth: AdminAuthOptions = {
@@ -339,6 +341,15 @@ export function createAdminRouter(
         } catch (err) {
             res.status(400).json({ error: (err as Error).message });
         }
+    });
+
+    router.post("/display/live/reset", guard, (req, res) => {
+        const actor = (req as AdminRequest).admin!;
+        const patches = aggregator.resetDisplay();
+        hub.broadcastPatches(null, patches, null, null);
+        store.appendAudit(actor.username, "display.live.reset", "live");
+        logger.info("live display reset", { username: actor.username });
+        res.json({ ok: true });
     });
 
     return router;
