@@ -146,33 +146,16 @@ function fileSafe(v: string): string {
   );
 }
 
-/** 重複を除いて結合する。カレンダー／ヘッダーのセッション名用。 */
-function uniqueNonEmpty(...values: Array<string | null | undefined>): string[] {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const raw of values) {
-    const v = (raw ?? "").trim();
-    if (!v || seen.has(v)) continue;
-    seen.add(v);
-    out.push(v);
-  }
-  return out;
-}
-
 /**
- * アーカイブ一覧の表示名。
- * Round/Session は SMIS 上 "Qualifying" / "RACE" になりがちなので、
- * Category（例: Japan Cup Official Paid Test1）を先頭に出す。
+ * アーカイブ一覧の表示名。SMIS の Category 名をそのまま出す。
+ * Round/Session の Qualifying / RACE は付けない。
  */
 function formatArchiveSessionTitle(s: {
   categoryName?: string | null;
-  roundName?: string | null;
-  sessionName?: string | null;
   competitionName?: string | null;
   index?: number;
 }): string {
-  const head = (s.categoryName ?? "").trim() || (s.competitionName ?? "").trim();
-  const title = uniqueNonEmpty(head, s.roundName, s.sessionName).join(" · ");
+  const title = (s.categoryName ?? "").trim() || (s.competitionName ?? "").trim();
   if (title) return title;
   return s.index != null ? `Session ${s.index + 1}` : "Session";
 }
@@ -589,8 +572,6 @@ export default function ResultPage() {
   const sessionHeadline = isArchive
     ? formatArchiveSessionTitle({
         categoryName,
-        roundName,
-        sessionName,
         competitionName,
       })
     : [roundName, sessionName].filter(Boolean).join(" · ") || categoryName || "Session";
