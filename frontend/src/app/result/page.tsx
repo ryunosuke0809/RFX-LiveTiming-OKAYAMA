@@ -16,7 +16,11 @@ import {
 import { formatTime, recomputeStandingsGaps } from "@/lib/format";
 import { TIME_COLORS } from "@/lib/colors";
 import { useLiveTiming } from "@/hooks/useLiveTiming";
-import { setLiveEntities } from "@/lib/entityRegistry";
+import {
+  pauseLiveEntityWrites,
+  resumeLiveEntityWrites,
+  setLiveEntities,
+} from "@/lib/entityRegistry";
 import { excludeOicClasses, excludeOicStandings } from "@/lib/entryFilter";
 import {
   fetchArchiveDays,
@@ -140,6 +144,37 @@ function fileSafe(v: string): string {
       .replace(/_+/g, "_")
       .replace(/^_|_$/g, "") || "NA"
   );
+}
+
+/** 重複を除いて結合する。カレンダー／ヘッダーのセッション名用。 */
+function uniqueNonEmpty(...values: Array<string | null | undefined>): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of values) {
+    const v = (raw ?? "").trim();
+    if (!v || seen.has(v)) continue;
+    seen.add(v);
+    out.push(v);
+  }
+  return out;
+}
+
+/**
+ * アーカイブ一覧の表示名。
+ * Round/Session は SMIS 上 "Qualifying" / "RACE" になりがちなので、
+ * Category（例: Japan Cup Official Paid Test1）を先頭に出す。
+ */
+function formatArchiveSessionTitle(s: {
+  categoryName?: string | null;
+  roundName?: string | null;
+  sessionName?: string | null;
+  competitionName?: string | null;
+  index?: number;
+}): string {
+  const head = (s.categoryName ?? "").trim() || (s.competitionName ?? "").trim();
+  const title = uniqueNonEmpty(head, s.roundName, s.sessionName).join(" · ");
+  if (title) return title;
+  return s.index != null ? `Session ${s.index + 1}` : "Session";
 }
 
 /**
@@ -301,7 +336,10 @@ function personalFromArchive(payload: ArchiveResultPayload, teamId: string): Dri
   };
 }
 
-function registerArchiveEntities(payload: ArchiveResultPayload): void {
+function buildArchiveEntities(payload: ArchiveResultPayload): {
+  teams: Map<string, Team>;
+  classes: Map<string, CarClass>;
+} {
   const teams = new Map<string, Team>();
   for (const t of payload.snapshot.teams) {
     teams.set(t.id, {
@@ -344,6 +382,24 @@ function registerArchiveEntities(payload: ArchiveResultPayload): void {
           },
         ],
       });
+    } else {
+      // スナップショットの Team が空ドライバーでも、Standing 側の名前を残す
+      const existing = teams.get(s.teamId)!;
+      if (!existing.drivers.some((d) => d.nameJ || d.nameE)) {
+        existing.drivers = [
+          {
+            no: s.driverNo,
+            nameJ: s.driverNameJ,
+            nameE: s.driverNameE || s.driverNameJ,
+            nation: "",
+          },
+        ];
+      }
+      if (!existing.nameE && !existing.nameJ) {
+        existing.nameJ = s.teamNameJ;
+        existing.nameE = s.teamNameE || s.teamNameJ;
+      }
+      if (!existing.no && s.teamNo) existing.no = s.teamNo;
     }
   }
   const classes = new Map<string, CarClass>();
@@ -356,7 +412,28 @@ function registerArchiveEntities(payload: ArchiveResultPayload): void {
       color: c.color,
     });
   }
-  setLiveEntities(teams, classes);
+  return { teams, classes };
+}
+
+function registerArchiveEntities(payload: ArchiveResultPayload): void {
+  const { teams, classes } = buildArchiveEntities(payload);
+  setLiveEntities(teams, classes, { force: true });
+}
+
+function restoreLiveEntities(live: {
+  hasData: boolean;
+  teams: Team[];
+  classes: CarClass[];
+}): void {
+  resumeLiveEntityWrites();
+  if (!live.hasData) {
+    setLiveEntities(null, null);
+    return;
+  }
+  setLiveEntities(
+    new Map(live.teams.map((t) => [t.id, t])),
+    new Map(live.classes.map((c) => [c.id, c])),
+  );
 }
 
 function getEventsForDate(year: number, month: number, day: number, archiveDays: Set<string>): string[] {
@@ -390,6 +467,8 @@ export default function ResultPage() {
   const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
   const live = useLiveTiming();
+  const liveRef = useRef(live);
+  liveRef.current = live;
   const isArchive = pastResult !== null;
   const isLive = !isArchive && live.hasData;
 
@@ -407,6 +486,20 @@ export default function ResultPage() {
       color: c.color,
     }));
   }, [pastResult]);
+  const archiveEntities = useMemo(
+    () => (pastResult ? buildArchiveEntities(pastResult) : null),
+    [pastResult],
+  );
+  const getTeam = useCallback(
+    (s: Standing) =>
+      archiveEntities ? archiveEntities.teams.get(s.teamId) : getTeamByStanding(s),
+    [archiveEntities],
+  );
+  const getClass = useCallback(
+    (s: Standing) =>
+      archiveEntities ? archiveEntities.classes.get(s.classId) : getClassByStanding(s),
+    [archiveEntities],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -448,8 +541,14 @@ export default function ResultPage() {
     };
   }, [selectedDate]);
 
+  // 過去セッション表示中はライブ WS が TeamId 再利用で車番・名前を上書きしないようにする。
   useEffect(() => {
-    if (pastResult) registerArchiveEntities(pastResult);
+    if (!pastResult) return;
+    registerArchiveEntities(pastResult);
+    pauseLiveEntityWrites();
+    return () => {
+      restoreLiveEntities(liveRef.current);
+    };
   }, [pastResult]);
 
   const baseStandings = useMemo(
@@ -487,8 +586,14 @@ export default function ResultPage() {
       snapSession?.sessionNameJ ||
       ""
     : sessionMeta.session.nameE || sessionMeta.session.nameJ;
-  // ヘッダー用: ラウンド/セッションを優先し、無ければカテゴリ名で何の結果か分かるようにする
-  const sessionHeadline = [roundName, sessionName].filter(Boolean).join(" · ") || categoryName || "Session";
+  const sessionHeadline = isArchive
+    ? formatArchiveSessionTitle({
+        categoryName,
+        roundName,
+        sessionName,
+        competitionName,
+      })
+    : [roundName, sessionName].filter(Boolean).join(" · ") || categoryName || "Session";
   const sessionDetail =
     categoryName && categoryName !== sessionHeadline && categoryName !== competitionName
       ? categoryName
@@ -507,11 +612,11 @@ export default function ResultPage() {
 
   const sortedStandings = useMemo(() => {
     const base = classFilter
-      ? baseStandings.filter((s) => getClassByStanding(s)?.nameE === classFilter)
+      ? baseStandings.filter((s) => getClass(s)?.nameE === classFilter)
       : baseStandings;
     const sorted = sortStandingsForResult(base);
     return classFilter ? recomputeStandingsGaps(sorted, isRaceMode) : sorted;
-  }, [classFilter, baseStandings, isRaceMode]);
+  }, [classFilter, baseStandings, isRaceMode, getClass]);
 
   const handleDownloadClassification = () => {
     if (isArchive && pastResult) {
@@ -544,7 +649,7 @@ export default function ResultPage() {
   };
 
   const handleDownloadIndividual = (s: Standing) => {
-    const team = getTeamByStanding(s);
+    const team = getTeam(s);
     if (isArchive && pastResult) {
       const name = buildResultCsvFilename({
         kind: "Laps",
@@ -578,6 +683,7 @@ export default function ResultPage() {
       const result = await fetchArchiveResult(date, sessionIndex);
       // エンティティを先に登録してから state 更新 (初回描画で車番・チーム名が空になるのを防ぐ)
       registerArchiveEntities(result);
+      pauseLiveEntityWrites();
       setPastResult(result);
       setIndividualTarget(null);
       setSelectedStanding(null);
@@ -588,6 +694,7 @@ export default function ResultPage() {
   }, []);
 
   const clearArchive = () => {
+    restoreLiveEntities(liveRef.current);
     setPastResult(null);
     setIndividualTarget(null);
     setSelectedStanding(null);
@@ -671,6 +778,8 @@ export default function ResultPage() {
             onSelectTarget={setIndividualTarget}
             onDownload={handleDownloadIndividual}
             getPersonal={getPersonal}
+            getTeam={getTeam}
+            getClass={getClass}
           />
         </div>
       ) : (
@@ -695,6 +804,8 @@ export default function ResultPage() {
                 onBackToLive={isArchive ? clearArchive : undefined}
                 onDownload={handleDownloadClassification}
                 onRowClick={(s) => setSelectedStanding(s)}
+                getTeam={getTeam}
+                getClass={getClass}
               />
             )}
             {activeTab === "calendar" && (
@@ -738,8 +849,8 @@ export default function ResultPage() {
       {selectedStanding && (
         <DriverDetailPanel
           standing={selectedStanding}
-          team={getTeamByStanding(selectedStanding)}
-          carClass={getClassByStanding(selectedStanding)}
+          team={getTeam(selectedStanding)}
+          carClass={getClass(selectedStanding)}
           personalData={getPersonal(selectedStanding)}
           onClose={() => setSelectedStanding(null)}
         />
@@ -752,6 +863,7 @@ export default function ResultPage() {
 
 function ClassificationView({
   standings, classFilter, sessionLabel, courseLabel, mode, onBackToLive, onDownload, onRowClick,
+  getTeam, getClass,
 }: {
   standings: Standing[];
   classFilter: string | null;
@@ -761,6 +873,8 @@ function ClassificationView({
   onBackToLive?: () => void;
   onDownload: () => void;
   onRowClick: (s: Standing) => void;
+  getTeam: (s: Standing) => Team | undefined;
+  getClass: (s: Standing) => CarClass | undefined;
 }) {
   const stickyOffsets = getStickyLeftOffsets(CLASSIFICATION_COLUMNS, CLASSIFICATION_STICKY_KEYS);
   const headerLabels: Record<string, string> = {
@@ -844,8 +958,8 @@ function ClassificationView({
           </thead>
           <tbody>
             {standings.map((s, idx) => {
-              const team = getTeamByStanding(s);
-              const cls = getClassByStanding(s);
+              const team = getTeam(s);
+              const cls = getClass(s);
               if (!team) return null;
               // Gap はサーバー計算値 (決勝=周回/タイム差、予選=ベストタイム差、60秒以上は分表記)。
               const gap = idx === 0 || !s.gap || s.gap === "—" ? "" : s.gap;
@@ -907,16 +1021,20 @@ function IndividualView({
   onSelectTarget,
   onDownload,
   getPersonal,
+  getTeam,
+  getClass,
 }: {
   standings: Standing[];
   target: Standing | null;
   onSelectTarget: (s: Standing | null) => void;
   onDownload: (s: Standing) => void;
   getPersonal: (s: Standing) => DriverPersonalData;
+  getTeam: (s: Standing) => Team | undefined;
+  getClass: (s: Standing) => CarClass | undefined;
 }) {
   const personalData = target ? getPersonal(target) : null;
-  const team = target ? getTeamByStanding(target) : null;
-  const cls = target ? getClassByStanding(target) : null;
+  const team = target ? getTeam(target) : null;
+  const cls = target ? getClass(target) : null;
 
   return (
     // スマホは縦並び、md (768px) 以上で左右 2 ペイン。
@@ -929,8 +1047,8 @@ function IndividualView({
         </div>
         <ScrollHintArea axis="y" className="flex-1 min-h-0" contentClassName="h-full">
           {standings.map((s) => {
-            const t = getTeamByStanding(s);
-            const c = getClassByStanding(s);
+            const t = getTeam(s);
+            const c = getClass(s);
             if (!t) return null;
             const isActive = target?.teamId === s.teamId;
             return (
@@ -972,8 +1090,8 @@ function IndividualView({
         </div>
         <HorizontalScrollArea contentClassName="flex gap-1.5 px-2 py-2">
           {standings.map((s) => {
-            const t = getTeamByStanding(s);
-            const c = getClassByStanding(s);
+            const t = getTeam(s);
+            const c = getClass(s);
             if (!t) return null;
             const isActive = target?.teamId === s.teamId;
             return (
@@ -1250,16 +1368,13 @@ function CalendarView({
                 >
                   <div className="min-w-0 flex-1">
                     <span className="text-sm text-zinc-200 block truncate">
-                      {[session.roundName, session.sessionName].filter(Boolean).join(" · ") ||
-                        session.categoryName ||
-                        `Session ${session.index + 1}`}
+                      {formatArchiveSessionTitle(session)}
                     </span>
                     <span className="text-xs text-zinc-500 truncate block">
-                      {session.categoryName &&
-                      session.categoryName !== session.roundName &&
-                      session.categoryName !== session.sessionName
-                        ? session.categoryName
-                        : session.competitionName || "OKAYAMA"}
+                      {session.competitionName &&
+                      session.competitionName !== session.categoryName
+                        ? session.competitionName
+                        : "OKAYAMA"}
                       {session.carCount > 0 ? ` · ${session.carCount} cars` : ""}
                     </span>
                   </div>
