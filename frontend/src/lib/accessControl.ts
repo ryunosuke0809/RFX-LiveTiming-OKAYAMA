@@ -20,8 +20,8 @@ export const VENUE_CENTER = {
  */
 export const VENUE_RADIUS_M = 3000;
 
-/** 位置の再確認間隔（ミリ秒）。移動後の切断用。 */
-export const GEO_RECHECK_INTERVAL_MS = 30_000;
+/** 位置の再確認間隔（ミリ秒）。移動後の切断用。短すぎると iOS が TIMEOUT しやすい。 */
+export const GEO_RECHECK_INTERVAL_MS = 120_000;
 
 const PUBLIC_HOSTS = new Set([
   "mola-timing-okayama.com",
