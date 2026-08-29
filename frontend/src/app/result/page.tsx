@@ -148,6 +148,24 @@ function fileSafe(v: string): string {
 }
 
 /**
+ * カレンダー行が決勝かどうか。サーバーの isRace を優先し、
+ * Category / Round / Session 名に RACE・決勝が付いている場合も拾う。
+ * 「チャレンジカップ レース … 公式予選」のように予選が明示されていれば決勝扱いしない。
+ */
+function isRaceArchiveSession(s: {
+  isRace?: boolean;
+  categoryName?: string | null;
+  sessionName?: string | null;
+  roundName?: string | null;
+}): boolean {
+  if (s.isRace) return true;
+  const text = [s.roundName, s.sessionName, s.categoryName].filter(Boolean).join(" ");
+  if (!text) return false;
+  if (/予選|qualif/i.test(text)) return false;
+  return /決勝|\brace\d*\b|レース|final|heat|ヒート/i.test(text);
+}
+
+/**
  * アーカイブ一覧の表示名。SMIS の Category 名をそのまま出す。
  * Round/Session の Qualifying / RACE は付けない。
  */
@@ -1372,7 +1390,11 @@ function CalendarView({
               {dateSessions.map((session) => (
                 <div
                   key={session.index}
-                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-3 sm:px-4 py-3 hover:bg-zinc-800/30 transition-colors gap-2"
+                  className={`flex flex-col sm:flex-row sm:items-center sm:justify-between px-3 sm:px-4 py-3 transition-colors gap-2 border-l-[3px] ${
+                    isRaceArchiveSession(session)
+                      ? "border-l-red-500 bg-red-950/45 hover:bg-red-900/35"
+                      : "border-l-transparent hover:bg-zinc-800/30"
+                  }`}
                 >
                   <div className="min-w-0 flex-1">
                     <span className="text-sm text-zinc-200 block truncate">
