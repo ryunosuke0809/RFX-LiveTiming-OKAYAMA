@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { CarClass } from "@/types/smis";
+import { classDisplayName } from "@/lib/classLabel";
 
 interface SideMenuProps {
   isOpen: boolean;
@@ -43,9 +44,9 @@ export default function SideMenu({ isOpen, onClose, classes = [], activeClassFil
       {classes.map((cls) => (
         <button
           key={cls.id}
-          onClick={() => onClassFilterChange(activeClassFilter === cls.nameE ? null : cls.nameE)}
+          onClick={() => onClassFilterChange(activeClassFilter === cls.id ? null : cls.id)}
           className={`flex items-center gap-2 text-left px-3 py-1.5 rounded text-xs font-medium transition-colors ${
-            activeClassFilter === cls.nameE
+            activeClassFilter === cls.id
               ? "bg-zinc-700 text-white"
               : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
           }`}
@@ -54,7 +55,7 @@ export default function SideMenu({ isOpen, onClose, classes = [], activeClassFil
             className="w-2 h-2 rounded-full flex-shrink-0"
             style={{ backgroundColor: cls.color }}
           />
-          {cls.nameE}
+          {classDisplayName(cls)}
         </button>
       ))}
     </div>

@@ -2,6 +2,7 @@
 
 import type { CarClass } from "@/types/smis";
 import { getClassColor } from "@/lib/colors";
+import { classDisplayName } from "@/lib/classLabel";
 
 interface SidePanelProps {
   classes: CarClass[];
@@ -47,12 +48,13 @@ export default function SidePanel({
               Class
             </h4>
             {classes.map((cls) => {
-              const colors = getClassColor(cls.nameE);
-              const isActive = activeFilter === cls.nameE;
+              const label = classDisplayName(cls);
+              const colors = getClassColor(label);
+              const isActive = activeFilter === cls.id;
               return (
                 <button
                   key={cls.id}
-                  onClick={() => onFilterChange(isActive ? null : cls.nameE)}
+                  onClick={() => onFilterChange(isActive ? null : cls.id)}
                   className={`w-full text-left px-3 py-2 rounded text-xs font-medium transition-colors mb-1 flex items-center gap-2 ${
                     isActive
                       ? "bg-zinc-700 text-white"
@@ -60,7 +62,7 @@ export default function SidePanel({
                   }`}
                 >
                   <span className={`inline-block w-3 h-3 rounded-sm ${colors.bg}`} />
-                  {cls.nameE}
+                  {label}
                 </button>
               );
             })}

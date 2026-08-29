@@ -2,6 +2,7 @@
 
 import type { Standing, Team, CarClass, DriverPersonalData } from "@/types/smis";
 import { getDriverName } from "@/data/mock";
+import { classDisplayName } from "@/lib/classLabel";
 import { formatTime } from "@/lib/format";
 import { TIME_COLORS } from "@/lib/colors";
 
@@ -45,7 +46,7 @@ export default function DriverDetailPanel({
               <div className="flex items-center gap-2 text-xs text-zinc-400">
                 <span>{driverName}</span>
                 <span className="text-zinc-600">|</span>
-                <span>{carClass?.nameE}</span>
+                <span>{classDisplayName(carClass)}</span>
                 <span className="text-zinc-600">|</span>
                 <span>{team.machine}</span>
               </div>

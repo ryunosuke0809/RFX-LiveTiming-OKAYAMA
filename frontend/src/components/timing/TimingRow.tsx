@@ -8,6 +8,7 @@ import { formatTime, formatPitTime } from "@/lib/format";
 import ClassBadge from "./ClassBadge";
 import PitTimer from "./PitTimer";
 import { getDriverName } from "@/data/mock";
+import { classDisplayName } from "@/lib/classLabel";
 import { stickyCellClass, stickyTdStyle, type TableColumn } from "@/lib/timingTableLayout";
 
 interface TimingRowProps {
@@ -174,7 +175,7 @@ export default function TimingRow({
       case "class":
         return {
           className: CELL_CLASS.class,
-          content: <ClassBadge className={carClass?.nameE || "---"} />,
+          content: <ClassBadge className={classDisplayName(carClass)} />,
         };
       case "driver":
         return { className: CELL_CLASS.driver, content: driverName };

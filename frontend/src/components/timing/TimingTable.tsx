@@ -90,7 +90,7 @@ export default function TimingTable({ standings, classFilter, flashKey = 0, isRa
 
   const filtered = (() => {
     if (!classFilter) return standings;
-    const rows = standings.filter((s) => getClassByStanding(s)?.nameE === classFilter);
+    const rows = standings.filter((s) => getClassByStanding(s)?.id === classFilter);
     return recomputeStandingsGaps(rows, isRaceMode);
   })();
 

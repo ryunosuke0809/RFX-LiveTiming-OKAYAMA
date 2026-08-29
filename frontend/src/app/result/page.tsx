@@ -23,6 +23,7 @@ import {
   setLiveEntities,
 } from "@/lib/entityRegistry";
 import { excludeOicClasses, excludeOicStandings } from "@/lib/entryFilter";
+import { classDisplayName } from "@/lib/classLabel";
 import {
   fetchArchiveDays,
   fetchArchiveSessions,
@@ -107,7 +108,7 @@ function generateClassificationCsv(standings: Standing[], meta: CsvMeta): string
     const team = getTeamByStanding(s);
     const cls = getClassByStanding(s);
     return [
-      idx + 1, s.classPosition, team?.no ?? "", csvSafe(cls?.nameE ?? ""), csvSafe(getDriverName(s, team)), csvSafe(team?.nameE ?? ""),
+      idx + 1, s.classPosition, team?.no ?? "", csvSafe(classDisplayName(cls)), csvSafe(getDriverName(s, team)), csvSafe(team?.nameE ?? ""),
       formatTime(s.bestTime), s.bestTimeLap, formatTime(s.lastLapTime), s.lap,
       formatTime(s.sectors[0]?.time), formatTime(s.sectors[1]?.time), formatTime(s.sectors[2]?.time),
       s.pits, s.status.replace("_", " ").toUpperCase(),
@@ -123,7 +124,7 @@ function generateIndividualCsv(standing: Standing, data: DriverPersonalData, met
     `# Competition: ${meta.competition}`,
     `# Category: ${meta.category}`,
     `# Session: ${meta.session}`,
-    `# No.${team?.no} ${team?.nameE} (${cls?.nameE})`,
+    `# No.${team?.no} ${team?.nameE} (${classDisplayName(cls)})`,
     `# Driver: ${getDriverName(standing, team)}`,
     `# Best Lap: ${formatTime(data.bestLapTime)} (Lap ${data.bestLap})`,
     `# Best S1: ${formatTime(data.bestS1)}  Best S2: ${formatTime(data.bestS2)}  Best S3: ${formatTime(data.bestS3)}`,
@@ -612,7 +613,7 @@ export default function ResultPage() {
 
   const sortedStandings = useMemo(() => {
     const base = classFilter
-      ? baseStandings.filter((s) => getClass(s)?.nameE === classFilter)
+      ? baseStandings.filter((s) => getClass(s)?.id === classFilter)
       : baseStandings;
     const sorted = sortStandingsForResult(base);
     return classFilter ? recomputeStandingsGaps(sorted, isRaceMode) : sorted;
@@ -918,7 +919,9 @@ function ClassificationView({
       {classFilter && (
         <div className="flex-shrink-0 mb-3">
           <span className="text-xs text-zinc-500">Filtered by: </span>
-          <span className="inline-block px-2 py-0.5 rounded text-xs font-bold bg-zinc-700 text-white">{classFilter}</span>
+          <span className="inline-block px-2 py-0.5 rounded text-xs font-bold bg-zinc-700 text-white">
+            {classDisplayName(standings.map((s) => getClass(s)).find(Boolean) ?? null) || classFilter}
+          </span>
         </div>
       )}
 
@@ -1009,7 +1012,7 @@ function ClassificationView({
                     <span className="inline-block min-w-8 h-6 px-1 rounded text-white text-[11px] font-bold leading-6 text-center" style={{ backgroundColor: cls?.color || "#71717a" }}>{team.no}</span>
                   </td>
                   <td className={sticky("class", "py-1.5 px-2 text-center text-xs text-zinc-400")} style={stickyStyle("class")}>
-                    {cls?.nameE}
+                    {classDisplayName(cls)}
                   </td>
                   <td className="py-1.5 pl-2 pr-1 text-left text-zinc-200 truncate">{getDriverName(s, team)}</td>
                   <td className="py-1.5 pl-2 pr-1 text-left text-zinc-300 truncate max-w-[200px]">{team.nameE}</td>
@@ -1180,7 +1183,7 @@ function IndividualView({
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] sm:text-xs text-zinc-400">
                     <span className="truncate max-w-[180px]">{team.nameE}</span>
                     <span className="text-zinc-600">|</span>
-                    <span>{cls?.nameE}</span>
+                    <span>{classDisplayName(cls)}</span>
                     {team.machine && (
                       <>
                         <span className="text-zinc-600">|</span>

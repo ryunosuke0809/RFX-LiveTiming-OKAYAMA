@@ -64,7 +64,7 @@ export default function TrackingPage() {
   const sessionName = isLive && live.sessionInfo ? live.sessionInfo.session.nameE : mockSessionInfo.session.nameE;
 
   const filteredStandings = classFilter
-    ? baseStandings.filter((s) => getClassByStanding(s)?.nameE === classFilter)
+    ? baseStandings.filter((s) => getClassByStanding(s)?.id === classFilter)
     : baseStandings;
 
   // IN PIT の車両はコースマップから消え、こちらの PitIn リストに表示する。
