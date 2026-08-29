@@ -182,11 +182,13 @@ export default function TimingTable({ standings, classFilter, flashKey = 0, isRa
                 pitCol={pitCol}
                 bestCol={bestCol}
                 isRaceMode={isRaceMode}
-                sectorFlash={sf?.sector}
+                sectorFlash={standing.blanked ? undefined : sf?.sector}
                 stickyOffsets={stickyOffsets}
                 firstStickyKey={firstStickyKey}
                 lastStickyKey={lastStickyKey}
-                onClick={onRowClick ? () => onRowClick(standing) : undefined}
+                onClick={
+                  onRowClick && !standing.blanked ? () => onRowClick(standing) : undefined
+                }
               />
             );
           })}

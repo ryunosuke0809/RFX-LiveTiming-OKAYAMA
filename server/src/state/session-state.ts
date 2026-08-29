@@ -268,6 +268,17 @@ export class LiveSessionState {
         };
     }
 
+    /** Live 配信用。非表示はフラグだけ付け、数値やギャップは変えない。 */
+    presentStanding(s: StandingVm): StandingVm {
+        const overlaid = this.overlayStanding(s);
+        if (!this.hiddenTeamIds.has(s.teamId)) return overlaid;
+        return { ...overlaid, blanked: true };
+    }
+
+    presentTeam(team: TeamSummaryVm): TeamSummaryVm {
+        return this.overlayTeam(team);
+    }
+
     trackCount(excludeIds?: ReadonlySet<string>): TrackCountVm {
         let onTrack = 0;
         let inPit = 0;
@@ -300,25 +311,8 @@ export class LiveSessionState {
      * フル状態スナップショット (新規接続時に送る用)。
      */
     snapshot(serverTs: string): LiveStateSnapshot {
-        const hidden = this.hiddenTeamIds;
-        const standings = this.standingsArray()
-            .filter((s) => !hidden.has(s.teamId))
-            .map((s) => this.overlayStanding(s));
-        const teams = Array.from(this.teams.values())
-            .filter((t) => !hidden.has(t.id))
-            .map((t) => this.overlayTeam(t));
-        const driverLaps: Record<string, LapDataVm[]> = {};
-        for (const [id, laps] of this.teamLaps) {
-            if (!hidden.has(id)) driverLaps[id] = laps;
-        }
-        let fastestLap = this.fastestLap;
-        if (fastestLap && hidden.has(fastestLap.teamId)) fastestLap = null;
-        else if (fastestLap) {
-            const ov = this.nameOverrides.get(fastestLap.teamId);
-            if (ov?.driverNameJ !== undefined) {
-                fastestLap = { ...fastestLap, driverNameJ: ov.driverNameJ };
-            }
-        }
+        const standings = this.standingsArray().map((s) => this.presentStanding(s));
+        const teams = Array.from(this.teams.values()).map((t) => this.presentTeam(t));
         return {
             serverTs,
             dataTs: this.lastDataTs,
@@ -326,12 +320,12 @@ export class LiveSessionState {
             circuitId: this.circuitId,
             session: this.session ? { ...this.session, flag: this.flag } : null,
             standings,
-            fastestLap,
-            trackCount: this.trackCount(hidden),
+            fastestLap: this.fastestLap,
+            trackCount: this.trackCount(),
             classes: Array.from(this.classes.values()),
             teams,
             recentMessages: this.recentMessages.slice(),
-            driverLaps,
+            driverLaps: Object.fromEntries(this.teamLaps),
             bestSectors: [...this.overallBestSector],
         };
     }

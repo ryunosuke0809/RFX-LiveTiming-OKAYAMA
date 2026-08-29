@@ -79,8 +79,8 @@ export default function LiveEntryEditor() {
             エントリー（非表示・名前変更）
           </h3>
           <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">
-            SMIS が誤って送った車を Live / Tracking から消します。履歴データは消えません。
-            名前は上書きされ、SMIS が再送してもこちらが優先されます。
+            SMIS が誤って送った車は、行は残して中身だけ空にします。ギャップ計算は変えません。
+            名前の上書きは、SMIS が再送してもこちらが優先されます。
           </p>
         </div>
         <button

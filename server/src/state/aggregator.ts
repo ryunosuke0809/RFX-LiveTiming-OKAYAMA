@@ -767,12 +767,12 @@ export class SessionStateAggregator {
     hideTeam(teamId: string): LiveStatePatch[] {
         if (!this.state.teams.has(teamId) && !this.state.standings.has(teamId)) return [];
         this.state.hiddenTeamIds.add(teamId);
-        const patches: LiveStatePatch[] = [
-            { kind: "standing_remove", teamId },
-            { kind: "track_count", value: this.state.trackCount(this.state.hiddenTeamIds) },
-        ];
-        if (this.state.fastestLap?.teamId === teamId) {
-            patches.push({ kind: "fastest_lap", value: null });
+        const patches: LiveStatePatch[] = [];
+        const team = this.state.teams.get(teamId);
+        if (team) patches.push({ kind: "team_upsert", value: this.state.presentTeam(team) });
+        const standing = this.state.standings.get(teamId);
+        if (standing) {
+            patches.push({ kind: "standing_upsert", value: this.state.presentStanding(standing) });
         }
         return patches;
     }
@@ -795,12 +795,12 @@ export class SessionStateAggregator {
         this.state.hiddenTeamIds.delete(teamId);
         const patches: LiveStatePatch[] = [];
         const team = this.state.teams.get(teamId);
-        if (team) patches.push({ kind: "team_upsert", value: this.state.overlayTeam(team) });
+        if (team) patches.push({ kind: "team_upsert", value: this.state.presentTeam(team) });
         const standing = this.state.standings.get(teamId);
         if (standing) {
-            patches.push({ kind: "standing_upsert", value: this.state.overlayStanding(standing) });
+            patches.push({ kind: "standing_upsert", value: this.state.presentStanding(standing) });
         }
-        patches.push({ kind: "track_count", value: this.state.trackCount(this.state.hiddenTeamIds) });
+        patches.push({ kind: "track_count", value: this.state.trackCount() });
         return patches;
     }
 
@@ -814,10 +814,10 @@ export class SessionStateAggregator {
         if (this.state.hiddenTeamIds.has(teamId)) return [];
         const patches: LiveStatePatch[] = [];
         const team = this.state.teams.get(teamId);
-        if (team) patches.push({ kind: "team_upsert", value: this.state.overlayTeam(team) });
+        if (team) patches.push({ kind: "team_upsert", value: this.state.presentTeam(team) });
         const standing = this.state.standings.get(teamId);
         if (standing) {
-            patches.push({ kind: "standing_upsert", value: this.state.overlayStanding(standing) });
+            patches.push({ kind: "standing_upsert", value: this.state.presentStanding(standing) });
         }
         return patches;
     }
@@ -859,29 +859,17 @@ export class SessionStateAggregator {
     }
 
     /**
-     * 非表示エントリーを Live 配信から外し、名前上書きを載せる。
+     * 名前上書きを載せ、非表示エントリーには blanked フラグだけ付ける。
      */
     private sanitizePatches(patches: LiveStatePatch[]): LiveStatePatch[] {
-        const hidden = this.state.hiddenTeamIds;
         const out: LiveStatePatch[] = [];
         for (const p of patches) {
             if (p.kind === "standing_upsert") {
-                if (hidden.has(p.value.teamId)) continue;
-                out.push({ kind: "standing_upsert", value: this.state.overlayStanding(p.value) });
+                out.push({ kind: "standing_upsert", value: this.state.presentStanding(p.value) });
                 continue;
             }
             if (p.kind === "team_upsert") {
-                if (hidden.has(p.value.id)) continue;
-                out.push({ kind: "team_upsert", value: this.state.overlayTeam(p.value) });
-                continue;
-            }
-            if (p.kind === "driver_lap" && hidden.has(p.teamId)) continue;
-            if (p.kind === "fastest_lap" && p.value && hidden.has(p.value.teamId)) {
-                out.push({ kind: "fastest_lap", value: null });
-                continue;
-            }
-            if (p.kind === "track_count") {
-                out.push({ kind: "track_count", value: this.state.trackCount(hidden) });
+                out.push({ kind: "team_upsert", value: this.state.presentTeam(p.value) });
                 continue;
             }
             out.push(p);

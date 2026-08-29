@@ -828,6 +828,10 @@ export default function OkayamaCircuitSvg({
             // 1) 各車の実位置(ドット)を計算してマーカー候補を作る。
             const marks: LabelMark[] = [];
             for (const s of standings) {
+              if (s.blanked) {
+                animRef.current.delete(s.teamId);
+                continue;
+              }
               const team = getTeamByStanding(s);
               const cls = getClassByStanding(s);
               if (!team) continue;

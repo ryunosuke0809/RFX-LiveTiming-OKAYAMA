@@ -67,6 +67,8 @@ export interface StandingVm {
     /** いま In Pit 中なら進入時刻 (ISO)。カウント用。 */
     pitEnteredAt: string | null;
     positionChange: number;
+    /** 管理画面で非表示。行は残し、表示上の中身だけ空にする。 */
+    blanked?: boolean;
 }
 
 export interface SessionInfoVm {

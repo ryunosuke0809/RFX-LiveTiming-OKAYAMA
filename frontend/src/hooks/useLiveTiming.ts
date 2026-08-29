@@ -727,6 +727,7 @@ function vmToStanding(v: StandingVm): Standing {
     pitTime: v.pitTime,
     pitEnteredAt: v.pitEnteredAt ?? null,
     positionChange: v.positionChange,
+    blanked: v.blanked === true,
   };
 }
 

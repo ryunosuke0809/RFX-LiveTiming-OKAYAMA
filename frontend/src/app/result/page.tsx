@@ -943,12 +943,38 @@ function ClassificationView({
               const team = getTeam(s);
               const cls = getClass(s);
               if (!team) return null;
-              // Gap はサーバー計算値 (決勝=周回/タイム差、予選=ベストタイム差、60秒以上は分表記)。
-              const gap = idx === 0 || !s.gap || s.gap === "—" ? "" : s.gap;
               const isEven = idx % 2 === 0;
               const sticky = (colKey: string, className: string) =>
                 `${stickyCellClass(colKey, stickyOffsets, CLASSIFICATION_FIRST_STICKY, CLASSIFICATION_LAST_STICKY, isEven)} ${className}`.trim();
               const stickyStyle = (colKey: string) => stickyTdStyle(colKey, stickyOffsets);
+              if (s.blanked) {
+                return (
+                  <tr
+                    key={s.teamId}
+                    className={`border-b border-zinc-800/70 ${isEven ? "bg-zinc-900/40" : "bg-zinc-900/20"}`}
+                  >
+                    <td className={sticky("p", "py-1.5 px-2")} style={stickyStyle("p")} />
+                    <td className={sticky("pic", "py-1.5 px-2")} style={stickyStyle("pic")} />
+                    <td className={sticky("no", "py-1.5 px-2 text-center")} style={stickyStyle("no")}>
+                      <span className="inline-block min-w-8 h-6 px-1 rounded text-white text-[11px] font-bold leading-6 text-center" style={{ backgroundColor: "#71717a" }}>{team.no}</span>
+                    </td>
+                    <td className={sticky("class", "py-1.5 px-2")} style={stickyStyle("class")} />
+                    <td className="py-1.5 pl-2 pr-1" />
+                    <td className="py-1.5 pl-2 pr-1" />
+                    <td className="py-1.5 px-3" />
+                    <td className="py-1.5 px-2" />
+                    <td className="py-1.5 px-3" />
+                    <td className="py-1.5 px-3" />
+                    <td className="py-1.5 px-3" />
+                    <td className="py-1.5 px-3" />
+                    <td className="py-1.5 px-3" />
+                    <td className="py-1.5 px-2" />
+                    <td className="py-1.5 px-2" />
+                  </tr>
+                );
+              }
+              // Gap はサーバー計算値 (決勝=周回/タイム差、予選=ベストタイム差、60秒以上は分表記)。
+              const gap = idx === 0 || !s.gap || s.gap === "—" ? "" : s.gap;
               return (
                 <tr
                   key={s.teamId}

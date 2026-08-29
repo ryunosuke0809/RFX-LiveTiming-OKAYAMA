@@ -65,6 +65,28 @@ export default function TimingRow({
     `${stickyCellClass(colKey, stickyOffsets, firstStickyKey, lastStickyKey, isEven)} ${className}`.trim();
   const stickyStyle = (colKey: string) => stickyTdStyle(colKey, stickyOffsets);
   const rowBg = isEven ? "bg-zinc-900/60" : "bg-zinc-900/30";
+  if (standing.blanked) {
+    return (
+      <tr className={`${rowBg} border-b border-zinc-800/30`}>
+        {columns.map((col) => {
+          const rendered = {
+            className: CELL_CLASS[col.key] ?? "py-px",
+            content: col.key === "nr" ? team?.no : null,
+          };
+          return (
+            <td
+              key={col.key}
+              className={sticky(col.key, rendered.className)}
+              style={stickyStyle(col.key)}
+            >
+              {rendered.content}
+            </td>
+          );
+        })}
+      </tr>
+    );
+  }
+
   const statusInfo = STATUS_INDICATOR[standing.status];
 
   const driverName = getDriverName(standing, team);

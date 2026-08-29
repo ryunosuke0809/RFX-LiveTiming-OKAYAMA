@@ -94,6 +94,8 @@ export interface Standing {
   /** In Pit 中の進入時刻 (ISO)。無い/未ピットは null */
   pitEnteredAt?: string | null;
   positionChange: number; // +/- 表示用
+  /** 管理画面で非表示。行は残し中身だけ空。 */
+  blanked?: boolean;
 }
 
 export type TrackFlag =
