@@ -333,6 +333,8 @@ export function useLiveTiming(url?: string): LiveTimingData {
         }
         case "standing_remove":
           s.standings.delete(patch.teamId);
+          s.teams.delete(patch.teamId);
+          s.driverLaps.delete(patch.teamId);
           clearSectorEnter(patch.teamId);
           break;
         case "fastest_lap":

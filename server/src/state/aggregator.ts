@@ -7,7 +7,7 @@ import {
     formatSecondsDiff,
     parseFlagFromMessage,
 } from "./derive.js";
-import type { LiveSessionState, TeamLapAccum } from "./session-state.js";
+import type { EntryNameOverride, LiveSessionState, TeamLapAccum } from "./session-state.js";
 import type {
     CarClassVm,
     CarStatus,
@@ -53,7 +53,7 @@ export class SessionStateAggregator {
             patches.push({ kind: "track_count", value: this.state.trackCount() });
         }
         patches.push(...this.mergeSessionInfo({ sessionStartedAt: null }));
-        return patches;
+        return this.sanitizePatches(patches);
     }
 
     apply(envelope: IngestEnvelope): LiveStatePatch[] {
@@ -108,7 +108,7 @@ export class SessionStateAggregator {
             const stalled = this.checkStalled();
             if (stalled.length > 0) patches = patches.concat(stalled);
         }
-        return patches;
+        return this.sanitizePatches(patches);
     }
 
     /** データ時刻(ms)。lastDataTs から算出。未確定時は null。 */
@@ -729,6 +729,167 @@ export class SessionStateAggregator {
     }
 
     // ============================================================
+    // Admin: エントリー非表示 / 名前上書き
+    // ============================================================
+
+    listEntries(): AdminLiveEntry[] {
+        const ids = new Set<string>([
+            ...this.state.teams.keys(),
+            ...this.state.standings.keys(),
+        ]);
+        const rows: AdminLiveEntry[] = [];
+        for (const id of ids) {
+            const team = this.state.teams.get(id);
+            const standing = this.state.standings.get(id);
+            const shownTeam = team ? this.state.overlayTeam(team) : null;
+            const shownStanding = standing ? this.state.overlayStanding(standing) : null;
+            const driver =
+                shownStanding != null
+                    ? { nameJ: shownStanding.driverNameJ, nameE: shownStanding.driverNameE }
+                    : shownTeam?.drivers.find((d) => d.no !== 0) ?? shownTeam?.drivers[0];
+            rows.push({
+                teamId: id,
+                teamNo: shownTeam?.no ?? shownStanding?.teamNo ?? "",
+                classId: shownTeam?.classId ?? shownStanding?.classId ?? "",
+                hidden: this.state.hiddenTeamIds.has(id),
+                teamNameJ: shownStanding?.teamNameJ ?? shownTeam?.nameJ ?? "",
+                teamNameE: shownStanding?.teamNameE ?? shownTeam?.nameE ?? "",
+                driverNameJ: driver?.nameJ ?? "",
+                driverNameE: driver?.nameE ?? "",
+                position: standing?.position ?? 0,
+                overridden: this.state.nameOverrides.has(id),
+            });
+        }
+        rows.sort((a, b) => a.teamNo.localeCompare(b.teamNo, "en", { numeric: true }));
+        return rows;
+    }
+
+    hideTeam(teamId: string): LiveStatePatch[] {
+        if (!this.state.teams.has(teamId) && !this.state.standings.has(teamId)) return [];
+        this.state.hiddenTeamIds.add(teamId);
+        const patches: LiveStatePatch[] = [
+            { kind: "standing_remove", teamId },
+            { kind: "track_count", value: this.state.trackCount(this.state.hiddenTeamIds) },
+        ];
+        if (this.state.fastestLap?.teamId === teamId) {
+            patches.push({ kind: "fastest_lap", value: null });
+        }
+        return patches;
+    }
+
+    resolveTeamId(teamIdOrNo: string): string | null {
+        const key = teamIdOrNo.trim();
+        if (!key) return null;
+        if (this.state.teams.has(key) || this.state.standings.has(key)) return key;
+        const byNo = [...this.state.teams.values()].find(
+            (t) => t.no === key || t.no.replace(/^0+/, "") === key.replace(/^0+/, ""),
+        );
+        if (byNo) return byNo.id;
+        const standingByNo = [...this.state.standings.values()].find(
+            (s) => s.teamNo === key || s.teamNo.replace(/^0+/, "") === key.replace(/^0+/, ""),
+        );
+        return standingByNo?.teamId ?? null;
+    }
+
+    showTeam(teamId: string): LiveStatePatch[] {
+        this.state.hiddenTeamIds.delete(teamId);
+        const patches: LiveStatePatch[] = [];
+        const team = this.state.teams.get(teamId);
+        if (team) patches.push({ kind: "team_upsert", value: this.state.overlayTeam(team) });
+        const standing = this.state.standings.get(teamId);
+        if (standing) {
+            patches.push({ kind: "standing_upsert", value: this.state.overlayStanding(standing) });
+        }
+        patches.push({ kind: "track_count", value: this.state.trackCount(this.state.hiddenTeamIds) });
+        return patches;
+    }
+
+    setEntryNames(teamId: string, names: EntryNameOverride | null): LiveStatePatch[] {
+        if (names === null || Object.keys(names).length === 0) {
+            this.state.nameOverrides.delete(teamId);
+        } else {
+            const prev = this.state.nameOverrides.get(teamId) ?? {};
+            this.state.nameOverrides.set(teamId, { ...prev, ...names });
+        }
+        if (this.state.hiddenTeamIds.has(teamId)) return [];
+        const patches: LiveStatePatch[] = [];
+        const team = this.state.teams.get(teamId);
+        if (team) patches.push({ kind: "team_upsert", value: this.state.overlayTeam(team) });
+        const standing = this.state.standings.get(teamId);
+        if (standing) {
+            patches.push({ kind: "standing_upsert", value: this.state.overlayStanding(standing) });
+        }
+        return patches;
+    }
+
+    importEntryEdits(raw: unknown, currentSignature: string | null): void {
+        if (!raw || typeof raw !== "object") return;
+        const o = raw as {
+            sessionSignature?: unknown;
+            hiddenTeamIds?: unknown;
+            names?: unknown;
+        };
+        const savedSig = typeof o.sessionSignature === "string" ? o.sessionSignature : null;
+        if (savedSig && currentSignature && savedSig !== currentSignature) return;
+        this.state.hiddenTeamIds.clear();
+        if (Array.isArray(o.hiddenTeamIds)) {
+            for (const id of o.hiddenTeamIds) {
+                if (typeof id === "string" && id.length > 0) this.state.hiddenTeamIds.add(id);
+            }
+        }
+        this.state.nameOverrides.clear();
+        if (o.names && typeof o.names === "object") {
+            for (const [id, value] of Object.entries(o.names as Record<string, unknown>)) {
+                const parsed = parseNameOverride(value);
+                if (parsed) this.state.nameOverrides.set(id, parsed);
+            }
+        }
+    }
+
+    exportEntryEdits(): {
+        sessionSignature: string | null;
+        hiddenTeamIds: string[];
+        names: Record<string, EntryNameOverride>;
+    } {
+        return {
+            sessionSignature: this.state.sessionSignature,
+            hiddenTeamIds: [...this.state.hiddenTeamIds],
+            names: Object.fromEntries(this.state.nameOverrides),
+        };
+    }
+
+    /**
+     * 非表示エントリーを Live 配信から外し、名前上書きを載せる。
+     */
+    private sanitizePatches(patches: LiveStatePatch[]): LiveStatePatch[] {
+        const hidden = this.state.hiddenTeamIds;
+        const out: LiveStatePatch[] = [];
+        for (const p of patches) {
+            if (p.kind === "standing_upsert") {
+                if (hidden.has(p.value.teamId)) continue;
+                out.push({ kind: "standing_upsert", value: this.state.overlayStanding(p.value) });
+                continue;
+            }
+            if (p.kind === "team_upsert") {
+                if (hidden.has(p.value.id)) continue;
+                out.push({ kind: "team_upsert", value: this.state.overlayTeam(p.value) });
+                continue;
+            }
+            if (p.kind === "driver_lap" && hidden.has(p.teamId)) continue;
+            if (p.kind === "fastest_lap" && p.value && hidden.has(p.value.teamId)) {
+                out.push({ kind: "fastest_lap", value: null });
+                continue;
+            }
+            if (p.kind === "track_count") {
+                out.push({ kind: "track_count", value: this.state.trackCount(hidden) });
+                continue;
+            }
+            out.push(p);
+        }
+        return out;
+    }
+
+    // ============================================================
     // helpers
     // ============================================================
 
@@ -740,6 +901,29 @@ export class SessionStateAggregator {
         this.state.session = { ...merged, flag: this.state.flag };
         return [{ kind: "session", fields }];
     }
+}
+
+export interface AdminLiveEntry {
+    teamId: string;
+    teamNo: string;
+    classId: string;
+    hidden: boolean;
+    teamNameJ: string;
+    teamNameE: string;
+    driverNameJ: string;
+    driverNameE: string;
+    position: number;
+    overridden: boolean;
+}
+
+function parseNameOverride(value: unknown): EntryNameOverride | null {
+    if (!value || typeof value !== "object") return null;
+    const src = value as Record<string, unknown>;
+    const out: EntryNameOverride = {};
+    for (const key of ["teamNameJ", "teamNameE", "driverNameJ", "driverNameE"] as const) {
+        if (typeof src[key] === "string") out[key] = src[key];
+    }
+    return Object.keys(out).length > 0 ? out : null;
 }
 
 function emptySessionInfo(): NonNullable<LiveSessionState["session"]> {

@@ -24,6 +24,7 @@ import { resolveLiveColumns, sanitizeLiveColumns } from "../display/live-columns
 import { sanitizeElapsedIdle } from "../display/elapsed-idle.js";
 import type { BroadcastHub } from "../broadcast/hub.js";
 import type { SessionStateAggregator } from "../state/aggregator.js";
+import type { LiveStatePatch } from "../state/types.js";
 
 /**
  * 管理画面 API (`/api/admin/*`)。
@@ -350,6 +351,68 @@ export function createAdminRouter(
         store.appendAudit(actor.username, "display.live.reset", "live");
         logger.info("live display reset", { username: actor.username });
         res.json({ ok: true });
+    });
+
+    // ---- Live エントリー（非表示・名前変更） ----
+
+    router.get("/live/entries", guard, (_req, res) => {
+        res.setHeader("Cache-Control", "no-store");
+        res.json({ entries: aggregator.listEntries() });
+    });
+
+    router.patch("/live/entries/:teamId", guard, (req, res) => {
+        const actor = (req as AdminRequest).admin!;
+        const rawId = String(req.params["teamId"] ?? "");
+        const teamId = aggregator.resolveTeamId(rawId);
+        if (!teamId) {
+            res.status(404).json({ error: "そのエントリーが見つかりません" });
+            return;
+        }
+        const body = (req.body ?? {}) as {
+            hidden?: unknown;
+            resetNames?: unknown;
+            teamNameJ?: unknown;
+            teamNameE?: unknown;
+            driverNameJ?: unknown;
+            driverNameE?: unknown;
+        };
+
+        const patches: LiveStatePatch[] = [];
+        if (typeof body.hidden === "boolean") {
+            patches.push(
+                ...(body.hidden ? aggregator.hideTeam(teamId) : aggregator.showTeam(teamId)),
+            );
+        }
+        if (body.resetNames === true) {
+            patches.push(...aggregator.setEntryNames(teamId, null));
+        } else {
+            const names: {
+                teamNameJ?: string;
+                teamNameE?: string;
+                driverNameJ?: string;
+                driverNameE?: string;
+            } = {};
+            for (const key of ["teamNameJ", "teamNameE", "driverNameJ", "driverNameE"] as const) {
+                if (typeof body[key] !== "string") continue;
+                const v = body[key].trim();
+                if (v.length > 80) {
+                    res.status(400).json({ error: `${key} が長すぎます` });
+                    return;
+                }
+                names[key] = v;
+            }
+            if (Object.keys(names).length > 0) {
+                patches.push(...aggregator.setEntryNames(teamId, names));
+            }
+        }
+
+        store.setDisplayConfig("live", "entries", aggregator.exportEntryEdits());
+        if (patches.length > 0) hub.broadcastPatches(null, patches, null, null);
+        store.appendAudit(actor.username, "live.entry.update", teamId, {
+            hidden: body.hidden,
+            resetNames: body.resetNames === true,
+        });
+        res.json({ entries: aggregator.listEntries() });
     });
 
     return router;

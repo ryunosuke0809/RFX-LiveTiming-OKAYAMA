@@ -18,6 +18,7 @@ import {
   type LiveColumnDef,
 } from "@/lib/liveColumns";
 import { DEFAULT_ELAPSED_IDLE, sanitizeElapsedIdle } from "@/lib/elapsedIdle";
+import LiveEntryEditor from "@/components/admin/LiveEntryEditor";
 
 /**
  * Live Timing 表の列を、並び・名称・表示/非表示・プルダウン内容まで編集する。
@@ -179,6 +180,8 @@ export default function AdminLiveDisplayPage() {
           {notice}
         </div>
       )}
+
+      <LiveEntryEditor />
 
       <LiveResetCard resetting={resetting} onReset={() => void resetLive()} />
 

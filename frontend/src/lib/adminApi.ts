@@ -195,3 +195,37 @@ export function adminSaveLiveDisplay(
 export function adminResetLiveDisplay(): Promise<{ ok: true }> {
   return request("/display/live/reset", { method: "POST" });
 }
+
+export interface AdminLiveEntry {
+  teamId: string;
+  teamNo: string;
+  classId: string;
+  hidden: boolean;
+  teamNameJ: string;
+  teamNameE: string;
+  driverNameJ: string;
+  driverNameE: string;
+  position: number;
+  overridden: boolean;
+}
+
+export function adminListLiveEntries(): Promise<{ entries: AdminLiveEntry[] }> {
+  return request("/live/entries");
+}
+
+export function adminPatchLiveEntry(
+  teamId: string,
+  body: {
+    hidden?: boolean;
+    resetNames?: boolean;
+    teamNameJ?: string;
+    teamNameE?: string;
+    driverNameJ?: string;
+    driverNameE?: string;
+  },
+): Promise<{ entries: AdminLiveEntry[] }> {
+  return request(`/live/entries/${encodeURIComponent(teamId)}`, {
+    method: "PATCH",
+    body,
+  });
+}

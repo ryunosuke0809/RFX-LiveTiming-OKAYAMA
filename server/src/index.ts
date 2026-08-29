@@ -44,6 +44,10 @@ hub.setSnapshotProvider(() => liveState.snapshot(new Date().toISOString()));
 
 // 再起動してもセッション途中のチーム名が出るよう、当日 DB から状態を復元
 hydrateLiveStateFromDb(repository, aggregator, liveState, logger);
+aggregator.importEntryEdits(
+    adminStore.getDisplayConfig("live")["entries"],
+    liveState.sessionSignature,
+);
 
 // 日付が変わったらライブ表示を空に戻す (前日のリザルトが残り続けるのを防ぐ)
 const stopDayRollover = startDayRollover(liveState, hub, logger);

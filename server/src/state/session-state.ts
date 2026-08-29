@@ -12,6 +12,14 @@ import type {
     TrackFlag,
 } from "./types.js";
 
+/** 管理画面からのエントリー名上書き。未指定フィールドは SMIS の値を使う。 */
+export interface EntryNameOverride {
+    teamNameJ?: string;
+    teamNameE?: string;
+    driverNameJ?: string;
+    driverNameE?: string;
+}
+
 /** 現在ラップのセクター蓄積 (周またぎ混在を防ぐための一時状態)。 */
 export interface TeamLapAccum {
     /** 進行中の周のセクター (表示用、未計測は null)。 */
@@ -77,6 +85,11 @@ export class LiveSessionState {
     /** teamId → 完了周のラップ履歴。 */
     readonly teamLaps = new Map<string, LapDataVm[]>();
 
+    /** 管理画面で非表示にしたエントリー。SMIS が再送しても Live には出さない。 */
+    readonly hiddenTeamIds = new Set<string>();
+    /** 管理画面で上書きしたチーム名 / ドライバー名。 */
+    readonly nameOverrides = new Map<string, EntryNameOverride>();
+
     overallBest: number | null = null;
     fastestLap: FastestLapVm | null = null;
 
@@ -120,6 +133,8 @@ export class LiveSessionState {
         this.resetForNewSession();
         this.classes.clear();
         this.teams.clear();
+        this.hiddenTeamIds.clear();
+        this.nameOverrides.clear();
     }
 
     /**
@@ -226,12 +241,40 @@ export class LiveSessionState {
             });
     }
 
-    trackCount(): TrackCountVm {
+    overlayTeam(team: TeamSummaryVm): TeamSummaryVm {
+        const ov = this.nameOverrides.get(team.id);
+        if (!ov) return team;
+        return {
+            ...team,
+            nameJ: ov.teamNameJ !== undefined ? ov.teamNameJ : team.nameJ,
+            nameE: ov.teamNameE !== undefined ? ov.teamNameE : team.nameE,
+            drivers: team.drivers.map((d) => ({
+                ...d,
+                nameJ: ov.driverNameJ !== undefined ? ov.driverNameJ : d.nameJ,
+                nameE: ov.driverNameE !== undefined ? ov.driverNameE : d.nameE,
+            })),
+        };
+    }
+
+    overlayStanding(s: StandingVm): StandingVm {
+        const ov = this.nameOverrides.get(s.teamId);
+        if (!ov) return s;
+        return {
+            ...s,
+            teamNameJ: ov.teamNameJ !== undefined ? ov.teamNameJ : s.teamNameJ,
+            teamNameE: ov.teamNameE !== undefined ? ov.teamNameE : s.teamNameE,
+            driverNameJ: ov.driverNameJ !== undefined ? ov.driverNameJ : s.driverNameJ,
+            driverNameE: ov.driverNameE !== undefined ? ov.driverNameE : s.driverNameE,
+        };
+    }
+
+    trackCount(excludeIds?: ReadonlySet<string>): TrackCountVm {
         let onTrack = 0;
         let inPit = 0;
         let stopped = 0;
         let retired = 0;
         for (const s of this.standings.values()) {
+            if (excludeIds?.has(s.teamId)) continue;
             const status = this.isGarageWaiting(s) ? "in_pit" : s.status;
             switch (status) {
                 case "on_track":
@@ -257,19 +300,38 @@ export class LiveSessionState {
      * フル状態スナップショット (新規接続時に送る用)。
      */
     snapshot(serverTs: string): LiveStateSnapshot {
+        const hidden = this.hiddenTeamIds;
+        const standings = this.standingsArray()
+            .filter((s) => !hidden.has(s.teamId))
+            .map((s) => this.overlayStanding(s));
+        const teams = Array.from(this.teams.values())
+            .filter((t) => !hidden.has(t.id))
+            .map((t) => this.overlayTeam(t));
+        const driverLaps: Record<string, LapDataVm[]> = {};
+        for (const [id, laps] of this.teamLaps) {
+            if (!hidden.has(id)) driverLaps[id] = laps;
+        }
+        let fastestLap = this.fastestLap;
+        if (fastestLap && hidden.has(fastestLap.teamId)) fastestLap = null;
+        else if (fastestLap) {
+            const ov = this.nameOverrides.get(fastestLap.teamId);
+            if (ov?.driverNameJ !== undefined) {
+                fastestLap = { ...fastestLap, driverNameJ: ov.driverNameJ };
+            }
+        }
         return {
             serverTs,
             dataTs: this.lastDataTs,
             lastPassingAt: this.lastPassingAt,
             circuitId: this.circuitId,
             session: this.session ? { ...this.session, flag: this.flag } : null,
-            standings: this.standingsArray(),
-            fastestLap: this.fastestLap,
-            trackCount: this.trackCount(),
+            standings,
+            fastestLap,
+            trackCount: this.trackCount(hidden),
             classes: Array.from(this.classes.values()),
-            teams: Array.from(this.teams.values()),
+            teams,
             recentMessages: this.recentMessages.slice(),
-            driverLaps: Object.fromEntries(this.teamLaps),
+            driverLaps,
             bestSectors: [...this.overallBestSector],
         };
     }
