@@ -367,6 +367,9 @@ export class SessionStateAggregator {
         const teamId = str(p, "teamId");
         const loopId = int(p, "loopId");
         if (!teamId || loopId === null) return [];
+        // Cancel/Edit は通過そのものではない。ピット回数や位置は後続 Standings で直す。
+        const passingType = str(p, "type");
+        if (passingType === "Cancel" || passingType === "Edit") return [];
 
         const status = deriveStatusFromLoop(loopId);
         const dataMs = this.currentDataMs();
@@ -594,6 +597,8 @@ export class SessionStateAggregator {
         // 1 周完了検知: LastLapTime が更新されたら、その時点の accum を 1 周として記録する。
         // 初回観測時は「基準値」だけ設定して記録しない (途中接続で前周の LastLapTime を
         // 誤って 1 周分カウントしてしまう off-by-one を防ぐ)。
+        // Cancel/Edit で LastLapTime や周回数が戻ったときは、既存周を上書き・削除する。
+        let completedLap: LapDataVm | null = null;
         if (accum.lastLapTime === -1) {
             accum.lastLapTime = newLast ?? 0;
         } else if (newLast !== null && newLast > 0 && newLast !== accum.lastLapTime) {
@@ -611,26 +616,23 @@ export class SessionStateAggregator {
                 // 個別ページだけでなくタイミング表の S3 にも出す（次周 S1 まで保持）。
                 accum.s3 = { time: s3t, type: "current" };
             }
-            const lapData: LapDataVm = {
-                lap: lapNo,
-                lapTime: newLast,
-                s1: s1t,
-                s2: s2t,
-                s3: s3t,
-                s1Type: accum.s1?.type ?? "none",
-                s2Type: accum.s2?.type ?? "none",
-                s3Type: isPitLap ? "current" : (accum.s3?.type ?? "none"),
-                lapTimeType: classifyTimeType(newLast, this.state.overallBest, personalBefore),
-                isPit: isPitLap,
-                position: newPosition,
-            };
-            const laps = this.state.teamLaps.get(teamId) ?? [];
-            if (!laps.some((l) => l.lap === lapNo)) {
-                laps.push(lapData);
-                this.state.teamLaps.set(teamId, laps);
-                extraPatches.push({ kind: "driver_lap", teamId, value: lapData });
+            if (lapNo > 0) {
+                completedLap = {
+                    lap: lapNo,
+                    lapTime: newLast,
+                    s1: s1t,
+                    s2: s2t,
+                    s3: s3t,
+                    s1Type: accum.s1?.type ?? "none",
+                    s2Type: accum.s2?.type ?? "none",
+                    s3Type: isPitLap ? "current" : (accum.s3?.type ?? "none"),
+                    lapTimeType: classifyTimeType(newLast, this.state.overallBest, personalBefore),
+                    isPit: isPitLap,
+                    position: newPosition,
+                };
             }
         }
+        extraPatches.push(...this.syncTeamLaps(teamId, newLap, completedLap));
 
         // 表示は「進行中の周」の値。ピット等で未計測の区間はブランク。
         const sectors: SectorTimeVm[] = [
@@ -685,6 +687,43 @@ export class SessionStateAggregator {
             extraPatches.push({ kind: "fastest_lap", value: this.state.fastestLap });
         }
         return extraPatches;
+    }
+
+    /**
+     * 個別周回履歴を Standings に合わせる。
+     * - 周回数が戻ったら (Cancel) それより後の周を捨てる
+     * - LastLapTime が変わったら同じ周番号を上書きする (Edit)。同じタイムなら触らない
+     */
+    private syncTeamLaps(
+        teamId: string,
+        standingLap: number,
+        completed: LapDataVm | null,
+    ): LiveStatePatch[] {
+        const prev = this.state.teamLaps.get(teamId) ?? [];
+        let next = standingLap > 0 ? prev.filter((l) => l.lap <= standingLap) : prev;
+        let changed = next.length !== prev.length;
+        let upserted: LapDataVm | null = null;
+
+        if (completed && completed.lap > 0) {
+            const idx = next.findIndex((l) => l.lap === completed.lap);
+            if (idx < 0) {
+                next = [...next, completed];
+                changed = true;
+                upserted = completed;
+            } else if (next[idx]!.lapTime !== completed.lapTime) {
+                next = next.slice();
+                next[idx] = completed;
+                changed = true;
+                upserted = completed;
+            }
+        }
+
+        if (!changed) return [];
+        next.sort((a, b) => a.lap - b.lap);
+        this.state.teamLaps.set(teamId, next);
+        const patches: LiveStatePatch[] = [{ kind: "driver_laps", teamId, value: next }];
+        if (upserted) patches.push({ kind: "driver_lap", teamId, value: upserted });
+        return patches;
     }
 
     /** teamId のラップ蓄積状態を取得 (無ければ初期化)。 */

@@ -115,6 +115,7 @@ type LiveStatePatch =
   | { kind: "best_sectors"; value: Array<number | null> }
   | { kind: "track_count"; value: TrackCount }
   | { kind: "driver_lap"; teamId: string; value: LapData }
+  | { kind: "driver_laps"; teamId: string; value: LapData[] }
   | { kind: "message"; value: unknown }
   | { kind: "display_live"; columns?: unknown; elapsed?: unknown };
 
@@ -346,12 +347,16 @@ export function useLiveTiming(url?: string): LiveTimingData {
         case "track_count":
           s.trackCount = patch.value;
           break;
+        case "driver_laps":
+          s.driverLaps.set(patch.teamId, [...patch.value].sort((a, b) => a.lap - b.lap));
+          break;
         case "driver_lap": {
-          const arr = s.driverLaps.get(patch.teamId) ?? [];
-          if (!arr.some((l) => l.lap === patch.value.lap)) {
-            arr.push(patch.value);
-            s.driverLaps.set(patch.teamId, arr);
-          }
+          const arr = [...(s.driverLaps.get(patch.teamId) ?? [])];
+          const idx = arr.findIndex((l) => l.lap === patch.value.lap);
+          if (idx < 0) arr.push(patch.value);
+          else arr[idx] = patch.value;
+          arr.sort((a, b) => a.lap - b.lap);
+          s.driverLaps.set(patch.teamId, arr);
           break;
         }
         case "display_live":

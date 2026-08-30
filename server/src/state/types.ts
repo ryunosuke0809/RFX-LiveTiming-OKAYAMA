@@ -194,6 +194,8 @@ export type LiveStatePatch =
     | { kind: "best_sectors"; value: Array<number | null> }
     | { kind: "track_count"; value: TrackCountVm }
     | { kind: "driver_lap"; teamId: string; value: LapDataVm }
+    /** 個別周回履歴の全置換 (Cancel/Edit で周の削除・上書きが起きたとき)。 */
+    | { kind: "driver_laps"; teamId: string; value: LapDataVm[] }
     | { kind: "message"; value: RaceControlMessageVm }
     /** 管理画面で Live 表の列定義が変わったとき。セッション状態とは独立。 */
     | { kind: "display_live"; columns?: unknown; elapsed?: unknown };
