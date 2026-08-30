@@ -7,7 +7,7 @@ import {
     formatSecondsDiff,
     parseFlagFromMessage,
 } from "./derive.js";
-import type { EntryNameOverride, LiveSessionState, TeamLapAccum } from "./session-state.js";
+import type { EntryNameOverride, LiveSessionState, RecordedPassing, TeamLapAccum } from "./session-state.js";
 import type {
     CarClassVm,
     CarStatus,
@@ -367,9 +367,23 @@ export class SessionStateAggregator {
         const teamId = str(p, "teamId");
         const loopId = int(p, "loopId");
         if (!teamId || loopId === null) return [];
-        // Cancel/Edit は通過そのものではない。ピット回数や位置は後続 Standings で直す。
-        const passingType = str(p, "type");
-        if (passingType === "Cancel" || passingType === "Edit") return [];
+        const time = int(p, "time");
+        const passingType = normalizePassingType(str(p, "type"));
+
+        // Cancel: passingId は元データと一致しない。当該車両の Time で消す。
+        if (passingType === "Cancel") {
+            if (time === null) return [];
+            if (!this.removePassingByTime(teamId, time, loopId)) return [];
+            return this.rebuildTeamLapsFromPassings(teamId);
+        }
+        // Edit: 新しい ID + 新しい Time の新規通過。ID では紐付けない。
+        if (passingType === "Edit") {
+            if (time === null) return [];
+            this.upsertPassing(teamId, { loopId, time });
+            return this.rebuildTeamLapsFromPassings(teamId);
+        }
+
+        if (time !== null) this.upsertPassing(teamId, { loopId, time });
 
         const status = deriveStatusFromLoop(loopId);
         const dataMs = this.currentDataMs();
@@ -726,6 +740,99 @@ export class SessionStateAggregator {
         return patches;
     }
 
+    private upsertPassing(teamId: string, passing: RecordedPassing): void {
+        const list = this.state.teamPassings.get(teamId) ?? [];
+        if (list.some((x) => x.loopId === passing.loopId && x.time === passing.time)) return;
+        list.push(passing);
+        this.state.teamPassings.set(teamId, list);
+    }
+
+    /** Cancel は ID ではなく当該車両の Time で消す。loopId が同じもの優先、無ければ Time のみ。 */
+    private removePassingByTime(teamId: string, time: number, loopId: number): boolean {
+        const list = this.state.teamPassings.get(teamId);
+        if (!list || list.length === 0) return false;
+        const exact = list.findIndex((x) => x.time === time && x.loopId === loopId);
+        const idx = exact >= 0 ? exact : list.findIndex((x) => x.time === time);
+        if (idx < 0) return false;
+        list.splice(idx, 1);
+        return true;
+    }
+
+    /**
+     * 残っている FL (loop 0) から個別周回を組み直す。
+     * 先頭 FL 同士の差分が L1 そのものならスタート扱い。Standings の L1 (スタート〜FL)
+     * だけ残して、2 周目以降を FL 差分で置き換える。
+     */
+    private rebuildTeamLapsFromPassings(teamId: string): LiveStatePatch[] {
+        const all = this.state.teamPassings.get(teamId) ?? [];
+        const fls = all
+            .filter((p) => p.loopId === 0)
+            .map((p) => p.time)
+            .sort((a, b) => a - b);
+        if (fls.length < 2) return [];
+
+        const prev = this.state.teamLaps.get(teamId) ?? [];
+        const lap1 = prev.find((l) => l.lap === 1 && l.lapTime != null && l.lapTime > 0);
+        const firstInterval = fls[1]! - fls[0]!;
+        const keepLap1 =
+            lap1 != null &&
+            lap1.lapTime != null &&
+            firstInterval > 0 &&
+            lap1.lapTime !== firstInterval;
+
+        const standing = this.state.standings.get(teamId);
+        const position = standing?.position ?? 0;
+        const overallBest = this.state.overallBest;
+        let teamBest: number | null = keepLap1 && lap1?.lapTime != null ? lap1.lapTime : null;
+        const next: LapDataVm[] = [];
+        if (keepLap1 && lap1) {
+            next.push({ ...lap1, lap: 1, position: lap1.position || position });
+        }
+
+        for (let i = 1; i < fls.length; i++) {
+            const end = fls[i]!;
+            const start = fls[i - 1]!;
+            const lapTime = end - start;
+            if (lapTime <= 0) continue;
+            const between = all.filter((p) => p.time > start && p.time < end);
+            const s1Hits = between.filter((p) => p.loopId === 1);
+            const s2Hits = between.filter((p) => p.loopId === 2);
+            const merged = s1Hits.length > 1 || s2Hits.length > 1;
+            const s1 = !merged && s1Hits.length === 1 ? s1Hits[0]!.time - start : null;
+            const s2 =
+                !merged && s1Hits.length === 1 && s2Hits.length === 1
+                    ? s2Hits[0]!.time - s1Hits[0]!.time
+                    : null;
+            const isPit = between.some((p) => p.loopId === 11);
+            let s3: number | null = null;
+            if (!merged && s1 != null && s2 != null && lapTime > s1 + s2) {
+                s3 = lapTime - s1 - s2;
+            }
+            const lapTimeType = classifyTimeType(lapTime, overallBest, teamBest);
+            if (teamBest === null || lapTime < teamBest) teamBest = lapTime;
+            next.push({
+                lap: next.length + 1,
+                lapTime,
+                s1: s1 != null && s1 > 0 ? s1 : null,
+                s2: s2 != null && s2 > 0 ? s2 : null,
+                s3,
+                s1Type: s1 != null && s1 > 0 ? "current" : "none",
+                s2Type: s2 != null && s2 > 0 ? "current" : "none",
+                s3Type: s3 != null ? "current" : "none",
+                lapTimeType,
+                isPit,
+                position,
+            });
+        }
+
+        this.state.teamLaps.set(teamId, next);
+        const accum = this.getLapAccum(teamId);
+        const last = next[next.length - 1];
+        accum.lastLapTime = last?.lapTime ?? accum.lastLapTime;
+        accum.lastSecKey = "";
+        return [{ kind: "driver_laps", teamId, value: next }];
+    }
+
     /** teamId のラップ蓄積状態を取得 (無ければ初期化)。 */
     private getLapAccum(teamId: string): TeamLapAccum {
         let a = this.state.teamLapAccum.get(teamId);
@@ -1048,6 +1155,15 @@ function int(obj: Record<string, unknown>, key: string): number | null {
         if (Number.isFinite(n)) return n;
     }
     return null;
+}
+
+/** SMIS Type="C" と Receiver の "Cancel" の両方を受ける。 */
+function normalizePassingType(raw: string | null): string {
+    if (raw === "C" || raw === "Cancel") return "Cancel";
+    if (raw === "E" || raw === "Edit") return "Edit";
+    if (raw === "B" || raw === "Backup") return "Backup";
+    if (raw === "M" || raw === "Manual") return "Manual";
+    return "Normal";
 }
 
 /**

@@ -20,6 +20,12 @@ export interface EntryNameOverride {
     driverNameE?: string;
 }
 
+/** 個別周回の再構築用。SMIS Passing から Cancel 済みを除いた有効通過。 */
+export interface RecordedPassing {
+    loopId: number;
+    time: number;
+}
+
 /** 現在ラップのセクター蓄積 (周またぎ混在を防ぐための一時状態)。 */
 export interface TeamLapAccum {
     /** 進行中の周のセクター (表示用、未計測は null)。 */
@@ -84,6 +90,11 @@ export class LiveSessionState {
     readonly teamLapAccum = new Map<string, TeamLapAccum>();
     /** teamId → 完了周のラップ履歴。 */
     readonly teamLaps = new Map<string, LapDataVm[]>();
+    /**
+     * teamId → 有効な通過。Cancel は passingId ではなく time (+ loopId) で消す。
+     * MOLA の Cancel/Edit は ID が元データと一致しない。
+     */
+    readonly teamPassings = new Map<string, RecordedPassing[]>();
 
     /** 管理画面で非表示にしたエントリー。SMIS が再送しても Live には出さない。 */
     readonly hiddenTeamIds = new Set<string>();
@@ -116,6 +127,7 @@ export class LiveSessionState {
         this.overallBestSector = [null, null, null];
         this.teamLapAccum.clear();
         this.teamLaps.clear();
+        this.teamPassings.clear();
         this.overallBest = null;
         this.fastestLap = null;
         this.flag = "green";
@@ -198,6 +210,9 @@ export class LiveSessionState {
         }
         for (const id of [...this.teamLapAccum.keys()]) {
             if (!keepIds.has(id)) this.teamLapAccum.delete(id);
+        }
+        for (const id of [...this.teamPassings.keys()]) {
+            if (!keepIds.has(id)) this.teamPassings.delete(id);
         }
 
         // どの standing からも参照されないクラスは落とす
