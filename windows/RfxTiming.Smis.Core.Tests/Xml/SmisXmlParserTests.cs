@@ -102,10 +102,36 @@ public sealed class SmisXmlParserTests
         var result = Assert.IsType<Team>(SmisXmlParser.Parse(xml));
         Assert.Equal("1:1:1", result.Id);
         Assert.Equal("1:1", result.ClassId);
-        Assert.Equal(64, result.No);
+        Assert.Equal("64", result.No);
         Assert.Equal(3, result.Drivers.Count);
         Assert.Equal("ベルトラン・バゲット", result.Drivers[1].NameJ);
         Assert.Equal("Bertrand Baguette", result.Drivers[1].NameE);
+    }
+
+    [Theory]
+    [InlineData("10A")]
+    [InlineData("100")]
+    [InlineData("001")]
+    [InlineData("002")]
+    [InlineData("10B")]
+    public void Parse_Team_KeepsCarNoAsReceived(string carNo)
+    {
+        string xml =
+            $"""<Team ID="1:1:1" ClassID="1:1:0" No="{carNo}" NameJ="Test" NameE="" Engine="" Machine="" Tire="" Nation="" />""";
+
+        var result = Assert.IsType<Team>(SmisXmlParser.Parse(xml));
+        Assert.Equal(carNo, result.No);
+    }
+
+    [Fact]
+    public void ParseMessages_TeamBatch_KeepsAlphanumericCarNo()
+    {
+        const string xml =
+            """<Team ID="1:1:1" ClassID="1:1:0" No="001" NameJ="A" NameE="" Engine="" Machine="" Tire="" Nation="" /><Team ID="1:1:2" ClassID="1:1:0" No="10A" NameJ="B" NameE="" Engine="" Machine="" Tire="" Nation="" /><Team ID="1:1:3" ClassID="1:1:0" No="10B" NameJ="C" NameE="" Engine="" Machine="" Tire="" Nation="" />""";
+
+        IReadOnlyList<SmisMessage> messages = SmisXmlParser.ParseMessages(xml);
+        Assert.Equal(new[] { "001", "10A", "10B" }, messages.OfType<Team>().Select(t => t.No));
+        Assert.DoesNotContain(messages, m => m is UnknownMessage);
     }
 
     [Fact]

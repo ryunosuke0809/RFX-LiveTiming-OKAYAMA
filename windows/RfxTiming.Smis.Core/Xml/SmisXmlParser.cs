@@ -302,7 +302,7 @@ public static class SmisXmlParser
         return new Team(
             Id: Attr(el, "ID"),
             ClassId: Attr(el, "ClassID"),
-            No: AttrInt(el, "No"),
+            No: Attr(el, "No"),
             NameJ: Attr(el, "NameJ"),
             NameE: Attr(el, "NameE"),
             Engine: Attr(el, "Engine"),

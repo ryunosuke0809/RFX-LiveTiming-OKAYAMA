@@ -8,11 +8,15 @@ namespace RfxTiming.Smis.Messages;
 ///   &lt;Driver No="1" .../&gt;
 /// &lt;/Team&gt;
 /// </code>
+/// <para>
+/// 車番 <see cref="No"/> は XML 属性の文字列をそのまま保持する。
+/// <c>001</c> / <c>10A</c> / <c>10B</c> のように先頭ゼロやアルファベットが来る。
+/// </para>
 /// </summary>
 public sealed record Team(
     string Id,
     string ClassId,
-    int No,
+    string No,
     string NameJ,
     string NameE,
     string Engine,
