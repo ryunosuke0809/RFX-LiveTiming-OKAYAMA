@@ -155,8 +155,6 @@ export default function TimingTable({ standings, classFilter, flashKey = 0, isRa
                 <th
                   key={col.key}
                   className={`py-1 font-semibold text-white uppercase tracking-wider ${col.align} ${
-                    col.fixed ? "timing-time-col" : ""
-                  } ${
                     isSticky
                       ? stickyCellClass(col.key, stickyOffsets, firstStickyKey, lastStickyKey)
                       : ""

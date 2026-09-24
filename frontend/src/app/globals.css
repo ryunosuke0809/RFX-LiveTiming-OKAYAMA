@@ -283,8 +283,12 @@ tr.group:hover .timing-sticky-odd {
   z-index: 1;
   overflow: hidden;
 }
-.timing-table .timing-time-col {
+/* ヘッダーには付けない。プルダウンが切れて選択できなくなる */
+.timing-table tbody td.timing-time-col {
   overflow: hidden;
   box-sizing: border-box;
   white-space: nowrap;
+}
+.timing-table thead th {
+  overflow: visible;
 }
