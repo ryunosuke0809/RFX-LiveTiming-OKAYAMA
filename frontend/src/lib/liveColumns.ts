@@ -285,6 +285,35 @@ export function visibleToggleOptions(col: LiveColumnDef | undefined): LiveColumn
   return (col?.toggle?.options ?? []).filter((o) => o.visible);
 }
 
+/** LAST / Time / Best は `1:12.161` 等を出すので、周回数用の狭い幅のままにしない。 */
+const TIME_COL_MIN_W = 128;
+const TIME_COL_PCT = "8%";
+
+export function isLapTimeMode(lapCol: string): boolean {
+  return lapCol === "last" || lapCol === "time";
+}
+
+/**
+ * タイムを出す列は % ではなく固定幅にする。
+ * table-layout:fixed だと % 指定は画面が狭いとき隣のタイムへはみ出す。
+ */
+export function withLapTimeColumnWidths<
+  T extends { key: string; minW: number; pct: string; fixed?: boolean },
+>(columns: T[], lapCol: string, bestCol = "best"): T[] {
+  const widenLaps = isLapTimeMode(lapCol);
+  const widenBest = bestCol !== "bestlap";
+  if (!widenLaps && !widenBest) return columns;
+  return columns.map((c) => {
+    if (widenLaps && c.key === "laps") {
+      return { ...c, minW: TIME_COL_MIN_W, pct: TIME_COL_PCT, fixed: true };
+    }
+    if (widenBest && c.key === "best") {
+      return { ...c, minW: TIME_COL_MIN_W, pct: TIME_COL_PCT, fixed: true };
+    }
+    return c;
+  });
+}
+
 export function resolvedToggleValue(
   col: LiveColumnDef | undefined,
   current: string | undefined,

@@ -12,6 +12,7 @@ import {
   resolvedToggleValue,
   visibleLiveColumns,
   visibleToggleOptions,
+  withLapTimeColumnWidths,
   type LiveColumnDef,
 } from "@/lib/liveColumns";
 import {
@@ -82,7 +83,11 @@ export default function TimingTable({ standings, classFilter, flashKey = 0, isRa
     setBestCol((cur) => resolvedToggleValue(defByKey(displayColumns, "best"), cur) as BestColMode);
   }, [displayColumns]);
 
-  const columns = toTableColumns(displayColumns, isRaceMode);
+  const columns = withLapTimeColumnWidths(
+    toTableColumns(displayColumns, isRaceMode),
+    lapCol,
+    bestCol,
+  );
   const stickyKeys = getStickyColumnKeys(columns.map((c) => c.key), isRaceMode);
   const stickyOffsets = getStickyLeftOffsets(columns, stickyKeys);
   const firstStickyKey = stickyKeys[0] ?? "";

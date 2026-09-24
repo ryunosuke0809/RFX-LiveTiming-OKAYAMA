@@ -5,6 +5,8 @@ export interface TableColumn {
   minW: number;
   pct: string;
   align: string;
+  /** true なら % ではなく minW の固定幅（タイム列の桁あふれ防止） */
+  fixed?: boolean;
 }
 
 /** STATUS + POS / PIC / No. / Class（レース時は順位変動 chg も含む）。
@@ -62,12 +64,12 @@ export function stickyTdStyle(
   return { left: `${left}px` };
 }
 
-/** sticky 列は minW の固定幅にして left オフセットと実幅を一致させる */
+/** sticky / 固定幅列は minW を実幅にする。% 指定だと狭い画面でタイムが隣へはみ出す。 */
 export function colWidthStyle(
   col: TableColumn,
   stickyOffsets: Map<string, number>,
 ): { width: string; minWidth: string } {
-  if (stickyOffsets.has(col.key)) {
+  if (stickyOffsets.has(col.key) || col.fixed) {
     const w = `${col.minW}px`;
     return { width: w, minWidth: w };
   }

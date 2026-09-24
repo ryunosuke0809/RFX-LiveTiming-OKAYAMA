@@ -50,8 +50,9 @@ const CELL_CLASS: Record<string, string> = {
   driver: "py-px pl-2 pr-1 text-zinc-200 truncate overflow-hidden whitespace-nowrap",
   car: "py-px pl-2 pr-1 text-zinc-400 truncate overflow-hidden whitespace-nowrap",
   laps: "py-px text-center font-mono whitespace-nowrap",
+  lapsTime: "py-px px-2 sm:pr-3 text-right font-mono tabular-nums whitespace-nowrap",
   gap: "py-px px-2 sm:pr-3 text-right font-mono text-zinc-300 whitespace-nowrap",
-  best: "py-px px-2 sm:pr-3 text-right font-mono whitespace-nowrap",
+  best: "py-px px-2 sm:pr-3 text-right font-mono tabular-nums whitespace-nowrap",
   s1: "py-px px-2 sm:pr-3 text-right font-mono whitespace-nowrap",
   s2: "py-px px-2 sm:pr-3 text-right font-mono whitespace-nowrap",
   s3: "py-px px-2 sm:pr-3 text-right font-mono whitespace-nowrap",
@@ -183,8 +184,7 @@ export default function TimingRow({
         return { className: CELL_CLASS.car, content: carCellValue };
       case "laps":
         return {
-          className: `${CELL_CLASS.laps} ${lapCellColor}`,
-          style: lapCol !== "laps" ? { fontSize: "0.85em" } : undefined,
+          className: `${lapCol === "laps" ? CELL_CLASS.laps : CELL_CLASS.lapsTime} ${lapCellColor}`,
           content: lapCellValue,
         };
       case "gap":

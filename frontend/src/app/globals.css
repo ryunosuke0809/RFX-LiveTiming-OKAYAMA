@@ -278,4 +278,5 @@ tr.group:hover .timing-sticky-odd {
 .timing-table tbody td:not(.timing-sticky-col) {
   position: relative;
   z-index: 1;
+  overflow: hidden;
 }
