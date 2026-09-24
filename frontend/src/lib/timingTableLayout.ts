@@ -68,10 +68,21 @@ export function stickyTdStyle(
 export function colWidthStyle(
   col: TableColumn,
   stickyOffsets: Map<string, number>,
-): { width: string; minWidth: string } {
+): { width: string; minWidth: string; maxWidth?: string } {
   if (stickyOffsets.has(col.key) || col.fixed) {
     const w = `${col.minW}px`;
-    return { width: w, minWidth: w };
+    return { width: w, minWidth: w, maxWidth: w };
   }
   return { width: col.pct, minWidth: `${col.minW}px` };
+}
+
+/** th/td にも同じ幅を付ける。Safari は col の width を無視して縮めることがある。 */
+export function colCellStyle(
+  col: TableColumn,
+  stickyOffsets: Map<string, number>,
+): CSSProperties {
+  return {
+    ...colWidthStyle(col, stickyOffsets),
+    ...stickyTdStyle(col.key, stickyOffsets),
+  };
 }

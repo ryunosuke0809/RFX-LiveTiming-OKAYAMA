@@ -927,10 +927,11 @@ function ClassificationView({
 
       <ScrollHintArea className="min-w-0" contentClassName="timing-table-scroll-x" axis="x">
         <table
-          className="timing-table w-full"
+          className="timing-table"
           style={{
             fontSize: "var(--timing-fs)",
             tableLayout: "fixed",
+            width: `max(100%, ${CLASSIFICATION_COLUMNS.reduce((sum, c) => sum + c.minW, 0)}px)`,
             minWidth: `${CLASSIFICATION_COLUMNS.reduce((sum, c) => sum + c.minW, 0)}px`,
           }}
         >

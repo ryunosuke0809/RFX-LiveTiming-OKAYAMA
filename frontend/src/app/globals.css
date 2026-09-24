@@ -159,11 +159,14 @@ body {
 .timing-table {
   border-collapse: separate;
   border-spacing: 0;
+  text-size-adjust: 100%;
+  -webkit-text-size-adjust: 100%;
 }
 
 /* 横スクロール領域 — 左端のすき間から裏のセルが見えないよう背景を揃える */
 .timing-table-scroll {
   overflow: auto;
+  -webkit-overflow-scrolling: touch;
   background-color: #0c0c0f;
 }
 
@@ -279,4 +282,9 @@ tr.group:hover .timing-sticky-odd {
   position: relative;
   z-index: 1;
   overflow: hidden;
+}
+.timing-table .timing-time-col {
+  overflow: hidden;
+  box-sizing: border-box;
+  white-space: nowrap;
 }

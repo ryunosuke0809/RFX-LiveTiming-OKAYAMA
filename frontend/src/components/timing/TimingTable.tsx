@@ -16,6 +16,7 @@ import {
   type LiveColumnDef,
 } from "@/lib/liveColumns";
 import {
+  colCellStyle,
   colWidthStyle,
   getStickyColumnKeys,
   getStickyLeftOffsets,
@@ -133,7 +134,13 @@ export default function TimingTable({ standings, classFilter, flashKey = 0, isRa
     >
       <table
         className="timing-table"
-        style={{ tableLayout: "fixed", fontSize: "var(--timing-fs)", minWidth: `${totalMinW}px`, width: "100%" }}
+        style={{
+          tableLayout: "fixed",
+          fontSize: "var(--timing-fs)",
+          // iOS は width:100% だと min-width を無視して列を潰す。縮めない。
+          width: `max(100%, ${totalMinW}px)`,
+          minWidth: `${totalMinW}px`,
+        }}
       >
         <colgroup>
           {columns.map((col) => (
@@ -148,13 +155,15 @@ export default function TimingTable({ standings, classFilter, flashKey = 0, isRa
                 <th
                   key={col.key}
                   className={`py-1 font-semibold text-white uppercase tracking-wider ${col.align} ${
+                    col.fixed ? "timing-time-col" : ""
+                  } ${
                     isSticky
                       ? stickyCellClass(col.key, stickyOffsets, firstStickyKey, lastStickyKey)
                       : ""
                   }`}
                   style={{
                     fontSize: "var(--timing-fs-sm)",
-                    ...(isSticky ? { left: `${stickyOffsets.get(col.key)}px` } : {}),
+                    ...colCellStyle(col, stickyOffsets),
                   }}
                 >
                   {renderHeader(col)}

@@ -9,7 +9,7 @@ import ClassBadge from "./ClassBadge";
 import PitTimer from "./PitTimer";
 import { getDriverName } from "@/data/mock";
 import { classDisplayName } from "@/lib/classLabel";
-import { stickyCellClass, stickyTdStyle, type TableColumn } from "@/lib/timingTableLayout";
+import { colCellStyle, stickyCellClass, type TableColumn } from "@/lib/timingTableLayout";
 
 interface TimingRowProps {
   standing: Standing;
@@ -65,7 +65,6 @@ export default function TimingRow({
 }: TimingRowProps) {
   const sticky = (colKey: string, className: string) =>
     `${stickyCellClass(colKey, stickyOffsets, firstStickyKey, lastStickyKey, isEven)} ${className}`.trim();
-  const stickyStyle = (colKey: string) => stickyTdStyle(colKey, stickyOffsets);
   const rowBg = isEven ? "bg-zinc-900/60" : "bg-zinc-900/30";
   if (standing.blanked) {
     return (
@@ -78,8 +77,8 @@ export default function TimingRow({
           return (
             <td
               key={col.key}
-              className={sticky(col.key, rendered.className)}
-              style={stickyStyle(col.key)}
+              className={sticky(col.key, `${rendered.className}${col.fixed ? " timing-time-col" : ""}`)}
+              style={colCellStyle(col, stickyOffsets)}
             >
               {rendered.content}
             </td>
@@ -235,8 +234,8 @@ export default function TimingRow({
         return (
           <td
             key={col.key}
-            className={sticky(col.key, rendered.className)}
-            style={{ ...rendered.style, ...stickyStyle(col.key) }}
+            className={sticky(col.key, `${rendered.className}${col.fixed ? " timing-time-col" : ""}`)}
+            style={{ ...colCellStyle(col, stickyOffsets), ...rendered.style }}
           >
             {rendered.content}
           </td>
