@@ -46,12 +46,33 @@ export function rebuildSessionsFromMessages(
     const aggregator = new SessionStateAggregator(state);
     const byKey = new Map<string, ArchiveSessionDetail>();
     let lastTs: string | null = null;
+    /**
+     * Category 電文が来ないセッション（BMW&MINI は NameJ の `&` でフレームが落ちることがある）。
+     * 車番入替のあと、クラスと車名から名前を補い、スタート時刻で Rd を分ける。
+     */
+    let segment: UnlabeledSegment | null = null;
 
     const flush = (endedAt: string | null) => {
         if (state.teams.size === 0 && state.standings.size === 0) return;
-        const snap = trimArchiveSnapshot(state.snapshot(new Date().toISOString()));
-        const session = snap.session;
-        const key = makeSessionKey(session);
+        let snap = trimArchiveSnapshot(state.snapshot(new Date().toISOString()));
+        let session = snap.session;
+        let keySuffix: string | null = null;
+        if (segment && session) {
+            const startedAt = segment.startedAt ?? session.sessionStartedAt;
+            const clock = clockOf(startedAt);
+            const categoryName = clock ? `${segment.label} ${clock}` : segment.label;
+            session = {
+                ...session,
+                categoryNameJ: categoryName,
+                categoryNameE: categoryName,
+                sessionNameJ: clock,
+                sessionNameE: clock,
+                sessionStartedAt: startedAt,
+            };
+            snap = { ...snap, session };
+            keySuffix = startedAt ?? clock ?? segment.label;
+        }
+        const key = makeSessionKey(session, keySuffix);
         if (!key) return;
 
         const carCount =
@@ -89,10 +110,25 @@ export function rebuildSessionsFromMessages(
     };
 
     for (const env of envelopes) {
+        const classNames = [...state.classes.values()].map((c) => c.nameJ || c.nameE || "");
+        const remap = isTeamRemap(state, env);
         if (willResetSession(state, env)) {
             flush(lastTs);
         }
         aggregator.apply(env);
+        if (env.kind === "Category") {
+            segment = null;
+        } else if (remap) {
+            const teamName = pickStr(env.payload, "nameJ", "NameJ") ?? "";
+            segment = looksLikeBmwEntry(classNames, teamName)
+                ? { label: "BMW&MINI", startedAt: null }
+                : null;
+        } else if (env.kind === "Start" && segment) {
+            segment = {
+                label: segment.label,
+                startedAt: state.session?.sessionStartedAt ?? segment.startedAt,
+            };
+        }
         lastTs = env.ts;
         if (!state.circuitId && env.circuitId) {
             state.circuitId = env.circuitId;
@@ -117,7 +153,44 @@ export function rebuildSessionsFromMessages(
  * SessionId は MOLA で使いまわされるため使わない。
  * Competition は途中で差し替わることがあるため、カテゴリがあれば大会名はキーに含めない。
  */
-function makeSessionKey(session: SessionInfoVm | null): string | null {
+interface UnlabeledSegment {
+    label: string;
+    startedAt: string | null;
+}
+
+/**
+ * Category が欠落した BMW&MINI。
+ * クラスが B/J/C（OIC はコース車なので無視）で、入れ替わった車名が BMW / MINI 系のときだけ。
+ */
+function looksLikeBmwEntry(classNames: string[], teamName: string): boolean {
+    const core = classNames
+        .map((name) => name.trim().toUpperCase())
+        .filter((name) => name && name !== "OIC");
+    const classOk =
+        core.length > 0 &&
+        core.every((name) => name === "B" || name === "J" || name === "C") &&
+        core.includes("B") &&
+        core.includes("J");
+    const nameOk = /BMW|MINI|JCW|CPS|F56|(^|[^A-Z0-9])M2([^A-Z0-9]|$)/i.test(teamName);
+    return classOk && nameOk;
+}
+
+function clockOf(iso: string | null | undefined): string {
+    if (!iso) return "";
+    const match = iso.match(/T(\d{2}):(\d{2})/);
+    return match ? `${match[1]}:${match[2]}` : "";
+}
+
+function isTeamRemap(state: LiveSessionState, env: IngestEnvelope): boolean {
+    if (env.kind !== "Team") return false;
+    const id = pickStr(env.payload, "id", "Id");
+    const no = parseCarNo(env.payload["no"] ?? env.payload["No"]);
+    if (!id || !no) return false;
+    const existing = state.teams.get(id);
+    return Boolean(existing && existing.no !== no);
+}
+
+function makeSessionKey(session: SessionInfoVm | null, startedAtSuffix?: string | null): string | null {
     if (!session) return null;
     const comp = session.competitionNameJ || session.competitionNameE || "";
     const cat = session.categoryNameJ || session.categoryNameE || "";
@@ -127,10 +200,11 @@ function makeSessionKey(session: SessionInfoVm | null): string | null {
     if (!comp && !cat && !round && !sess) return null;
     // カテゴリがある場合は「カテゴリ+ラウンド+セッション種別」で同一視
     // （Competition 再送で大会名だけ変わっても重複させない）
-    if (cat) {
-        return `${cat}|${round}|${sess}|${session.isRace ? "R" : "T"}`;
-    }
-    return `${comp}|${round}|${sess}|${session.isRace ? "R" : "T"}`;
+    // Category を補ったセッションはスタート時刻を足し、同名の複数ヒートを混ぜない。
+    const base = cat
+        ? `${cat}|${round}|${sess}|${session.isRace ? "R" : "T"}`
+        : `${comp}|${round}|${sess}|${session.isRace ? "R" : "T"}`;
+    return startedAtSuffix ? `${base}|${startedAtSuffix}` : base;
 }
 
 function displayName(session: SessionInfoVm | null): string {
