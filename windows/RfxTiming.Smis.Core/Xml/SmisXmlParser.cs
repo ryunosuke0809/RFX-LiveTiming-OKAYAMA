@@ -23,10 +23,19 @@ namespace RfxTiming.Smis.Xml;
 public static class SmisXmlParser
 {
     /// <summary>Receiver UI 等で配布ビルドを識別するためのパーサープロファイル名。</summary>
-    public const string ParserProfile = "mola-batch-v2";
+    public const string ParserProfile = "mola-amp-v3";
 
     private static readonly System.Text.RegularExpressions.Regex MolaMissingEndDateRegex = new(
         """StartDate="([^"]*)"\s+"([^"]*)"\s*/>""",
+        System.Text.RegularExpressions.RegexOptions.CultureInvariant
+            | System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    /// <summary>
+    /// 実体参照になっていない <c>&amp;</c>（例: <c>BMW &amp; MINI</c> の生テキスト）。
+    /// 既に <c>&amp;amp;</c> 等になっているものは対象外。
+    /// </summary>
+    private static readonly System.Text.RegularExpressions.Regex BareAmpersandRegex = new(
+        "&(?!(?:amp|lt|gt|quot|apos|#\\d+|#x[0-9A-Fa-f]+);)",
         System.Text.RegularExpressions.RegexOptions.CultureInvariant
             | System.Text.RegularExpressions.RegexOptions.Compiled);
 
@@ -97,7 +106,24 @@ public static class SmisXmlParser
             xml = xml.Replace("StartDatae=", "StartDate=", StringComparison.Ordinal);
         }
 
-        return MolaMissingEndDateRegex.Replace(xml, """StartDate="$1" EndDate="$2" />""");
+        xml = MolaMissingEndDateRegex.Replace(xml, """StartDate="$1" EndDate="$2" />""");
+        return EscapeBareAmpersands(xml);
+    }
+
+    /// <summary>
+    /// MOLA はカテゴリ名の <c>&amp;</c> をエスケープせず送ることがある
+    /// （例: <c>NameJ="BMW &amp; MINI ..."</c>）。XML としては不正なので、
+    /// そのフレーム全体がパース失敗になりクラウドへ送られない。
+    /// 生の <c>&amp;</c> だけ <c>&amp;amp;</c> に直してから読む。
+    /// </summary>
+    private static string EscapeBareAmpersands(string xml)
+    {
+        if (xml.IndexOf('&') < 0)
+        {
+            return xml;
+        }
+
+        return BareAmpersandRegex.Replace(xml, "&amp;");
     }
 
     private static bool TryParseSingleRoot(string normalized, out XElement root)

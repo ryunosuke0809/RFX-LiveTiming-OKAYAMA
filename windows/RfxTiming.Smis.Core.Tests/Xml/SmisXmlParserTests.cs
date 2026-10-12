@@ -304,6 +304,43 @@ public sealed class SmisXmlParserTests
     // 岡山 MOLA 実機ログ (exports/archive/2026:06:11) 由来のリグレッション
 
     [Fact]
+    public void Parse_Category_BareAmpersandInName_DecodesAmpersand()
+    {
+        const string xml =
+            """<Category ID="1:1" NameJ="BMW & MINI Racing 2026 Round5 RACE10" NameE="BMW & MINI Racing 2026 Round5 RACE10" CourseName="OKAYAMA International Circuit" CourseLength="370300" />""";
+
+        var result = Assert.IsType<Category>(SmisXmlParser.Parse(xml));
+        Assert.Equal("1:1", result.Id);
+        Assert.Equal("BMW & MINI Racing 2026 Round5 RACE10", result.NameJ);
+        Assert.Equal("BMW & MINI Racing 2026 Round5 RACE10", result.NameE);
+        Assert.Equal(370300, result.CourseLengthCm);
+    }
+
+    [Fact]
+    public void Parse_Category_AlreadyEscapedAmpersand_DoesNotDoubleEscape()
+    {
+        const string xml =
+            """<Category ID="1:1" NameJ="BMW &amp; MINI" NameE="BMW &amp; MINI" CourseName="OKAYAMA" CourseLength="370300" />""";
+
+        var result = Assert.IsType<Category>(SmisXmlParser.Parse(xml));
+        Assert.Equal("BMW & MINI", result.NameJ);
+        Assert.Equal("BMW & MINI", result.NameE);
+    }
+
+    [Fact]
+    public void ParseMessages_BatchWithBareAmpersandCategory_KeepsFollowingElements()
+    {
+        const string xml =
+            """<Competition ID="1" NameJ="Cup" NameE="" StartDate="2026/10/11" EndDate="2026/10/12" /><Category ID="1:1" NameJ="BMW & MINI Racing" NameE="BMW & MINI Racing" CourseName="OKAYAMA" CourseLength="370300" /><Round ID="1:1:1" NameJ="決勝" NameE="Race" Type="L" />""";
+
+        IReadOnlyList<SmisMessage> messages = SmisXmlParser.ParseMessages(xml);
+        Assert.Equal(3, messages.Count);
+        Assert.IsType<Competition>(messages[0]);
+        Assert.Equal("BMW & MINI Racing", Assert.IsType<Category>(messages[1]).NameJ);
+        Assert.IsType<Round>(messages[2]);
+    }
+
+    [Fact]
     public void ParseMessages_MolaCompetition_StartDataeTypo_ReturnsCompetition()
     {
         const string xml =
@@ -479,6 +516,6 @@ public sealed class SmisXmlParserTests
         }
 
         xml = line[(space + 1)..];
-        return xml.StartsWith('<', StringComparison.Ordinal);
+        return xml.StartsWith('<');
     }
 }
