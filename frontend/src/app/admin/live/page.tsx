@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { livePanelFromSearch, type LivePanelId } from "@/components/admin/adminNav";
 import {
   AdminApiError,
   adminGetLiveDisplay,
@@ -48,6 +50,7 @@ export default function AdminLiveDisplayPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [resetting, setResetting] = useState(false);
+  const panel = livePanelFromSearch(useSearchParams().get("panel"));
   const draft = presets[editing];
 
   const applyLoaded = (data: AdminLiveDisplay, jumpToLive: boolean) => {
@@ -101,6 +104,10 @@ export default function AdminLiveDisplayPage() {
       clearInterval(id);
     };
   }, []);
+
+  useEffect(() => {
+    document.querySelector("[data-admin-scroll]")?.scrollTo({ top: 0 });
+  }, [panel]);
 
   const update = (next: Draft[]) => {
     setPresets((prev) => ({ ...prev, [editing]: next }));
@@ -212,15 +219,42 @@ export default function AdminLiveDisplayPage() {
 
   const visibleCount = draft.filter((c) => c.visible).length;
 
+  const saveBar = (
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+      <p className="text-[11px] text-zinc-500">
+        {panel === "columns"
+          ? `${editing === "race" ? "決勝" : "予選・練習"} · 表示 ${visibleCount} / ${draft.length} 列`
+          : "予選・決勝の並びと経過時間"}
+        {dirty ? " · 未保存の変更あり" : ""}
+      </p>
+      <div className="flex items-center gap-2">
+        {panel === "columns" ? (
+          <button
+            type="button"
+            onClick={resetDefaults}
+            disabled={loading}
+            className="rounded-md border border-zinc-600 px-2.5 py-1.5 text-[11px] font-semibold text-zinc-300 transition-colors hover:border-zinc-400 hover:text-white disabled:opacity-50"
+          >
+            この並びを既定に戻す
+          </button>
+        ) : null}
+        <button
+          type="button"
+          disabled={saving || loading || !dirty}
+          onClick={() => void save()}
+          className="rounded-md bg-amber-600 px-3 py-1.5 text-[11px] font-bold text-white transition-colors hover:bg-amber-500 disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-500"
+        >
+          {saving ? "保存中…" : "保存して Live に反映"}
+        </button>
+      </div>
+    </div>
+  );
+
   return (
     <div className="mx-auto max-w-4xl p-3 sm:p-4">
       <div className="mb-4">
-        <h2 className="text-sm font-bold tracking-wider text-white uppercase">Live 表示</h2>
-        <p className="mt-1 text-xs leading-relaxed text-zinc-400">
-          タイミング表の列の並び・名称・表示／非表示と、ヘッダーのプルダウン（Car / Behind など）を編集します。
-          予選・練習と決勝で別の並びを保存しておくと、MOLA のラウンド名を見て Live が自動で切り替わります。
-          経過時間は Passing が止まったあとの扱いもここで変えます（赤旗中断でも Passing は止まるので、セッション終了そのものではありません）。
-        </p>
+        <h2 className="text-sm font-bold tracking-wider text-white uppercase">{PANEL_COPY[panel].title}</h2>
+        <p className="mt-1 text-xs leading-relaxed text-zinc-400">{PANEL_COPY[panel].body}</p>
       </div>
 
       {error && (
@@ -234,86 +268,105 @@ export default function AdminLiveDisplayPage() {
         </div>
       )}
 
-      <LiveEntryEditor />
+      {panel === "entries" ? <LiveEntryEditor /> : null}
+      {panel === "reset" ? <LiveResetCard resetting={resetting} onReset={() => void resetLive()} /> : null}
 
-      <LiveResetCard resetting={resetting} onReset={() => void resetLive()} />
+      {panel === "elapsed" ? (
+        <>
+          {saveBar}
+          <ElapsedIdleEditor elapsed={elapsed} disabled={loading} onChange={patchElapsed} />
+        </>
+      ) : null}
 
-      <ElapsedIdleEditor elapsed={elapsed} disabled={loading} onChange={patchElapsed} />
-
-      <PresetBar
-        editing={editing}
-        autoPreset={autoPreset}
-        pinnedPreset={pinnedPreset}
-        liveSession={liveSession}
-        disabled={loading}
-        onEditing={setEditing}
-        onAuto={(next) => {
-          setAutoPreset(next);
-          markDirty();
-        }}
-        onPinned={(next) => {
-          setPinnedPreset(next);
-          markDirty();
-        }}
-        onCopy={copyToOther}
-      />
-
-      {loading ? (
-        <div className="mb-4 rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-3 text-xs text-zinc-500">
-          読み込み中…
-        </div>
-      ) : (
-        <HeaderPreview columns={draft} mode={editing} />
-      )}
-
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-[11px] text-zinc-500">
-          {editing === "race" ? "決勝" : "予選・練習"} · 表示 {visibleCount} / {draft.length} 列
-          {dirty ? " · 未保存の変更あり" : ""}
-        </p>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={resetDefaults}
+      {panel === "presets" ? (
+        <>
+          {saveBar}
+          <PresetBar
+            editing={editing}
+            autoPreset={autoPreset}
+            pinnedPreset={pinnedPreset}
+            liveSession={liveSession}
             disabled={loading}
-            className="rounded-md border border-zinc-600 px-2.5 py-1.5 text-[11px] font-semibold text-zinc-300 transition-colors hover:border-zinc-400 hover:text-white disabled:opacity-50"
-          >
-            この並びを既定に戻す
-          </button>
-          <button
-            type="button"
-            disabled={saving || loading || !dirty}
-            onClick={() => void save()}
-            className="rounded-md bg-amber-600 px-3 py-1.5 text-[11px] font-bold text-white transition-colors hover:bg-amber-500 disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-500"
-          >
-            {saving ? "保存中…" : "保存して Live に反映"}
-          </button>
-        </div>
-      </div>
+            onEditing={setEditing}
+            onAuto={(next) => {
+              setAutoPreset(next);
+              markDirty();
+            }}
+            onPinned={(next) => {
+              setPinnedPreset(next);
+              markDirty();
+            }}
+            onCopy={copyToOther}
+          />
+        </>
+      ) : null}
 
-      <div className="overflow-hidden rounded-xl border border-zinc-700 bg-zinc-900/80">
-        {loading ? (
-          <div className="px-4 py-8 text-center text-sm text-zinc-500">読み込み中…</div>
-        ) : (
-          draft.map((col, index) => (
-            <ColumnEditor
-              key={col.key}
-              col={col}
-              index={index}
-              total={draft.length}
-              open={openKey === col.key}
-              onToggleOpen={() => setOpenKey(openKey === col.key ? null : col.key)}
-              onMove={move}
-              onPatch={patchColumn}
-              onPatchOption={patchOption}
-              onDefaultOption={setDefaultOption}
-            />
-          ))
-        )}
-      </div>
+      {panel === "columns" ? (
+        <>
+          {saveBar}
+          <div className="mb-3 flex flex-wrap gap-2">
+            <PresetTab active={editing === "time"} disabled={loading} onClick={() => setEditing("time")}>
+              予選・練習
+            </PresetTab>
+            <PresetTab active={editing === "race"} disabled={loading} onClick={() => setEditing("race")}>
+              決勝
+            </PresetTab>
+          </div>
+          {loading ? (
+            <div className="mb-4 rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-3 text-xs text-zinc-500">
+              読み込み中…
+            </div>
+          ) : (
+            <HeaderPreview columns={draft} mode={editing} />
+          )}
+          <div className="overflow-hidden rounded-xl border border-zinc-700 bg-zinc-900/80">
+            {loading ? (
+              <div className="px-4 py-8 text-center text-sm text-zinc-500">読み込み中…</div>
+            ) : (
+              draft.map((col, index) => (
+                <ColumnEditor
+                  key={col.key}
+                  col={col}
+                  index={index}
+                  total={draft.length}
+                  open={openKey === col.key}
+                  onToggleOpen={() => setOpenKey(openKey === col.key ? null : col.key)}
+                  onMove={move}
+                  onPatch={patchColumn}
+                  onPatchOption={patchOption}
+                  onDefaultOption={setDefaultOption}
+                />
+              ))
+            )}
+          </div>
+        </>
+      ) : null}
     </div>
   );
 }
+
+const PANEL_COPY: Record<LivePanelId, { title: string; body: string }> = {
+  columns: {
+    title: "列の並び",
+    body: "タイミング表の列の順番・名称・表示／非表示と、ヘッダーのプルダウンを編集します。上の予選・練習 / 決勝で、編集する並びを切り替えます。",
+  },
+  presets: {
+    title: "予選と決勝",
+    body: "予選・練習と決勝で、列の並びを別々に保存します。MOLA のラウンド名を見て Live が自動で切り替えます。",
+  },
+  elapsed: {
+    title: "経過時間",
+    body: "Passing が止まったあとの経過時間の扱いです。赤旗中断でも Passing は止まるので、セッション終了そのものではありません。",
+  },
+  entries: {
+    title: "エントリー",
+    body: "車番の非表示と、チーム名・ドライバー名の上書きです。",
+  },
+  reset: {
+    title: "リセット",
+    body: "公開中の Live に出ているタイムと経過時間を消します。履歴データは消えません。",
+  },
+};
 
 function LiveResetCard({
   resetting,
