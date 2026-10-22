@@ -197,5 +197,15 @@ export type LiveStatePatch =
     /** 個別周回履歴の全置換 (Cancel/Edit で周の削除・上書きが起きたとき)。 */
     | { kind: "driver_laps"; teamId: string; value: LapDataVm[] }
     | { kind: "message"; value: RaceControlMessageVm }
-    /** 管理画面で Live 表の列定義が変わったとき。セッション状態とは独立。 */
-    | { kind: "display_live"; columns?: unknown; elapsed?: unknown };
+    /**
+     * 管理画面の列定義、または予選/決勝プリセットの自動切替。
+     * presets があるクライアントは isRace で選び、columns は単一レイアウトの互換用。
+     */
+    | {
+          kind: "display_live";
+          columns?: unknown;
+          elapsed?: unknown;
+          presets?: unknown;
+          autoPreset?: boolean;
+          pinnedPreset?: "time" | "race";
+      };

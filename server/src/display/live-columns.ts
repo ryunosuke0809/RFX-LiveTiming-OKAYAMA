@@ -250,3 +250,56 @@ function overlayToggle(def: LiveColumnToggle, rec: Record<string, unknown>): Liv
 function isLiveColumnKey(value: string): value is LiveColumnKey {
     return (LIVE_COLUMN_KEYS as readonly string[]).includes(value);
 }
+
+/** 予選・練習 (time) と決勝 (race)。Live の isRace と同じ区分。 */
+export type LivePresetMode = "time" | "race";
+
+export interface LiveColumnPresets {
+    time: LiveColumnDef[];
+    race: LiveColumnDef[];
+}
+
+/**
+ * 保存済みプリセットを既定へマージする。
+ * 未保存の側は fallback（いまの単一レイアウト）を複製する。
+ */
+export function resolveLivePresets(stored: unknown, fallback: LiveColumnDef[]): LiveColumnPresets {
+    const rec = stored && typeof stored === "object" ? (stored as Record<string, unknown>) : {};
+    return {
+        time: resolveLiveColumns("time" in rec ? rec["time"] : fallback),
+        race: resolveLiveColumns("race" in rec ? rec["race"] : fallback),
+    };
+}
+
+export function sanitizeLivePresets(input: unknown): LiveColumnPresets {
+    if (!input || typeof input !== "object") {
+        throw new Error("予選と決勝の並びを送ってください");
+    }
+    const rec = input as Record<string, unknown>;
+    if (rec["time"] === undefined || rec["race"] === undefined) {
+        throw new Error("予選と決勝の並びを両方送ってください");
+    }
+    return {
+        time: sanitizeLiveColumns(rec["time"]),
+        race: sanitizeLiveColumns(rec["race"]),
+    };
+}
+
+export function isLivePresetMode(value: unknown): value is LivePresetMode {
+    return value === "time" || value === "race";
+}
+
+/** 自動切替オンならセッション種別、オフなら固定側。 */
+export function activeLiveColumns(
+    presets: LiveColumnPresets,
+    autoPreset: boolean,
+    pinnedPreset: LivePresetMode,
+    isRace: boolean,
+): LiveColumnDef[] {
+    const mode: LivePresetMode = autoPreset ? (isRace ? "race" : "time") : pinnedPreset;
+    return presets[mode];
+}
+
+export function sameLiveColumns(a: LiveColumnDef[], b: LiveColumnDef[]): boolean {
+    return JSON.stringify(a) === JSON.stringify(b);
+}

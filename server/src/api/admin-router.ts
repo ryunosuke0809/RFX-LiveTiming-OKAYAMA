@@ -20,8 +20,12 @@ import {
     verifyPassword,
 } from "../admin/password.js";
 import { isBrowserOriginAllowed } from "../auth.js";
-import { resolveLiveColumns, sanitizeLiveColumns } from "../display/live-columns.js";
-import { sanitizeElapsedIdle } from "../display/elapsed-idle.js";
+import {
+    readLiveDisplay,
+    saveLiveDisplay,
+    toDisplayLivePatch,
+    type SaveLiveDisplayInput,
+} from "../display/live-display.js";
 import type { BroadcastHub } from "../broadcast/hub.js";
 import type { SessionStateAggregator } from "../state/aggregator.js";
 import type { LiveStatePatch } from "../state/types.js";
@@ -308,37 +312,43 @@ export function createAdminRouter(
 
     router.get("/display/live", guard, (_req, res) => {
         res.setHeader("Cache-Control", "no-store");
-        res.json(liveDisplayFromStore(store));
+        res.json({
+            ...readLiveDisplay(store),
+            liveSession: aggregator.liveSession,
+        });
     });
 
     router.put("/display/live", guard, (req, res) => {
         const actor = (req as AdminRequest).admin!;
-        const body = (req.body ?? {}) as { columns?: unknown; elapsed?: unknown };
-        if (body.columns === undefined && body.elapsed === undefined) {
-            res.status(400).json({ error: "columns or elapsed required" });
+        const body = (req.body ?? {}) as SaveLiveDisplayInput;
+        if (
+            body.columns === undefined &&
+            body.elapsed === undefined &&
+            body.presets === undefined
+        ) {
+            res.status(400).json({ error: "columns, presets or elapsed required" });
             return;
         }
         try {
-            const current = liveDisplayFromStore(store);
-            const columns =
-                body.columns !== undefined ? sanitizeLiveColumns(body.columns) : current.columns;
-            const elapsed =
-                body.elapsed !== undefined ? sanitizeElapsedIdle(body.elapsed) : current.elapsed;
-            if (body.columns !== undefined) {
-                store.setDisplayConfig("live", "columns", columns);
-                store.appendAudit(actor.username, "display.live.update", "live:columns");
+            const saved = saveLiveDisplay(store, body, aggregator.sessionMode === "race");
+            if (body.presets !== undefined || body.columns !== undefined) {
+                store.appendAudit(actor.username, "display.live.update", "live:columns", {
+                    autoPreset: saved.autoPreset,
+                    pinnedPreset: saved.pinnedPreset,
+                });
             }
             if (body.elapsed !== undefined) {
-                store.setDisplayConfig("live", "elapsed", elapsed);
                 store.appendAudit(actor.username, "display.live.elapsed", "live:elapsed");
             }
-            hub.broadcastPatches(null, [{ kind: "display_live", columns, elapsed }]);
+            hub.broadcastPatches(null, [toDisplayLivePatch(saved)]);
             logger.info("live display updated", {
                 username: actor.username,
+                presets: body.presets !== undefined,
                 columns: body.columns !== undefined,
                 elapsed: body.elapsed !== undefined,
+                autoPreset: saved.autoPreset,
             });
-            res.json({ columns, elapsed });
+            res.json({ ...saved, liveSession: aggregator.liveSession });
         } catch (err) {
             res.status(400).json({ error: (err as Error).message });
         }
@@ -416,14 +426,6 @@ export function createAdminRouter(
     });
 
     return router;
-}
-
-function liveDisplayFromStore(store: AdminStore) {
-    const cfg = store.getDisplayConfig("live");
-    return {
-        columns: resolveLiveColumns(cfg["columns"]),
-        elapsed: sanitizeElapsedIdle(cfg["elapsed"]),
-    };
 }
 
 function publicUser(store: AdminStore, id: number) {

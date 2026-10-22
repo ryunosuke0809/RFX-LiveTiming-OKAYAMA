@@ -1,15 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Standing } from "@/types/smis";
 import TimingRow from "./TimingRow";
 import ColumnToggle from "./ColumnToggle";
 import ScrollHintArea from "@/components/shared/ScrollHintArea";
 import { getTeamByStanding, getClassByStanding } from "@/data/mock";
 import { recomputeStandingsGaps } from "@/lib/format";
-import { useLiveDisplayColumns, getLiveDisplayColumns } from "@/lib/liveDisplaySync";
+import { useLiveDisplayColumns, getLiveDisplayBundle } from "@/lib/liveDisplaySync";
 import {
   resolvedToggleValue,
+  selectLiveColumns,
   visibleLiveColumns,
   visibleToggleOptions,
   withLapTimeColumnWidths,
@@ -58,31 +59,49 @@ function defByKey(defs: LiveColumnDef[], key: string): LiveColumnDef | undefined
   return defs.find((c) => c.key === key);
 }
 
+function initialToggle(isRaceMode: boolean, key: string): string {
+  const columns = selectLiveColumns(getLiveDisplayBundle(), isRaceMode);
+  return resolvedToggleValue(defByKey(columns, key), undefined);
+}
+
 export default function TimingTable({ standings, classFilter, flashKey = 0, isRaceMode = false, sectorFlashes = [], onRowClick }: TimingTableProps) {
-  const displayColumns = useLiveDisplayColumns();
+  const displayColumns = useLiveDisplayColumns(isRaceMode);
+  const displayColumnsRef = useRef(displayColumns);
+  displayColumnsRef.current = displayColumns;
+  const userToggled = useRef(false);
   const [carCol, setCarCol] = useState<CarColMode>(
-    () => resolvedToggleValue(defByKey(getLiveDisplayColumns(), "car"), undefined) as CarColMode,
+    () => initialToggle(isRaceMode, "car") as CarColMode,
   );
   const [gapCol, setGapCol] = useState<GapColMode>(
-    () => resolvedToggleValue(defByKey(getLiveDisplayColumns(), "gap"), undefined) as GapColMode,
+    () => initialToggle(isRaceMode, "gap") as GapColMode,
   );
   const [lapCol, setLapCol] = useState<LapColMode>(
-    () => resolvedToggleValue(defByKey(getLiveDisplayColumns(), "laps"), undefined) as LapColMode,
+    () => initialToggle(isRaceMode, "laps") as LapColMode,
   );
   const [pitCol, setPitCol] = useState<PitColMode>(
-    () => resolvedToggleValue(defByKey(getLiveDisplayColumns(), "pit"), undefined) as PitColMode,
+    () => initialToggle(isRaceMode, "pit") as PitColMode,
   );
   const [bestCol, setBestCol] = useState<BestColMode>(
-    () => resolvedToggleValue(defByKey(getLiveDisplayColumns(), "best"), undefined) as BestColMode,
+    () => initialToggle(isRaceMode, "best") as BestColMode,
   );
 
+  const applyToggleDefaults = (columns: LiveColumnDef[], keepUserChoice: boolean) => {
+    setCarCol((cur) => resolvedToggleValue(defByKey(columns, "car"), keepUserChoice ? cur : undefined) as CarColMode);
+    setGapCol((cur) => resolvedToggleValue(defByKey(columns, "gap"), keepUserChoice ? cur : undefined) as GapColMode);
+    setLapCol((cur) => resolvedToggleValue(defByKey(columns, "laps"), keepUserChoice ? cur : undefined) as LapColMode);
+    setPitCol((cur) => resolvedToggleValue(defByKey(columns, "pit"), keepUserChoice ? cur : undefined) as PitColMode);
+    setBestCol((cur) => resolvedToggleValue(defByKey(columns, "best"), keepUserChoice ? cur : undefined) as BestColMode);
+  };
+
   useEffect(() => {
-    setCarCol((cur) => resolvedToggleValue(defByKey(displayColumns, "car"), cur) as CarColMode);
-    setGapCol((cur) => resolvedToggleValue(defByKey(displayColumns, "gap"), cur) as GapColMode);
-    setLapCol((cur) => resolvedToggleValue(defByKey(displayColumns, "laps"), cur) as LapColMode);
-    setPitCol((cur) => resolvedToggleValue(defByKey(displayColumns, "pit"), cur) as PitColMode);
-    setBestCol((cur) => resolvedToggleValue(defByKey(displayColumns, "best"), cur) as BestColMode);
+    applyToggleDefaults(displayColumns, userToggled.current);
   }, [displayColumns]);
+
+  // 予選↔決勝の切替では、視聴中の選択よりプリセットの「初期」を優先する。
+  useEffect(() => {
+    userToggled.current = false;
+    applyToggleDefaults(displayColumnsRef.current, false);
+  }, [isRaceMode]);
 
   const columns = withLapTimeColumnWidths(
     toTableColumns(displayColumns, isRaceMode),
@@ -112,6 +131,7 @@ export default function TimingTable({ standings, classFilter, flashKey = 0, isRa
         : col.key === "best" ? bestCol
         : options[0]!.value;
       const onChange = (value: string) => {
+        userToggled.current = true;
         if (col.key === "car") setCarCol(value as CarColMode);
         else if (col.key === "gap") setGapCol(value as GapColMode);
         else if (col.key === "laps") setLapCol(value as LapColMode);

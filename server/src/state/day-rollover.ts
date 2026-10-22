@@ -2,6 +2,7 @@ import { formatYyyymmdd } from "../db/schema.js";
 import type { BroadcastHub } from "../broadcast/hub.js";
 import type { LiveSessionState } from "./session-state.js";
 import type { Logger } from "../logger.js";
+import type { LiveStatePatch } from "./types.js";
 
 /** 日付の比較間隔。長時間 sleep より定期比較の方が時刻補正・サスペンドに強い。 */
 const CHECK_INTERVAL_MS = 30_000;
@@ -21,6 +22,7 @@ export function startDayRollover(
     liveState: LiveSessionState,
     hub: BroadcastHub,
     logger: Logger,
+    onReset?: () => LiveStatePatch | null,
 ): () => void {
     let currentDay = formatYyyymmdd(new Date());
 
@@ -35,7 +37,11 @@ export function startDayRollover(
         liveState.resetForNewDay();
 
         // 購読中のクライアントを空表示へ。新規接続には snapshotProvider が空を返す。
-        hub.broadcastPatches(liveState.circuitId, [{ kind: "reset", scope: "day" }]);
+        // 日付が変わるとセッション種別は予選側に戻るので、列プリセットも合わせる。
+        const patches: LiveStatePatch[] = [{ kind: "reset", scope: "day" }];
+        const preset = onReset?.();
+        if (preset) patches.push(preset);
+        hub.broadcastPatches(liveState.circuitId, patches);
 
         logger.info("live state reset for new day", {
             previousDay,

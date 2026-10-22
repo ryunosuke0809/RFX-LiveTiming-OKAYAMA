@@ -178,18 +178,33 @@ export interface AdminElapsedIdle {
   idleDisplay: "freeze" | "blank";
 }
 
-export function adminGetLiveDisplay(): Promise<{
+export type AdminLivePresetMode = "time" | "race";
+
+export interface AdminLiveSession {
+  mode: AdminLivePresetMode;
+  roundName: string;
+}
+
+export interface AdminLiveDisplay {
   columns: AdminLiveColumn[];
   elapsed: AdminElapsedIdle;
-}> {
+  presets: { time: AdminLiveColumn[]; race: AdminLiveColumn[] };
+  autoPreset: boolean;
+  pinnedPreset: AdminLivePresetMode;
+  liveSession?: AdminLiveSession;
+}
+
+export function adminGetLiveDisplay(): Promise<AdminLiveDisplay> {
   return request("/display/live");
 }
 
-export function adminSaveLiveDisplay(
-  columns: AdminLiveColumn[],
-  elapsed: AdminElapsedIdle,
-): Promise<{ columns: AdminLiveColumn[]; elapsed: AdminElapsedIdle }> {
-  return request("/display/live", { method: "PUT", body: { columns, elapsed } });
+export function adminSaveLiveDisplay(body: {
+  presets: { time: AdminLiveColumn[]; race: AdminLiveColumn[] };
+  elapsed: AdminElapsedIdle;
+  autoPreset: boolean;
+  pinnedPreset: AdminLivePresetMode;
+}): Promise<AdminLiveDisplay> {
+  return request("/display/live", { method: "PUT", body });
 }
 
 export function adminResetLiveDisplay(): Promise<{ ok: true }> {

@@ -38,6 +38,20 @@ export class SessionStateAggregator {
         return this.state.lastPassingAt;
     }
 
+    /** ラウンド名から決めた予選 (time) / 決勝 (race)。列プリセットの切替に使う。 */
+    get sessionMode(): "race" | "time" {
+        return this.state.sessionMode;
+    }
+
+    /** 管理画面に出す、いま受信しているラウンド。 */
+    get liveSession(): { mode: "race" | "time"; roundName: string } {
+        const session = this.state.session;
+        return {
+            mode: this.state.sessionMode,
+            roundName: session?.roundNameJ || session?.roundNameE || "",
+        };
+    }
+
     /**
      * 画面上のライブ結果だけ消す（Select と同じ timing reset）。
      * SQLite の履歴は触らない。エントリー（Team）は残し、タイムだけ空にする。
@@ -1104,7 +1118,7 @@ function resolveDriver(
  * ラウンド名からセッション種別を推定する。
  * 決勝 / Race / Final / レース / Heat 等 → "race"、それ以外 (予選・専有・フリー等) → "time"。
  */
-function deriveSessionMode(
+export function deriveSessionMode(
     nameJ: string,
     nameE: string,
     type: string | null,

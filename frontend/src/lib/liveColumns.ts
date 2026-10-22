@@ -314,6 +314,45 @@ export function withLapTimeColumnWidths<
   });
 }
 
+/** 予選・練習 (time) と決勝 (race)。Live の isRace と同じ区分。 */
+export type LivePresetMode = "time" | "race";
+
+export interface LiveColumnPresets {
+  time: LiveColumnDef[];
+  race: LiveColumnDef[];
+}
+
+/** 未保存の側は fallback（いまの単一レイアウト）を使う。 */
+export function resolveLivePresets(stored: unknown, fallback: LiveColumnDef[]): LiveColumnPresets {
+  const rec = stored && typeof stored === "object" ? (stored as Record<string, unknown>) : {};
+  return {
+    time: resolveLiveColumns("time" in rec ? rec.time : fallback),
+    race: resolveLiveColumns("race" in rec ? rec.race : fallback),
+  };
+}
+
+/**
+ * 自動切替オンなら予選/決勝、オフなら固定した側の並び。
+ * プリセット未設定のサーバーは両方 fallback なので、見た目は従来どおり。
+ */
+export function selectLiveColumns(
+  source: {
+    columns: LiveColumnDef[];
+    presets: LiveColumnPresets;
+    autoPreset: boolean;
+    pinnedPreset: LivePresetMode;
+  },
+  isRace: boolean,
+): LiveColumnDef[] {
+  if (!source.autoPreset) {
+    const pinned = source.presets[source.pinnedPreset];
+    return pinned.length > 0 ? pinned : source.columns;
+  }
+  const mode: LivePresetMode = isRace ? "race" : "time";
+  const preset = source.presets[mode];
+  return preset.length > 0 ? preset : source.columns;
+}
+
 export function resolvedToggleValue(
   col: LiveColumnDef | undefined,
   current: string | undefined,

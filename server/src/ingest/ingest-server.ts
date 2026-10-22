@@ -11,6 +11,7 @@ import type {
     IngestServerMessage,
     SmisMessageKind,
 } from "../types/ingest.js";
+import type { LiveStatePatch } from "../state/types.js";
 
 const SERVER_VERSION = "0.1.0";
 
@@ -56,6 +57,7 @@ export function attachIngestServer(
     repository: TimingRepository,
     hub: BroadcastHub,
     aggregator: SessionStateAggregator,
+    afterApply?: (kind: SmisMessageKind) => LiveStatePatch | null,
 ): WebSocketServer {
     const wss = new WebSocketServer({ noServer: true });
 
@@ -93,7 +95,15 @@ export function attachIngestServer(
                 logger.warn("ingest received binary frame, ignored");
                 return;
             }
-            handleTextFrame(ws, data.toString("utf-8"), repository, hub, aggregator, logger);
+            handleTextFrame(
+                ws,
+                data.toString("utf-8"),
+                repository,
+                hub,
+                aggregator,
+                logger,
+                afterApply,
+            );
         });
 
         ws.on("close", () => {
@@ -131,6 +141,7 @@ function handleTextFrame(
     hub: BroadcastHub,
     aggregator: SessionStateAggregator,
     logger: Logger,
+    afterApply?: (kind: SmisMessageKind) => LiveStatePatch | null,
 ): void {
     let parsed: unknown;
     try {
@@ -155,6 +166,9 @@ function handleTextFrame(
     } catch (err) {
         logger.warn("aggregator threw", { error: (err as Error).message, kind: envelope.value.kind });
     }
+
+    const presetPatch = afterApply?.(envelope.value.kind);
+    if (presetPatch) patches = [...patches, presetPatch];
 
     hub.broadcastRaw(envelope.value);
     hub.broadcastPatches(

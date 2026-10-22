@@ -20,12 +20,9 @@ import {
   clearSectorEnter,
   noteSectorEnter,
 } from "@/lib/sectorEnterClock";
-import { resolveLiveColumns } from "@/lib/liveColumns";
-import { sanitizeElapsedIdle } from "@/lib/elapsedIdle";
 import {
+  applyDisplayLivePatch,
   fetchLiveDisplayColumns,
-  setElapsedIdleConfig,
-  setLiveDisplayColumns,
 } from "@/lib/liveDisplaySync";
 
 // ============================================================
@@ -117,7 +114,14 @@ type LiveStatePatch =
   | { kind: "driver_lap"; teamId: string; value: LapData }
   | { kind: "driver_laps"; teamId: string; value: LapData[] }
   | { kind: "message"; value: unknown }
-  | { kind: "display_live"; columns?: unknown; elapsed?: unknown };
+  | {
+      kind: "display_live";
+      columns?: unknown;
+      elapsed?: unknown;
+      presets?: unknown;
+      autoPreset?: boolean;
+      pinnedPreset?: "time" | "race";
+    };
 
 type ServerMessage =
   | { type: "hello" }
@@ -360,12 +364,7 @@ export function useLiveTiming(url?: string): LiveTimingData {
           break;
         }
         case "display_live":
-          if (patch.columns !== undefined) {
-            setLiveDisplayColumns(resolveLiveColumns(patch.columns));
-          }
-          if (patch.elapsed !== undefined) {
-            setElapsedIdleConfig(sanitizeElapsedIdle(patch.elapsed));
-          }
+          applyDisplayLivePatch(patch);
           break;
         default:
           break;

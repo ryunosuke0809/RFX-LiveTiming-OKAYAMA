@@ -14,8 +14,7 @@ import { LiveSessionState } from "./state/session-state.js";
 import { SessionStateAggregator } from "./state/aggregator.js";
 import { hydrateLiveStateFromDb } from "./state/hydrate.js";
 import { startDayRollover } from "./state/day-rollover.js";
-import { resolveLiveColumns } from "./display/live-columns.js";
-import { sanitizeElapsedIdle } from "./display/elapsed-idle.js";
+import { readLiveDisplay, syncActiveColumns, toDisplayLivePatch } from "./display/live-display.js";
 
 const config = loadConfig();
 const logger = new Logger(config.logLevel);
@@ -48,9 +47,14 @@ aggregator.importEntryEdits(
     adminStore.getDisplayConfig("live")["entries"],
     liveState.sessionSignature,
 );
+// 復元したラウンド（予選 / 決勝）に合わせて、公開中の列並びを揃える。
+syncActiveColumns(adminStore, aggregator.sessionMode === "race");
 
 // 日付が変わったらライブ表示を空に戻す (前日のリザルトが残り続けるのを防ぐ)
-const stopDayRollover = startDayRollover(liveState, hub, logger);
+const stopDayRollover = startDayRollover(liveState, hub, logger, () => {
+    const updated = syncActiveColumns(adminStore, aggregator.sessionMode === "race");
+    return updated ? toDisplayLivePatch(updated) : null;
+});
 
 const app = express();
 app.disable("x-powered-by");
@@ -58,13 +62,7 @@ app.use(express.json({ limit: "256kb" }));
 app.use("/api/admin", createAdminRouter(adminStore, archive, config, logger, hub, aggregator));
 app.use(
     "/api",
-    createApiRouter(repository, hub, config, archive, () => {
-        const cfg = adminStore.getDisplayConfig("live");
-        return {
-            columns: resolveLiveColumns(cfg["columns"]),
-            elapsed: sanitizeElapsedIdle(cfg["elapsed"]),
-        };
-    }),
+    createApiRouter(repository, hub, config, archive, () => readLiveDisplay(adminStore)),
 );
 
 app.get("/", (_req, res) => {
@@ -90,7 +88,13 @@ app.get("/", (_req, res) => {
 
 const httpServer = http.createServer(app);
 
-attachIngestServer(httpServer, config, logger, repository, hub, aggregator);
+attachIngestServer(httpServer, config, logger, repository, hub, aggregator, (kind) => {
+    if (kind !== "Round") return null;
+    const updated = syncActiveColumns(adminStore, aggregator.sessionMode === "race");
+    if (!updated) return null;
+    logger.info("live column preset applied", { mode: aggregator.sessionMode });
+    return toDisplayLivePatch(updated);
+});
 attachBroadcastServer(httpServer, config, logger, hub);
 
 httpServer.listen(config.port, config.host, () => {

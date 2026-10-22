@@ -7,22 +7,21 @@ import type { AppConfig } from "../config.js";
 import { requiresViewAuth } from "../config.js";
 import { isBrowserOriginAllowed } from "../auth.js";
 import { issueViewToken } from "../view-token.js";
-import type { LiveColumnDef } from "../display/live-columns.js";
-import type { ElapsedIdleConfig } from "../display/elapsed-idle.js";
+import type { LiveDisplayConfig } from "../display/live-display.js";
 
 /**
  * REST API。
  * - health / messages: 運用・デバッグ
  * - ws-token: /ws 用短期トークン発行
  * - archive/*: 過去セッション一覧・リザルト JSON / CSV
- * - display/live: Live 表の列定義と経過時間の停止設定（認証不要。管理画面の保存結果）
+ * - display/live: Live 表の列定義・予選/決勝プリセット・経過時間の停止設定（認証不要）
  */
 export function createApiRouter(
     repository: TimingRepository,
     hub: BroadcastHub,
     config: AppConfig,
     archive: ArchiveService,
-    getLiveDisplay: () => { columns: LiveColumnDef[]; elapsed: ElapsedIdleConfig },
+    getLiveDisplay: () => LiveDisplayConfig,
 ): Router {
     const router = Router();
     const tokenHits = new Map<string, { count: number; resetAt: number }>();
