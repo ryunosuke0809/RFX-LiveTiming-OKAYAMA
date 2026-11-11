@@ -57,23 +57,27 @@ interface ClassificationColumn extends TableColumn {
 /**
  * Live に単独の列が無い Lap（ベスト周）は Best の右、
  * Last Lap は同じラップのセクター（S1）の左に付ける。
+ *
+ * 表が最低幅（minW の合計）まで縮み、文字が 12px のときでも、
+ * Gap / Last Lap に 9 桁（+1:15.276）、Best / S1〜S3 に 8 桁（1:00.358）が収まる割合にしている。
+ * 幅の広い画面では文字も 1.05vw で大きくなるので、割合を下げると再びはみ出す。
  */
 const CLASSIFICATION_COLUMNS: ClassificationColumn[] = [
   { key: "p", live: "pos", minW: 36, pct: "3.5%", align: "text-center" },
   { key: "pic", live: "pic", minW: 36, pct: "3.5%", align: "text-center" },
   { key: "no", live: "nr", minW: 52, pct: "4.5%", align: "text-center" },
   { key: "class", live: "class", minW: 52, pct: "5%", align: "text-center" },
-  { key: "name", live: "driver", minW: 100, pct: "12%", align: "text-left pl-2" },
-  { key: "team", live: "car", minW: 120, pct: "14%", align: "text-left pl-2" },
-  { key: "best", live: "best", minW: 88, pct: "9%", align: "text-right pr-3" },
-  { key: "lap", live: "best", minW: 40, pct: "4%", align: "text-center" },
-  { key: "gap", live: "gap", minW: 72, pct: "7%", align: "text-right pr-3" },
-  { key: "last", live: "s1", minW: 80, pct: "8%", align: "text-right pr-3" },
-  { key: "s1", live: "s1", minW: 68, pct: "6.5%", align: "text-right pr-3" },
-  { key: "s2", live: "s2", minW: 68, pct: "6.5%", align: "text-right pr-3" },
-  { key: "s3", live: "s3", minW: 68, pct: "6%", align: "text-right pr-3" },
-  { key: "pits", live: "pit", minW: 40, pct: "4%", align: "text-center" },
-  { key: "laps", live: "laps", minW: 40, pct: "4%", align: "text-center" },
+  { key: "name", live: "driver", minW: 114, pct: "11%", align: "text-left pl-2" },
+  { key: "team", live: "car", minW: 125, pct: "12%", align: "text-left pl-2" },
+  { key: "best", live: "best", minW: 83, pct: "8%", align: "text-right pr-3" },
+  { key: "lap", live: "best", minW: 39, pct: "3.75%", align: "text-center" },
+  { key: "gap", live: "gap", minW: 88, pct: "8.5%", align: "text-right pr-3" },
+  { key: "last", live: "s1", minW: 88, pct: "8.5%", align: "text-right pr-3" },
+  { key: "s1", live: "s1", minW: 81, pct: "7.75%", align: "text-right pr-3" },
+  { key: "s2", live: "s2", minW: 81, pct: "7.75%", align: "text-right pr-3" },
+  { key: "s3", live: "s3", minW: 81, pct: "7.75%", align: "text-right pr-3" },
+  { key: "pits", live: "pit", minW: 42, pct: "4%", align: "text-center" },
+  { key: "laps", live: "laps", minW: 42, pct: "4%", align: "text-center" },
 ];
 
 const CLASSIFICATION_CELL_CLASS: Record<ClassificationKey, string> = {
@@ -83,13 +87,13 @@ const CLASSIFICATION_CELL_CLASS: Record<ClassificationKey, string> = {
   class: "py-1.5 px-2 text-center text-xs text-zinc-400",
   name: "py-1.5 pl-2 pr-1 text-left text-zinc-200 truncate",
   team: "py-1.5 pl-2 pr-1 text-left text-zinc-300 truncate max-w-[200px]",
-  best: "py-1.5 px-3 text-right font-mono font-bold text-fuchsia-400",
+  best: "py-1.5 pl-2 pr-3 text-right font-mono font-bold text-fuchsia-400",
   lap: "py-1.5 px-2 text-center text-zinc-500 font-mono text-xs",
-  gap: "py-1.5 px-3 text-right font-mono text-zinc-400",
-  last: "py-1.5 px-3 text-right font-mono text-yellow-300",
-  s1: "py-1.5 px-3 text-right font-mono text-zinc-300",
-  s2: "py-1.5 px-3 text-right font-mono text-zinc-300",
-  s3: "py-1.5 px-3 text-right font-mono text-zinc-300",
+  gap: "py-1.5 pl-2 pr-3 text-right font-mono text-zinc-400",
+  last: "py-1.5 pl-2 pr-3 text-right font-mono text-yellow-300",
+  s1: "py-1.5 pl-2 pr-3 text-right font-mono text-zinc-300",
+  s2: "py-1.5 pl-2 pr-3 text-right font-mono text-zinc-300",
+  s3: "py-1.5 pl-2 pr-3 text-right font-mono text-zinc-300",
   pits: "py-1.5 px-2 text-center font-mono text-zinc-500",
   laps: "py-1.5 px-2 text-center font-mono text-zinc-400",
 };
