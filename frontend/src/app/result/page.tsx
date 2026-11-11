@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef, type ReactNode } from "react";
 import SideMenu from "@/components/layout/SideMenu";
 import DriverDetailPanel from "@/components/shared/DriverDetailPanel";
 import ScrollHintArea, { HorizontalScrollArea } from "@/components/shared/ScrollHintArea";
@@ -40,29 +40,81 @@ import {
   stickyTdStyle,
   type TableColumn,
 } from "@/lib/timingTableLayout";
+import { useLiveDisplayBundle } from "@/lib/liveDisplaySync";
+import type { LiveColumnDef, LiveColumnKey } from "@/lib/liveColumns";
 import type { CarClass, DriverPersonalData, Standing, Team, TimeType } from "@/types/smis";
 
-const CLASSIFICATION_COLUMNS: TableColumn[] = [
-  { key: "p", minW: 36, pct: "3.5%", align: "text-center" },
-  { key: "pic", minW: 36, pct: "3.5%", align: "text-center" },
-  { key: "no", minW: 52, pct: "4.5%", align: "text-center" },
-  { key: "class", minW: 52, pct: "5%", align: "text-center" },
-  { key: "name", minW: 100, pct: "12%", align: "text-left pl-2" },
-  { key: "team", minW: 120, pct: "14%", align: "text-left pl-2" },
-  { key: "best", minW: 88, pct: "9%", align: "text-right pr-3" },
-  { key: "lap", minW: 40, pct: "4%", align: "text-center" },
-  { key: "gap", minW: 72, pct: "7%", align: "text-right pr-3" },
-  { key: "last", minW: 80, pct: "8%", align: "text-right pr-3" },
-  { key: "s1", minW: 68, pct: "6.5%", align: "text-right pr-3" },
-  { key: "s2", minW: 68, pct: "6.5%", align: "text-right pr-3" },
-  { key: "s3", minW: 68, pct: "6%", align: "text-right pr-3" },
-  { key: "pits", minW: 40, pct: "4%", align: "text-center" },
-  { key: "laps", minW: 40, pct: "4%", align: "text-center" },
+type ClassificationKey =
+  | "p" | "pic" | "no" | "class" | "name" | "team" | "best" | "lap"
+  | "gap" | "last" | "s1" | "s2" | "s3" | "pits" | "laps";
+
+interface ClassificationColumn extends TableColumn {
+  key: ClassificationKey;
+  /** 並びの基準にする Live 列。同じ Live 列に付く列どうしは、この配列の順に並ぶ。 */
+  live: LiveColumnKey;
+}
+
+/**
+ * Live に単独の列が無い Lap（ベスト周）は Best の右、
+ * Last Lap は同じラップのセクター（S1）の左に付ける。
+ */
+const CLASSIFICATION_COLUMNS: ClassificationColumn[] = [
+  { key: "p", live: "pos", minW: 36, pct: "3.5%", align: "text-center" },
+  { key: "pic", live: "pic", minW: 36, pct: "3.5%", align: "text-center" },
+  { key: "no", live: "nr", minW: 52, pct: "4.5%", align: "text-center" },
+  { key: "class", live: "class", minW: 52, pct: "5%", align: "text-center" },
+  { key: "name", live: "driver", minW: 100, pct: "12%", align: "text-left pl-2" },
+  { key: "team", live: "car", minW: 120, pct: "14%", align: "text-left pl-2" },
+  { key: "best", live: "best", minW: 88, pct: "9%", align: "text-right pr-3" },
+  { key: "lap", live: "best", minW: 40, pct: "4%", align: "text-center" },
+  { key: "gap", live: "gap", minW: 72, pct: "7%", align: "text-right pr-3" },
+  { key: "last", live: "s1", minW: 80, pct: "8%", align: "text-right pr-3" },
+  { key: "s1", live: "s1", minW: 68, pct: "6.5%", align: "text-right pr-3" },
+  { key: "s2", live: "s2", minW: 68, pct: "6.5%", align: "text-right pr-3" },
+  { key: "s3", live: "s3", minW: 68, pct: "6%", align: "text-right pr-3" },
+  { key: "pits", live: "pit", minW: 40, pct: "4%", align: "text-center" },
+  { key: "laps", live: "laps", minW: 40, pct: "4%", align: "text-center" },
 ];
 
-const CLASSIFICATION_STICKY_KEYS = ["p", "pic", "no", "class"];
-const CLASSIFICATION_FIRST_STICKY = "p";
-const CLASSIFICATION_LAST_STICKY = "class";
+const CLASSIFICATION_CELL_CLASS: Record<ClassificationKey, string> = {
+  p: "py-1.5 px-2 text-center font-bold text-white font-mono",
+  pic: "py-1.5 px-2 text-center text-zinc-400 font-mono",
+  no: "py-1.5 px-2 text-center",
+  class: "py-1.5 px-2 text-center text-xs text-zinc-400",
+  name: "py-1.5 pl-2 pr-1 text-left text-zinc-200 truncate",
+  team: "py-1.5 pl-2 pr-1 text-left text-zinc-300 truncate max-w-[200px]",
+  best: "py-1.5 px-3 text-right font-mono font-bold text-fuchsia-400",
+  lap: "py-1.5 px-2 text-center text-zinc-500 font-mono text-xs",
+  gap: "py-1.5 px-3 text-right font-mono text-zinc-400",
+  last: "py-1.5 px-3 text-right font-mono text-yellow-300",
+  s1: "py-1.5 px-3 text-right font-mono text-zinc-300",
+  s2: "py-1.5 px-3 text-right font-mono text-zinc-300",
+  s3: "py-1.5 px-3 text-right font-mono text-zinc-300",
+  pits: "py-1.5 px-2 text-center font-mono text-zinc-500",
+  laps: "py-1.5 px-2 text-center font-mono text-zinc-400",
+};
+
+const CLASSIFICATION_STICKY_KEYS = new Set<ClassificationKey>(["p", "pic", "no", "class"]);
+
+/**
+ * 管理画面で保存した Live 列の並び（予選・練習 / 決勝）にリザルト表を合わせる。
+ * 使うのは並びだけ。表示／非表示と名称はリザルトに持ち込まない。
+ */
+function orderClassificationColumns(liveColumns: LiveColumnDef[]): ClassificationColumn[] {
+  const rank = new Map(liveColumns.map((c, i) => [c.key, i]));
+  const at = (col: ClassificationColumn) => rank.get(col.live) ?? liveColumns.length;
+  return [...CLASSIFICATION_COLUMNS].sort((a, b) => at(a) - at(b));
+}
+
+/** 先頭から続く P / PIC / No. / Class だけ固定する（Live 表と同じ）。 */
+function classificationStickyKeys(columns: ClassificationColumn[]): ClassificationKey[] {
+  const keys: ClassificationKey[] = [];
+  for (const col of columns) {
+    if (!CLASSIFICATION_STICKY_KEYS.has(col.key)) break;
+    keys.push(col.key);
+  }
+  return keys;
+}
 
 // --- CSV helpers ---
 
@@ -472,6 +524,7 @@ export default function ResultPage() {
   const live = useLiveTiming();
   const liveRef = useRef(live);
   liveRef.current = live;
+  const liveDisplay = useLiveDisplayBundle();
   const isArchive = pastResult !== null;
   const isLive = !isArchive && live.hasData;
 
@@ -610,6 +663,12 @@ export default function ResultPage() {
     : isLive
       ? live.isRace
       : false;
+
+  // セッションの種類で並びを選ぶ。Live の自動切替オフ（固定）は過去セッションに持ち込まない。
+  const classificationColumns = useMemo(
+    () => orderClassificationColumns(liveDisplay.presets[isRaceMode ? "race" : "time"]),
+    [liveDisplay, isRaceMode],
+  );
 
   const sortedStandings = useMemo(() => {
     const base = classFilter
@@ -794,6 +853,7 @@ export default function ResultPage() {
             {activeTab === "classification" && (
               <ClassificationView
                 standings={sortedStandings}
+                columns={classificationColumns}
                 classFilter={classFilter}
                 sessionLabel={sessionHeadline}
                 courseLabel={
@@ -863,10 +923,11 @@ export default function ResultPage() {
 // ========== Classification (全体順位リザルト) ==========
 
 function ClassificationView({
-  standings, classFilter, sessionLabel, courseLabel, mode, onBackToLive, onDownload, onRowClick,
+  standings, columns, classFilter, sessionLabel, courseLabel, mode, onBackToLive, onDownload, onRowClick,
   getTeam, getClass,
 }: {
   standings: Standing[];
+  columns: ClassificationColumn[];
   classFilter: string | null;
   sessionLabel: string;
   courseLabel: string;
@@ -877,8 +938,12 @@ function ClassificationView({
   getTeam: (s: Standing) => Team | undefined;
   getClass: (s: Standing) => CarClass | undefined;
 }) {
-  const stickyOffsets = getStickyLeftOffsets(CLASSIFICATION_COLUMNS, CLASSIFICATION_STICKY_KEYS);
-  const headerLabels: Record<string, string> = {
+  const stickyKeys = classificationStickyKeys(columns);
+  const stickyOffsets = getStickyLeftOffsets(columns, stickyKeys);
+  const firstStickyKey = stickyKeys[0] ?? "";
+  const lastStickyKey = stickyKeys[stickyKeys.length - 1] ?? "";
+  const totalMinW = columns.reduce((sum, c) => sum + c.minW, 0);
+  const headerLabels: Record<ClassificationKey, string> = {
     p: "P", pic: "PIC", no: "No.", class: "Class", name: "Name", team: "Team",
     best: "Best Time", lap: "Lap", gap: "Gap", last: "Last Lap",
     s1: "S1", s2: "S2", s3: "S3", pits: "Pits", laps: "Laps",
@@ -931,25 +996,25 @@ function ClassificationView({
           style={{
             fontSize: "var(--timing-fs)",
             tableLayout: "fixed",
-            width: `max(100%, ${CLASSIFICATION_COLUMNS.reduce((sum, c) => sum + c.minW, 0)}px)`,
-            minWidth: `${CLASSIFICATION_COLUMNS.reduce((sum, c) => sum + c.minW, 0)}px`,
+            width: `max(100%, ${totalMinW}px)`,
+            minWidth: `${totalMinW}px`,
           }}
         >
           <colgroup>
-            {CLASSIFICATION_COLUMNS.map((col) => (
+            {columns.map((col) => (
               <col key={col.key} style={colWidthStyle(col, stickyOffsets)} />
             ))}
           </colgroup>
           <thead>
             <tr className="border-b-2 border-red-700 bg-zinc-800">
-              {CLASSIFICATION_COLUMNS.map((col) => {
+              {columns.map((col) => {
                 const isSticky = stickyOffsets.has(col.key);
                 return (
                   <th
                     key={col.key}
                     className={`py-2 px-2 text-xs font-semibold text-white uppercase tracking-wider ${col.align} ${
                       isSticky
-                        ? stickyCellClass(col.key, stickyOffsets, CLASSIFICATION_FIRST_STICKY, CLASSIFICATION_LAST_STICKY)
+                        ? stickyCellClass(col.key, stickyOffsets, firstStickyKey, lastStickyKey)
                         : ""
                     }`}
                     style={isSticky ? { left: `${stickyOffsets.get(col.key)}px` } : undefined}
@@ -967,65 +1032,55 @@ function ClassificationView({
               if (!team) return null;
               const isEven = idx % 2 === 0;
               const sticky = (colKey: string, className: string) =>
-                `${stickyCellClass(colKey, stickyOffsets, CLASSIFICATION_FIRST_STICKY, CLASSIFICATION_LAST_STICKY, isEven)} ${className}`.trim();
+                `${stickyCellClass(colKey, stickyOffsets, firstStickyKey, lastStickyKey, isEven)} ${className}`.trim();
               const stickyStyle = (colKey: string) => stickyTdStyle(colKey, stickyOffsets);
+              const carNo = (color: string) => (
+                <span className="inline-block min-w-8 h-6 px-1 rounded text-white text-[11px] font-bold leading-6 text-center" style={{ backgroundColor: color }}>{team.no}</span>
+              );
               if (s.blanked) {
                 return (
                   <tr
                     key={s.teamId}
                     className={`border-b border-zinc-800/70 ${isEven ? "bg-zinc-900/40" : "bg-zinc-900/20"}`}
                   >
-                    <td className={sticky("p", "py-1.5 px-2")} style={stickyStyle("p")} />
-                    <td className={sticky("pic", "py-1.5 px-2")} style={stickyStyle("pic")} />
-                    <td className={sticky("no", "py-1.5 px-2 text-center")} style={stickyStyle("no")}>
-                      <span className="inline-block min-w-8 h-6 px-1 rounded text-white text-[11px] font-bold leading-6 text-center" style={{ backgroundColor: "#71717a" }}>{team.no}</span>
-                    </td>
-                    <td className={sticky("class", "py-1.5 px-2")} style={stickyStyle("class")} />
-                    <td className="py-1.5 pl-2 pr-1" />
-                    <td className="py-1.5 pl-2 pr-1" />
-                    <td className="py-1.5 px-3" />
-                    <td className="py-1.5 px-2" />
-                    <td className="py-1.5 px-3" />
-                    <td className="py-1.5 px-3" />
-                    <td className="py-1.5 px-3" />
-                    <td className="py-1.5 px-3" />
-                    <td className="py-1.5 px-3" />
-                    <td className="py-1.5 px-2" />
-                    <td className="py-1.5 px-2" />
+                    {columns.map((col) => (
+                      <td key={col.key} className={sticky(col.key, CLASSIFICATION_CELL_CLASS[col.key])} style={stickyStyle(col.key)}>
+                        {col.key === "no" ? carNo("#71717a") : null}
+                      </td>
+                    ))}
                   </tr>
                 );
               }
               // Gap はサーバー計算値 (決勝=周回/タイム差、予選=ベストタイム差、60秒以上は分表記)。
               const gap = idx === 0 || !s.gap || s.gap === "—" ? "" : s.gap;
+              const cells: Record<ClassificationKey, ReactNode> = {
+                p: idx + 1,
+                pic: s.classPosition,
+                no: carNo(cls?.color || "#71717a"),
+                class: classDisplayName(cls),
+                name: getDriverName(s, team),
+                team: team.nameE,
+                best: formatTime(s.bestTime),
+                lap: s.bestTimeLap > 0 ? `L${s.bestTimeLap}` : "",
+                gap,
+                last: formatTime(s.lastLapTime),
+                s1: formatTime(s.sectors[0]?.time),
+                s2: formatTime(s.sectors[1]?.time),
+                s3: formatTime(s.sectors[2]?.time),
+                pits: s.pits,
+                laps: s.lap,
+              };
               return (
                 <tr
                   key={s.teamId}
                   onClick={() => onRowClick(s)}
                   className={`group border-b border-zinc-800/70 hover:bg-zinc-800/50 transition-colors cursor-pointer ${isEven ? "bg-zinc-900/40" : "bg-zinc-900/20"}`}
                 >
-                  <td className={sticky("p", "py-1.5 px-2 text-center font-bold text-white font-mono")} style={stickyStyle("p")}>
-                    {idx + 1}
-                  </td>
-                  <td className={sticky("pic", "py-1.5 px-2 text-center text-zinc-400 font-mono")} style={stickyStyle("pic")}>
-                    {s.classPosition}
-                  </td>
-                  <td className={sticky("no", "py-1.5 px-2 text-center")} style={stickyStyle("no")}>
-                    <span className="inline-block min-w-8 h-6 px-1 rounded text-white text-[11px] font-bold leading-6 text-center" style={{ backgroundColor: cls?.color || "#71717a" }}>{team.no}</span>
-                  </td>
-                  <td className={sticky("class", "py-1.5 px-2 text-center text-xs text-zinc-400")} style={stickyStyle("class")}>
-                    {classDisplayName(cls)}
-                  </td>
-                  <td className="py-1.5 pl-2 pr-1 text-left text-zinc-200 truncate">{getDriverName(s, team)}</td>
-                  <td className="py-1.5 pl-2 pr-1 text-left text-zinc-300 truncate max-w-[200px]">{team.nameE}</td>
-                  <td className="py-1.5 px-3 text-right font-mono font-bold text-fuchsia-400">{formatTime(s.bestTime)}</td>
-                  <td className="py-1.5 px-2 text-center text-zinc-500 font-mono text-xs">{s.bestTimeLap > 0 ? `L${s.bestTimeLap}` : ""}</td>
-                  <td className="py-1.5 px-3 text-right font-mono text-zinc-400">{gap}</td>
-                  <td className="py-1.5 px-3 text-right font-mono text-yellow-300">{formatTime(s.lastLapTime)}</td>
-                  <td className="py-1.5 px-3 text-right font-mono text-zinc-300">{formatTime(s.sectors[0]?.time)}</td>
-                  <td className="py-1.5 px-3 text-right font-mono text-zinc-300">{formatTime(s.sectors[1]?.time)}</td>
-                  <td className="py-1.5 px-3 text-right font-mono text-zinc-300">{formatTime(s.sectors[2]?.time)}</td>
-                  <td className="py-1.5 px-2 text-center font-mono text-zinc-500">{s.pits}</td>
-                  <td className="py-1.5 px-2 text-center font-mono text-zinc-400">{s.lap}</td>
+                  {columns.map((col) => (
+                    <td key={col.key} className={sticky(col.key, CLASSIFICATION_CELL_CLASS[col.key])} style={stickyStyle(col.key)}>
+                      {cells[col.key]}
+                    </td>
+                  ))}
                 </tr>
               );
             })}

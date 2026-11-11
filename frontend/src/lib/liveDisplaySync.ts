@@ -128,8 +128,8 @@ export async function fetchLiveDisplayColumns(signal?: AbortSignal): Promise<Liv
   return columns;
 }
 
-/** Live 表が使う列。自動切替オンなら予選/決勝のプリセット、オフなら固定した並び。 */
-export function useLiveDisplayColumns(isRace = false): LiveColumnDef[] {
+/** 管理画面で保存した列設定一式（予選/決勝プリセット含む）。未取得・失敗時は既定。 */
+export function useLiveDisplayBundle(): LiveDisplayBundle {
   const [bundle, setBundle] = useState<LiveDisplayBundle>(getLiveDisplayBundle);
 
   useEffect(() => {
@@ -144,7 +144,12 @@ export function useLiveDisplayColumns(isRace = false): LiveColumnDef[] {
     };
   }, []);
 
-  return selectLiveColumns(bundle, isRace);
+  return bundle;
+}
+
+/** Live 表が使う列。自動切替オンなら予選/決勝のプリセット、オフなら固定した並び。 */
+export function useLiveDisplayColumns(isRace = false): LiveColumnDef[] {
+  return selectLiveColumns(useLiveDisplayBundle(), isRace);
 }
 
 /** ELAPSED の Passing 停止設定。未取得時は既定（90秒でフリーズ）。 */
